@@ -10,7 +10,7 @@ from mpegdash.utils import (
 #global ids
 retry = 3
 download_dir = os.getcwd() # set the folder to output
-working_dir = os.getcwd() # set the folder to download emphemeral files
+working_dir = os.getcwd() # set the folder to download ephemeral files
 keyfile_path = working_dir + "/keyfile.json"
 
 #Patching the Mpegdash lib for keyID
