@@ -16,3 +16,6 @@ Downloads MPEG-DASH Cenc based drm contents by parsing the manifest if the keyID
 4. If it is of multi segments then use dashdownloader_multisegment.py
 5. Paste the mpd url in the script at the bottom inside the standalone check condition in mpd variable.
 4. Run the script after checking requirements are satisfied.
+
+## Note
+CBCS and SAMPLE-AES contents need to be manually analyzed and the script has to be modified for decrypting those content.
