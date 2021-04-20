@@ -90,7 +90,7 @@ def download_media(filename,url,epoch = 0):
             else:
                 try:
                     with open(filename, 'wb') as video_file:
-                        shutil.copyfileobj(video.raw, video_file)
+                        shutil.copyfileobj(media.raw, video_file)
                         return False #Successfully downloaded the file
                 except:
                     print("Connection error: Reattempting download of video..")
@@ -139,25 +139,25 @@ def decrypt(kid,filename):
 
 
 def handle_irregular_segments(media_info,video_title,output_path):
-    no_segment,video_url,video_kid,no_segment,audio_url,audio_kid = media_info
+    no_segment,video_url,video_kid,video_extension,no_segment,audio_url,audio_kid,audio_extension = media_info
     video_url = base_url + video_url
     audio_url = base_url + audio_url   
     video_init = video_url.replace("$Number$","init")
     audio_init = audio_url.replace("$Number$","init")
-    download_media("video_1.mp4",video_init)
-    download_media("audio_1.mp4",audio_init)
-    for count in range(2,no_segment):
+    download_media("video_0.mp4",video_init)
+    download_media("audio_0.mp4",audio_init)
+    for count in range(1,no_segment):
         video_segment_url = video_url.replace("$Number$",str(count))
         audio_segment_url = audio_url.replace("$Number$",str(count))
-        video_status = download_media(f"video_{str(count)}.mp4",video_segment_url)   
-        audio_status = download_media(f"audio_{str(count)}.mp4",audio_segment_url)
+        video_status = download_media(f"video_{str(count)}.{video_extension}",video_segment_url)   
+        audio_status = download_media(f"audio_{str(count)}.{audio_extension}",audio_segment_url)
         if(video_status):
             if os.name == "nt":
-                video_concat_command = "copy /b " + "+".join([f"video_{i}.mp4" for i in range(1,count)]) + " encrypted_video.mp4"
-                audio_concat_command = "copy /b " + "+".join([f"audio_{i}.mp4" for i in range(1,count)]) + " encrypted_audio.mp4"
+                video_concat_command = "copy /b " + "+".join([f"video_{i}.{video_extension}" for i in range(0,count)]) + " encrypted_video.mp4"
+                audio_concat_command = "copy /b " + "+".join([f"audio_{i}.{audio_extension}" for i in range(0,count)]) + " encrypted_audio.mp4"
             else:
-                video_concat_command = "cat " + " ".join([f"video_{i}.mp4" for i in range(1,count)]) + " > encrypted_video.mp4"
-                audio_concat_command = "cat " + " ".join([f"audio_{i}.mp4" for i in range(1,count)]) + " > encrypted_audio.mp4"
+                video_concat_command = "cat " + " ".join([f"video_{i}.{video_extension}" for i in range(0,count)]) + " > encrypted_video.mp4"
+                audio_concat_command = "cat " + " ".join([f"audio_{i}.{audio_extension}" for i in range(0,count)]) + " > encrypted_audio.mp4"
             os.system(video_concat_command)
             os.system(audio_concat_command)
             break
@@ -190,11 +190,15 @@ def manifest_parser(mpd_url):
                     approx_no_segments = int(running_time // 10) # aproximate of 10 sec per segment
                     print("Expected No of segments:",approx_no_segments)
                     if(content_type == "audio/mp4"):
+                        segment_extension = segment.media.split(".")[-1]
                         audio.append(approx_no_segments)
                         audio.append(segment.media)
+                        audio.append(segment_extension)
                     elif(content_type == "video/mp4"):
+                        segment_extension = segment.media.split(".")[-1]
                         video.append(approx_no_segments)
                         video.append(segment.media)
+                        video.append(segment_extension)
             for prot in repr.content_protections:
                 if(prot.value == "cenc"):
                     kId = prot.key_id.replace('-','')
