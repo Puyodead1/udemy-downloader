@@ -8,6 +8,7 @@ from mpegdash.utils import (
 )
 
 #global ids
+quality = 1080 #default to 1080p
 retry = 3
 download_dir = os.getcwd() # set the folder to output
 working_dir = os.getcwd() # set the folder to download ephemeral files
@@ -54,27 +55,26 @@ def manifest_parser(mpd_url):
     video = []
     for period in mpd.periods:
         for adapt_set in period.adaptation_sets:
-            #print(adapt_set.content_type)
             content_type = adapt_set.content_type
             for repr in adapt_set.representations:
                 base_url = repr.base_urls[0].base_url_value
                 if(content_type == "audio"):
                     audio.append(base_url)
-                elif(content_type == "video"):
+                elif(content_type == "video" and repr.height == quality):
                     video.append(base_url)
             for prot in adapt_set.content_protections:
                 if(prot.value == "cenc"):
                     kId = prot.key_id.replace('-','')
                     if(content_type == "audio"):
                         audio.append(kId)
-                    elif(content_type == "video"):
+                    elif(content_type == "video" and repr.height == quality):
                         video.append(kId)
                     break
     return video + audio
 
 def download(url,filename,count = 0):
     video = requests.get(url, stream=True)
-    if video.status_code is 200:
+    if video.status_code == 200:
         video_length = int(video.headers.get('content-length'))
         if(os.path.isfile(filename) and os.path.getsize(filename) >= video_length):
             print("Video already downloaded.. skipping write to disk..")
