@@ -1,5 +1,5 @@
 #dashdrmmultisegmentdownloader
-import os,requests,shutil,json,glob,re
+import os,requests,shutil,json,glob
 from mpegdash.parser import MPEGDASHParser
 from mpegdash.nodes import Descriptor
 from mpegdash.utils import (
@@ -14,7 +14,7 @@ working_dir = os.getcwd() + "\working_dir" # set the folder to download ephemera
 keyfile_path = download_dir + "\keyfile_test.json"
 
 if not os.path.exists(working_dir):
-    os.makedirs()
+    os.makedirs(working_dir)
 
 #Get the keys
 with open(keyfile_path,'r') as keyfile:
@@ -45,20 +45,15 @@ Descriptor.__init__ = __init__
 Descriptor.parse = parse
 Descriptor.write = write
 
-#Compiled regex time
-days = re.compile("([\d.]+)D")
-hours = re.compile("([\d.]+)H")
-minutes = re.compile("([\d.]+)M")
-seconds = re.compile("([\d.]+)S")
-
 def durationtoseconds(period):
     #Duration format in PTxDxHxMxS
     if(period[:2] == "PT"):
         period = period[2:]   
-        day = int(days.match(period).group(1)) if days.match(period) else 0 # Probably never happens
-        hour = int(hours.match(period).group(1)) if hours.match(period) else 0
-        minute = int(minutes.match(period).group(1)) if minutes.match(period) else 0
-        second = seconds.match(period).group(1)
+        day = int(period.split("D")[0] if 'D' in period else 0)
+        hour = int(period.split("H")[0].split("D")[-1]  if 'H' in period else 0)
+        minute = int(period.split("M")[0].split("H")[-1] if 'M' in period else 0)
+        second = period.split("S")[0].split("M")[-1]
+        print(day,hour,minute,second)
         total_time = float(str((day * 24 * 60 * 60) + (hour * 60 * 60) + (minute * 60) + (int(second.split('.')[0]))) + '.' + str(int(second.split('.')[-1])))
         return total_time
 
