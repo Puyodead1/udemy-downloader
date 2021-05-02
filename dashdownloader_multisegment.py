@@ -53,7 +53,7 @@ def durationtoseconds(period):
         hour = int(period.split("H")[0].split("D")[-1]  if 'H' in period else 0)
         minute = int(period.split("M")[0].split("H")[-1] if 'M' in period else 0)
         second = period.split("S")[0].split("M")[-1]
-        print(day,hour,minute,second)
+        print("Total time: " + str(day) + " days " + str(hour) + " hours " + str(minute) + " minutes and " + str(second) + " seconds")
         total_time = float(str((day * 24 * 60 * 60) + (hour * 60 * 60) + (minute * 60) + (int(second.split('.')[0]))) + '.' + str(int(second.split('.')[-1])))
         return total_time
 
@@ -171,7 +171,7 @@ def manifest_parser(mpd_url):
     running_time = durationtoseconds(mpd.media_presentation_duration)
     for period in mpd.periods:
         for adapt_set in period.adaptation_sets:
-            print(adapt_set.mime_type)
+            print("Processing " + adapt_set.mime_type)
             content_type = adapt_set.mime_type
             repr = adapt_set.representations[-1] # Max Quality
             for segment in repr.segment_templates:
