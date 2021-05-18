@@ -1,4 +1,4 @@
-# Drm Dash stream downloader - Udemy edition
+# Udemy Downloader with DRM support
 
 ## Description
 Downloads MPEG-DASH Cenc based drm contents by parsing the manifest if the keyID and key is known.
