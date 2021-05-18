@@ -1,7 +1,7 @@
 # Udemy Downloader with DRM support
 
 ## Description
-Downloads MPEG-DASH Cenc based drm contents by parsing the manifest if the keyID and key is known.
+Simple and hacky program to download a udemy course, has support for DRM videos but requires the user to aquire the decryption key (for legal reasons).
 
 ## Requirements
 1. You would need to download ffmpeg and mp4decrypter from Bento4 SDK and ensure they are in path(typing their name in cmd invokes them).
