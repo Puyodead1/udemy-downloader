@@ -1,21 +1,21 @@
-# Drm Dash stream downloader
+# Udemy Downloader with DRM support
+
+### NOTE
+This program is WIP, the code is provided as-is and i am not held resposible for any legal repercussions resulting from the use of this program.
+
+## License
+All code is licensed under the MIT license
 
 ## Description
-Downloads MPEG-DASH Cenc based drm contents by parsing the manifest if the keyID and key is known.
+Simple and hacky program to download a udemy course, has support for DRM videos but requires the user to aquire the decryption key (for legal reasons).
 
 ## Requirements
 1. You would need to download ffmpeg and mp4decrypter from Bento4 SDK and ensure they are in path(typing their name in cmd invokes them).
-2. Dash-IF conforming Manifest file having information about the cenc keyID ,PSSH box information.
-3. Basic python knowledge to edit the script's manifest parser function according to your manifest and set your prefered download location.
 
 ## Usage
-1. Clone the repository
-2. Install the requirements in requirements.txt using pip
-2. Find the manifest(mpd) file you would want to download and copy its url (Use Devtools if in a browser.)
-3. View the mpd file and check if it uses single mp4 segment or multi segments($Number_xx$.mp4)
-4. If it is of multi segments then use dashdownloader_multisegment.py
-5. Paste the mpd url in the script at the bottom inside the standalone check condition in mpd variable.
-4. Run the script after checking requirements are satisfied.
+todo
 
-## Note
-CBCS and SAMPLE-AES contents need to be manually analyzed and the script has to be modified for decrypting those content.
+# Credits
+https://github.com/Jayapraveen/Drm-Dash-stream-downloader - for the original code which this is based on
+https://github.com/alastairmccormack/pywvpssh - For code related to PSSH extraction
+https://github.com/alastairmccormack/pymp4parse/ - For code related to mp4 box parsing (used by pywvpssh)
