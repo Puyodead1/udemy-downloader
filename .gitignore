@@ -112,3 +112,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+*.mp4
+keyfile.json

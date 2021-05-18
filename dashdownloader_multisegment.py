@@ -11,7 +11,7 @@ from mpegdash.utils import (
 retry = 3
 download_dir = os.getcwd() # set the folder to output
 working_dir = os.getcwd() + "\working_dir" # set the folder to download ephemeral files
-keyfile_path = download_dir + "\keyfile_test.json"
+keyfile_path = download_dir + "\keyfile.json"
 
 if not os.path.exists(working_dir):
     os.makedirs(working_dir)
@@ -63,46 +63,35 @@ def durationtoseconds(period):
 
 def download_media(filename,url,epoch = 0):
     if(os.path.isfile(filename)):
-        media_head = requests.head(url, allow_redirects = True)
-        if media_head.status_code == 200:
-            media_length = int(media_head.headers.get("content-length"))
-            if(os.path.getsize(filename) >= media_length):
-                print("Video already downloaded.. skipping Downloading..")
-            else:
-                print("Redownloading faulty download..")
-                os.remove(filename) #Improve removing logic
-                download_media(filename,url)
-        else:
-            if (epoch > retry):
-                exit("Server doesn't support HEAD.")
-            download_media(filename,url,epoch + 1)
+        print("Segment already downloaded.. skipping..")
     else:
         media = requests.get(url, stream=True)
         media_length = int(media.headers.get("content-length"))
         if media.status_code == 200:
-            if(os.path.isfile(filename) and os.path.getsize(filename) >= video_length):
-                print("Video already downloaded.. skipping write to disk..")
+            if(os.path.isfile(filename) and os.path.getsize(filename) >= media_length):
+                print("Segment already downloaded.. skipping write to disk..")
             else:
                 try:
                     with open(filename, 'wb') as video_file:
                         shutil.copyfileobj(media.raw, video_file)
+                        print("Segment downloaded: " + filename)
                         return False #Successfully downloaded the file
                 except:
-                    print("Connection error: Reattempting download of video..")
+                    print("Connection error: Reattempting download of segment..")
                     download_media(filename,url, epoch + 1)
 
-            if os.path.getsize(filename) >= video_length:
+            if os.path.getsize(filename) >= media_length:
                 pass
             else:
-                print("Error downloaded video is faulty.. Retrying to download")
+                print("Segment is faulty.. Redownloading...")
                 download_media(filename,url, epoch + 1)
         elif(media.status_code == 404):
             print("Probably end hit!\n",url)
             return True #Probably hit the last of the file
         else:
             if (epoch > retry):
-                exit("Error Video fetching exceeded retry times.")
-            print("Error fetching video file.. Retrying to download")
+                exit("Error fetching segment, exceeded retry times.")
+            print("Error fetching segment file.. Redownloading...")
             download_media(filename,url, epoch + 1)
 
 def cleanup(path):
@@ -117,14 +106,14 @@ def cleanup(path):
 
 def mux_process(video_title,outfile):
     if os.name == "nt":
-        command = f"ffmpeg -y -i decrypted_audio.mp4 -i decrypted_video.mp4 -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=2020-00-00T70:05:30.000000Z {outfile}.mp4"
+        command = f"ffmpeg -y -i decrypted_audio.mp4 -i decrypted_video.mp4 -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=2020-00-00T70:05:30.000000Z \"{outfile}.mp4\""
     else:
         command = f"nice -n 7 ffmpeg -y -i decrypted_audio.mp4 -i decrypted_video.mp4 -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=2020-00-00T70:05:30.000000Z {outfile}.mp4"
     os.system(command)
 
-def decrypt(kid,filename):
+def decrypt(filename):
     try:
-        key = keyfile[kid.lower()]
+        key = keyfile["0"]
     except KeyError as error:
         exit("Key not found")
     if(os.name == "nt"):
@@ -134,31 +123,29 @@ def decrypt(kid,filename):
 
 
 def handle_irregular_segments(media_info,video_title,output_path):
-    no_segment,video_url,video_kid,video_extension,no_segment,audio_url,audio_kid,audio_extension = media_info
-    video_url = base_url + video_url
-    audio_url = base_url + audio_url   
-    video_init = video_url.replace("$Number$","init")
-    audio_init = audio_url.replace("$Number$","init")
-    download_media("video_0.mp4",video_init)
-    download_media("audio_0.mp4",audio_init)
+    no_segment,video_url,video_init,video_extension,no_segment,audio_url,audio_init,audio_extension = media_info
+    download_media("video_0.seg.mp4",video_init)
+    download_media("audio_0.seg.mp4",audio_init)
     for count in range(1,no_segment):
         video_segment_url = video_url.replace("$Number$",str(count))
         audio_segment_url = audio_url.replace("$Number$",str(count))
-        video_status = download_media(f"video_{str(count)}.{video_extension}",video_segment_url)   
-        audio_status = download_media(f"audio_{str(count)}.{audio_extension}",audio_segment_url)
+        video_status = download_media(f"video_{str(count)}.seg.{video_extension}",video_segment_url)   
+        audio_status = download_media(f"audio_{str(count)}.seg.{audio_extension}",audio_segment_url)
         if(video_status):
             if os.name == "nt":
-                video_concat_command = "copy /b " + "+".join([f"video_{i}.{video_extension}" for i in range(0,count)]) + " encrypted_video.mp4"
-                audio_concat_command = "copy /b " + "+".join([f"audio_{i}.{audio_extension}" for i in range(0,count)]) + " encrypted_audio.mp4"
+                video_concat_command = "copy /b " + "+".join([f"video_{i}.seg.{video_extension}" for i in range(0,count)]) + " encrypted_video.mp4"
+                audio_concat_command = "copy /b " + "+".join([f"audio_{i}.seg.{audio_extension}" for i in range(0,count)]) + " encrypted_audio.mp4"
             else:
-                video_concat_command = "cat " + " ".join([f"video_{i}.{video_extension}" for i in range(0,count)]) + " > encrypted_video.mp4"
-                audio_concat_command = "cat " + " ".join([f"audio_{i}.{audio_extension}" for i in range(0,count)]) + " > encrypted_audio.mp4"
+                video_concat_command = "cat " + " ".join([f"video_{i}.seg.{video_extension}" for i in range(0,count)]) + " > encrypted_video.mp4"
+                audio_concat_command = "cat " + " ".join([f"audio_{i}.seg.{audio_extension}" for i in range(0,count)]) + " > encrypted_audio.mp4"
+            print(video_concat_command)
+            print(audio_concat_command)
             os.system(video_concat_command)
             os.system(audio_concat_command)
+            decrypt("video")
+            decrypt("audio")
+            mux_process(video_title,output_path)
             break
-    decrypt(video_kid,"video")
-    decrypt(audio_kid,"audio")
-    mux_process(video_title,output_path)
     
 
 def manifest_parser(mpd_url):
@@ -181,36 +168,31 @@ def manifest_parser(mpd_url):
                     total_segments = running_time / segment_time
                 else:
                     print("Media segments are of inequal timeframe")
-                    print(segment.media)
-                    approx_no_segments = int(running_time // 10) # aproximate of 10 sec per segment
+                    
+                    approx_no_segments = round(running_time / 6) + 20 # aproximate of 6 sec per segment
                     print("Expected No of segments:",approx_no_segments)
                     if(content_type == "audio/mp4"):
                         segment_extension = segment.media.split(".")[-1]
                         audio.append(approx_no_segments)
                         audio.append(segment.media)
+                        audio.append(segment.initialization)
                         audio.append(segment_extension)
                     elif(content_type == "video/mp4"):
                         segment_extension = segment.media.split(".")[-1]
                         video.append(approx_no_segments)
                         video.append(segment.media)
+                        video.append(segment.initialization)
                         video.append(segment_extension)
-            for prot in repr.content_protections:
-                if(prot.value == "cenc"):
-                    kId = prot.key_id.replace('-','')
-                    if(content_type == "audio/mp4"):
-                        audio.append(kId)
-                    elif(content_type == "video/mp4"):
-                        video.append(kId)
     return video + audio
 
 
 
 if __name__ == "__main__":
-    mpd = "https://www.example.com/index.mpd"
+    mpd = "https://www.udemy.com/assets/25653992/encrypted-files/out/v1/6d2a767a83064e7fa747bedeb1841f7d/06c8dc12da2745f1b0b4e7c2c032dfef/842d4b8e2e014fbbb87c640ddc89d036/index.mpd?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE2MjEzMjc0NzAsInBhdGgiOiJvdXQvdjEvNmQyYTc2N2E4MzA2NGU3ZmE3NDdiZWRlYjE4NDFmN2QvMDZjOGRjMTJkYTI3NDVmMWIwYjRlN2MyYzAzMmRmZWYvODQyZDRiOGUyZTAxNGZiYmI4N2M2NDBkZGM4OWQwMzYvIn0.4NpalcpDz0i5SXl6UYxnxECoacfRkJBHtKx5tWlJMOQ&provider=cloudfront&v=1"
     base_url = mpd.split("index.mpd")[0]
     os.chdir(working_dir)
     media_info = manifest_parser(mpd)
-    video_title = "Title of the video"
-    output_path = download_dir + "\output_video_name"
+    video_title = "171. Editing Collision Meshes"
+    output_path = download_dir + "\\171. Editing Collision Meshes"
     handle_irregular_segments(media_info,video_title,output_path)
     cleanup(working_dir)
