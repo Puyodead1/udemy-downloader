@@ -3,6 +3,9 @@
 ### NOTE
 This program is WIP, the code is provided as-is and i am not held resposible for any legal repercussions resulting from the use of this program.
 
+## Support
+if you want help using the program and have discord, join [my discord server](https://discord.gg/5B3XVb4RRX) or use [github issues](https://github.com/Puyodead1/udemy-downloader/issues)
+
 ## License
 All code is licensed under the MIT license
 
