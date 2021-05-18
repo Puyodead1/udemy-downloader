@@ -6,12 +6,13 @@ from mpegdash.utils import (
     parse_attr_value, parse_child_nodes, parse_node_value,
     write_attr_value, write_child_node, write_node_value
 )
+from utils import extract_kid
 
 #global ids
 retry = 3
-download_dir = os.getcwd() # set the folder to output
+download_dir = os.getcwd() + '\out_dir' # set the folder to output
 working_dir = os.getcwd() + "\working_dir" # set the folder to download ephemeral files
-keyfile_path = download_dir + "\keyfile.json"
+keyfile_path = os.getcwd() + "\keyfile.json"
 
 if not os.path.exists(working_dir):
     os.makedirs(working_dir)
@@ -111,9 +112,9 @@ def mux_process(video_title,outfile):
         command = f"nice -n 7 ffmpeg -y -i decrypted_audio.mp4 -i decrypted_video.mp4 -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=2020-00-00T70:05:30.000000Z {outfile}.mp4"
     os.system(command)
 
-def decrypt(filename):
+def decrypt(kid,filename):
     try:
-        key = keyfile["0"]
+        key = keyfile[kid.lower()]
     except KeyError as error:
         exit("Key not found")
     if(os.name == "nt"):
@@ -125,7 +126,11 @@ def decrypt(filename):
 def handle_irregular_segments(media_info,video_title,output_path):
     no_segment,video_url,video_init,video_extension,no_segment,audio_url,audio_init,audio_extension = media_info
     download_media("video_0.seg.mp4",video_init)
+    video_kid = extract_kid("video_0.seg.mp4")
+    print("KID for video file is: " + video_kid)
     download_media("audio_0.seg.mp4",audio_init)
+    audio_kid = extract_kid("audio_0.seg.mp4")
+    print("KID for audio file is: " + audio_kid)
     for count in range(1,no_segment):
         video_segment_url = video_url.replace("$Number$",str(count))
         audio_segment_url = audio_url.replace("$Number$",str(count))
@@ -142,8 +147,8 @@ def handle_irregular_segments(media_info,video_title,output_path):
             print(audio_concat_command)
             os.system(video_concat_command)
             os.system(audio_concat_command)
-            decrypt("video")
-            decrypt("audio")
+            decrypt(video_kid,"video")
+            decrypt(audio_kid,"audio")
             mux_process(video_title,output_path)
             break
     
@@ -188,11 +193,11 @@ def manifest_parser(mpd_url):
 
 
 if __name__ == "__main__":
-    mpd = "https://www.udemy.com/assets/25653992/encrypted-files/out/v1/6d2a767a83064e7fa747bedeb1841f7d/06c8dc12da2745f1b0b4e7c2c032dfef/842d4b8e2e014fbbb87c640ddc89d036/index.mpd?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE2MjEzMjc0NzAsInBhdGgiOiJvdXQvdjEvNmQyYTc2N2E4MzA2NGU3ZmE3NDdiZWRlYjE4NDFmN2QvMDZjOGRjMTJkYTI3NDVmMWIwYjRlN2MyYzAzMmRmZWYvODQyZDRiOGUyZTAxNGZiYmI4N2M2NDBkZGM4OWQwMzYvIn0.4NpalcpDz0i5SXl6UYxnxECoacfRkJBHtKx5tWlJMOQ&provider=cloudfront&v=1"
+    mpd = "mpd url"
     base_url = mpd.split("index.mpd")[0]
     os.chdir(working_dir)
     media_info = manifest_parser(mpd)
-    video_title = "171. Editing Collision Meshes"
-    output_path = download_dir + "\\171. Editing Collision Meshes"
+    video_title = "175. Inverse Transforming Vectors" # the video title that gets embeded into the mp4 file metadata
+    output_path = download_dir + "\\175. Inverse Transforming Vectors" # video title used in the filename, dont append .mp4
     handle_irregular_segments(media_info,video_title,output_path)
     cleanup(working_dir)
