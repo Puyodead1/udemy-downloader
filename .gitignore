@@ -114,3 +114,5 @@ dmypy.json
 .pyre/
 *.mp4
 keyfile.json
+.env
+test_data.json
