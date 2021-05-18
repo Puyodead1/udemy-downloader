@@ -3,6 +3,9 @@
 ### NOTE
 This program is WIP, the code is provided as-is and i am not held resposible for any legal repercussions resulting from the use of this program.
 
+## License
+All code is licensed under the MIT license
+
 ## Description
 Simple and hacky program to download a udemy course, has support for DRM videos but requires the user to aquire the decryption key (for legal reasons).
 
