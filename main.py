@@ -165,9 +165,9 @@ def manifest_parser(mpd_url):
     video = []
     audio = []
     manifest = requests.get(mpd_url).text
-    with open(f"{working_dir}\\manifest.mpd",'w') as manifest_handler:
+    with open("manifest.mpd",'w') as manifest_handler:
         manifest_handler.write(manifest)
-    mpd = MPEGDASHParser.parse(f"{working_dir}\\manifest.mpd")
+    mpd = MPEGDASHParser.parse("./manifest.mpd")
     running_time = durationtoseconds(mpd.media_presentation_duration)
     for period in mpd.periods:
         for adapt_set in period.adaptation_sets:
