@@ -9,6 +9,7 @@ from mpegdash.utils import (parse_attr_value, parse_child_nodes,
                             parse_node_value, write_attr_value,
                             write_child_node, write_node_value)
 from utils import extract_kid
+from vtt_to_srt import convert
 
 load_dotenv()
 
@@ -24,6 +25,8 @@ retry = 3
 home_dir = os.getcwd()
 keyfile_path = "%s\keyfile.json" % os.getcwd()
 dl_assets = False
+dl_captions = False
+caption_locale = "en"
 quality = None  # None will download the best possible
 valid_qualities = [144, 360, 480, 720, 1080]
 
@@ -315,7 +318,7 @@ def download(url, path, filename):
     return file_size
 
 
-def process_lecture(lecture, lecture_path, lecture_dir):
+def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
     lecture_title = lecture["title"]
     lecture_asset = lecture["asset"]
     if lecture_asset["media_license_token"] == None:
@@ -380,6 +383,48 @@ def process_lecture(lecture, lecture_path, lecture_dir):
         print("> Found %s assets for lecture '%s'" %
               (len(assets), lecture_title))
 
+    # process captions
+    if dl_captions:
+        captions = []
+        for caption in lecture_asset.get("captions"):
+            if not isinstance(caption, dict):
+                continue
+            if caption.get("_class") != "caption":
+                continue
+            download_url = caption.get("url")
+            if not download_url or not isinstance(download_url, str):
+                continue
+            lang = (caption.get("language") or caption.get("srclang")
+                    or caption.get("label")
+                    or caption.get("locale_id").split("_")[0])
+            ext = "vtt" if "vtt" in download_url.rsplit(".", 1)[-1] else "srt"
+            if caption_locale == "all" or caption_locale == lang:
+                captions.append({
+                    "language": lang,
+                    "locale_id": caption.get("locale_id"),
+                    "ext": ext,
+                    "url": download_url
+                })
+
+        for caption in captions:
+            filename = f"%s. %s_%s.%s" % (lecture_index, sanitize(
+                lecture_title), caption.get("locale_id"), caption.get("ext"))
+            filename_no_ext = f"%s. %s_%s" % (lecture_index,
+                                              sanitize(lecture_title),
+                                              caption.get("locale_id"))
+            filepath = f"%s\\%s" % (lecture_dir, filename)
+
+            if os.path.isfile(filepath):
+                print("> Captions '%s' already downloaded." % filename)
+            else:
+                print(f"> Downloading captions: '%s'" % filename)
+                download(caption.get("url"), filepath, filename)
+                if caption.get("ext") == "vtt":
+                    print("> Converting captions to SRT format...")
+                    convert(lecture_dir, filename_no_ext)
+                    print("> Caption conversion complete.")
+                    os.remove(filepath)
+
 
 def parse(data):
     chapters = []
@@ -396,10 +441,10 @@ def parse(data):
             except IndexError:
                 # This is caused by there not being a starting chapter
                 lectures.append(obj)
-                lecture_path = f"%s\\%s. %s.mp4" % (download_dir,
-                                                    lectures.index(obj) + 1,
-                                                    sanitize(obj["title"]))
-                process_lecture(obj, lecture_path, download_dir)
+                lecture_index = lectures.index(obj) + 1
+                lecture_path = f"%s\\%s. %s.mp4" % (
+                    download_dir, lecture_index, sanitize(obj["title"]))
+                process_lecture(obj, lecture_index, lecture_path, download_dir)
 
     for chapter in chapters:
         chapter_dir = f"%s\\%s. %s" % (download_dir, chapters.index(chapter) +
@@ -408,10 +453,13 @@ def parse(data):
             os.mkdir(chapter_dir)
 
         for lecture in chapter["lectures"]:
-            lecture_path = f"%s\\%s. %s.mp4" % (
-                chapter_dir, chapter["lectures"].index(lecture) + 1,
-                sanitize(lecture["title"]))
-            process_lecture(lecture, lecture_path, chapter_dir)
+            lecture_index = chapter["lectures"].index(lecture) + 1
+            lecture_path = f"%s\\%s. %s.mp4" % (chapter_dir, lecture_index,
+                                                sanitize(lecture["title"]))
+            process_lecture(lecture, lecture_index, lecture_path, chapter_dir)
+    print("\n\n\n\n\n\n\n\n=====================")
+    print("All downloads completed for course!")
+    print("=====================")
 
 
 if __name__ == "__main__":
@@ -432,15 +480,33 @@ if __name__ == "__main__":
         metavar="",
     )
     parser.add_argument(
+        "-l",
+        "--lang",
+        dest="lang",
+        type=str,
+        help="The language to download for captions (Default is en)",
+        metavar="",
+    )
+    parser.add_argument(
         "--download-assets",
         dest="download_assets",
         action="store_true",
-        help="Download lecture assets along with lectures",
+        help="If specified, lecture assets will be downloaded.",
+    )
+    parser.add_argument(
+        "--download-captions",
+        dest="download_captions",
+        action="store_true",
+        help="If specified, captions will be downloaded.",
     )
 
     args = parser.parse_args()
     if args.download_assets:
         dl_assets = True
+    if args.lang:
+        caption_locale = args.lang
+    if args.download_captions:
+        dl_captions = True
     if args.quality:
         if not args.quality in valid_qualities:
             print("Invalid quality specified! %s" % quality)

@@ -71,15 +71,17 @@ You can now run `python main.py` to start downloading. The course will download 
 # Advanced Usage
 
 ```
-usage: main.py [-h] [-d] [-q] [--download-assets]
+usage: main.py [-h] [-d] [-q] [-l] [--download-assets] [--download-captions]
 
 Udemy Downloader
 
 optional arguments:
-  -h, --help         show this help message and exit
-  -d, --debug        Use test_data.json rather than fetch from the udemy api.
-  -q , --quality     Download specific video quality. (144, 360, 480, 720, 1080)
-  --download-assets  Download lecture assets along with lectures
+  -h, --help           show this help message and exit
+  -d, --debug          Use test_data.json rather than fetch from the udemy api.
+  -q , --quality       Download specific video quality. (144, 360, 480, 720, 1080)
+  -l , --lang          The language to download for captions (Default is en)
+  --download-assets    If specified, lecture assets will be downloaded.
+  --download-captions  If specified, captions will be downloaded.
 ```
 
 - Download a specific quality
@@ -88,6 +90,14 @@ optional arguments:
   - `python main.py --download-assets`
 - Download assets and specify a quality
   - `python main.py -q 360 --download-assets`
+- Download captions
+  - `python main.py --download-captions`
+- Download captions with specific language
+  - `python main.py --download-captions -l en` - English subtitles
+  - `python main.py --download-captions -l es` - Spanish subtitles
+  - `python main.py --download-captions -l it` - Italian subtitles
+  - `python main.py --download-captions -l pl` - Polish Subtitles
+  - etc
 
 # Getting an error about "Accepting the latest terms of service"?
 
