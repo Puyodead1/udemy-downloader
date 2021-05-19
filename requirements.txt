@@ -4,3 +4,5 @@ tqdm
 requests
 python-dotenv
 protobuf
+webvtt-py
+pysrt
