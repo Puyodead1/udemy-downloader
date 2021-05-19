@@ -310,7 +310,6 @@ def download(url, path, filename):
                 desc=filename)
     res = requests.get(url, headers=header, stream=True)
     res.raise_for_status()
-    print(res.status_code)
     with (open(path, 'ab')) as f:
         for chunk in res.iter_content(chunk_size=1024):
             if chunk:
