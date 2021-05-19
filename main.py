@@ -308,14 +308,55 @@ def download(url, path, filename):
                 unit='B',
                 unit_scale=True,
                 desc=filename)
-    req = requests.get(url, headers=header, stream=True)
+    res = requests.get(url, headers=header, stream=True)
+    res.raise_for_status()
+    print(res.status_code)
     with (open(path, 'ab')) as f:
-        for chunk in req.iter_content(chunk_size=1024):
+        for chunk in res.iter_content(chunk_size=1024):
             if chunk:
                 f.write(chunk)
                 pbar.update(1024)
     pbar.close()
     return file_size
+
+
+def process_caption(caption,
+                    lecture_index,
+                    lecture_title,
+                    lecture_dir,
+                    tries=0):
+    filename = f"%s. %s_%s.%s" % (lecture_index, sanitize(lecture_title),
+                                  caption.get("locale_id"), caption.get("ext"))
+    filename_no_ext = f"%s. %s_%s" % (lecture_index, sanitize(lecture_title),
+                                      caption.get("locale_id"))
+    filepath = f"%s\\%s" % (lecture_dir, filename)
+
+    if os.path.isfile(filepath):
+        print("> Captions '%s' already downloaded." % filename)
+    else:
+        print(f"> Downloading captions: '%s'" % filename)
+        try:
+            download(caption.get("url"), filepath, filename)
+        except Exception as e:
+            if tries >= 3:
+                print(
+                    f"> Error downloading captions: {e}. Exceeded retries, skipping."
+                )
+                return
+            else:
+                print(
+                    f"> Error downloading captions: {e}. Will retry {3-tries} more times."
+                )
+                process_caption(caption, lecture_index, lecture_title,
+                                lecture_dir, tries + 1)
+        if caption.get("ext") == "vtt":
+            try:
+                print("> Converting captions to SRT format...")
+                convert(lecture_dir, filename_no_ext)
+                print("> Caption conversion complete.")
+                os.remove(filepath)
+            except Exception as e:
+                print(f"> Error converting captions: {e}")
 
 
 def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
@@ -335,7 +376,11 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
                 "src"]  # best quality is the first index
 
         if not os.path.isfile(lecture_path):
-            download(lecture_url, lecture_path, lecture_title)
+            try:
+                download(lecture_url, lecture_path, lecture_title)
+            except Exception as e:
+                # We could add a retry here
+                print(f"> Error downloading lecture: {e}. Skipping...")
         else:
             print(f"> Lecture '%s' is already downloaded, skipping..." %
                   lecture_title)
@@ -377,9 +422,15 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
                                      for x in asset["download_urls"]["File"]
                                      if x["label"] == "download"), None)
                 if download_url:
-                    download(download_url,
-                             f"%s\\%s" % (lecture_dir, asset_filename),
-                             asset_filename)
+                    try:
+                        download(download_url,
+                                 f"%s\\%s" % (lecture_dir, asset_filename),
+                                 asset_filename)
+                    except Exception as e:
+                        print(
+                            f"> Error downloading lecture asset: {e}. Skipping"
+                        )
+                        continue
         print("> Found %s assets for lecture '%s'" %
               (len(assets), lecture_title))
 
@@ -407,23 +458,7 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
                 })
 
         for caption in captions:
-            filename = f"%s. %s_%s.%s" % (lecture_index, sanitize(
-                lecture_title), caption.get("locale_id"), caption.get("ext"))
-            filename_no_ext = f"%s. %s_%s" % (lecture_index,
-                                              sanitize(lecture_title),
-                                              caption.get("locale_id"))
-            filepath = f"%s\\%s" % (lecture_dir, filename)
-
-            if os.path.isfile(filepath):
-                print("> Captions '%s' already downloaded." % filename)
-            else:
-                print(f"> Downloading captions: '%s'" % filename)
-                download(caption.get("url"), filepath, filename)
-                if caption.get("ext") == "vtt":
-                    print("> Converting captions to SRT format...")
-                    convert(lecture_dir, filename_no_ext)
-                    print("> Caption conversion complete.")
-                    os.remove(filepath)
+            process_caption(caption, lecture_index, lecture_title, lecture_dir)
 
 
 def parse(data):
