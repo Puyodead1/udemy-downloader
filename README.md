@@ -108,3 +108,4 @@ optional arguments:
 - https://github.com/Jayapraveen/Drm-Dash-stream-downloader - for the original code which this is based on
 - https://github.com/alastairmccormack/pywvpssh - For code related to PSSH extraction
 - https://github.com/alastairmccormack/pymp4parse/ - For code related to mp4 box parsing (used by pywvpssh)
+- https://github.com/lbrayner/vtt-to-srt - For code related to converting subtitles from vtt to srt format
