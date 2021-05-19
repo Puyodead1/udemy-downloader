@@ -108,9 +108,9 @@ def cleanup(path):
 """
 def mux_process(video_title,lecture_working_dir,outfile):
     if os.name == "nt":
-        command = f"ffmpeg -y -i \"{lecture_working_dir}\\decrypted_audio.mp4\" -i \"{lecture_working_dir}\\decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=2020-00-00T70:05:30.000000Z \"{outfile}.mp4\""
+        command = f"ffmpeg -y -i \"{lecture_working_dir}\\decrypted_audio.mp4\" -i \"{lecture_working_dir}\\decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=2020-00-00T70:05:30.000000Z \"{outfile}\""
     else:
-        command = f"nice -n 7 ffmpeg -y -i \"{lecture_working_dir}\\decrypted_audio.mp4\" -i \"{lecture_working_dir}\\decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=2020-00-00T70:05:30.000000Z \"{outfile}.mp4\""
+        command = f"nice -n 7 ffmpeg -y -i \"{lecture_working_dir}\\decrypted_audio.mp4\" -i \"{lecture_working_dir}\\decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=2020-00-00T70:05:30.000000Z \"{outfile}\""
     os.system(command)
 
 """
@@ -252,28 +252,34 @@ def parse(data):
             if lecture_asset["media_license_token"] == None:
                 # not encrypted
                 lecture_url = lecture_asset["media_sources"][0]["src"] # best quality is the first index
-                download(lecture_url, lecture_path, lecture_title)
+                if not os.path.isfile(lecture_path):
+                    download(lecture_url, lecture_path, lecture_title)
+                else:
+                    print("Lecture " + lecture_title + " is already downloaded, skipping...")
             else:
                 # encrypted
                 print(f"Lecture %s has DRM, attempting to download" % lecture_title)
                 lecture_working_dir = "%s\%s" % (working_dir, lecture_asset["id"]) # set the folder to download ephemeral files
                 if not os.path.exists(lecture_working_dir):
                     os.mkdir(lecture_working_dir)
-                mpd_url = lecture_asset["media_sources"][1]["src"] # index 1 is the dash
-                base_url = mpd_url.split("index.mpd")[0]
-                media_info = manifest_parser(mpd_url)
-                handle_irregular_segments(media_info,lecture_title,lecture_working_dir,lecture_path)
-                cleanup(lecture_working_dir)
+                if not os.path.isfile(lecture_path):
+                    mpd_url = lecture_asset["media_sources"][1]["src"] # index 1 is the dash
+                    base_url = mpd_url.split("index.mpd")[0]
+                    media_info = manifest_parser(mpd_url)
+                    handle_irregular_segments(media_info,lecture_title,lecture_working_dir,lecture_path)
+                    cleanup(lecture_working_dir)
+                else:
+                    print("Lecture " + lecture_title + " is already downloaded, skipping...")
 
-r = requests.get(f"https://udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,title,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,media_license_token,course_is_drmed,media_sources,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000".format(course_id), headers={"Authorization": header_bearer, "x-udemy-authorization": header_bearer})
-if r.status_code == 200:
-    # loop
-    data = r.json()
-    parse(data["results"])
-else:
-    print("An error occurred while trying to fetch coure data!")
-    print(r.text)
+# r = requests.get(f"https://udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,title,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,media_license_token,course_is_drmed,media_sources,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000".format(course_id), headers={"Authorization": header_bearer, "x-udemy-authorization": header_bearer})
+# if r.status_code == 200:
+#     # loop
+#     data = r.json()
+#     parse(data["results"])
+# else:
+#     print("An error occurred while trying to fetch coure data!")
+#     print(r.text)
 
-# with open("test_data.json", encoding="utf8") as f:
-#     data = json.loads(f.read())["results"]
-#     parse(data)
+with open("test_data.json", encoding="utf8") as f:
+    data = json.loads(f.read())["results"]
+    parse(data)
