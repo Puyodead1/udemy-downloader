@@ -116,3 +116,5 @@ dmypy.json
 keyfile.json
 .env
 test_data.json
+out_dir
+working_dir
