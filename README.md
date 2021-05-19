@@ -68,6 +68,27 @@ It is up to you to aquire the key and key id.
 
 You can now run `python main.py` to start downloading. The course will download to `out_dir`, chapters are seperated into folders.
 
+# Advanced Usage
+
+```
+usage: main.py [-h] [-d] [-q] [--download-assets]
+
+Udemy Downloader
+
+optional arguments:
+  -h, --help         show this help message and exit
+  -d, --debug        Use test_data.json rather than fetch from the udemy api.
+  -q , --quality     Download specific video quality. (144, 360, 480, 720, 1080)
+  --download-assets  Download lecture assets along with lectures
+```
+
+- Download a specific quality
+  - `python main.py -q 720`
+- Download assets along with lectures
+  - `python main.py --download-assets`
+- Download assets and specify a quality
+  - `python main.py -q 360 --download-assets`
+
 # Getting an error about "Accepting the latest terms of service"?
 
 - If you are using Udemy business, you must edit `main.py` and change `udemy.com` to `<portal name>.udemy.com`
