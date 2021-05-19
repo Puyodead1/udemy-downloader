@@ -68,6 +68,10 @@ It is up to you to aquire the key and key id.
 
 You can now run `python main.py` to start downloading. The course will download to `out_dir`, chapters are seperated into folders.
 
+# Getting an error about "Accepting the latest terms of service"?
+
+- If you are using Udemy business, you must edit `main.py` and change `udemy.com` to `<portal name>.udemy.com`
+
 # Credits
 
 - https://github.com/Jayapraveen/Drm-Dash-stream-downloader - for the original code which this is based on
