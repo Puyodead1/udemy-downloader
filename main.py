@@ -242,7 +242,7 @@ def parse(data):
             chapters[-1]["lectures"].append(obj)
     
     for chapter in chapters:
-        chapter_dir = f"%s\\%s. %s" % (download_dir,chapters.index(chapter) + 1,chapter["title"])
+        chapter_dir = f"%s\\%s. %s" % (download_dir,chapters.index(chapter) + 1,sanitize(chapter["title"]))
         if not os.path.exists(chapter_dir):
             os.mkdir(chapter_dir)
 
