@@ -11,13 +11,8 @@ from mpegdash.utils import (parse_attr_value, parse_child_nodes,
 from utils import extract_kid
 from vtt_to_srt import convert
 
-load_dotenv()
-
-course_id = os.getenv("UDEMY_COURSE_ID")  # the course id to download
-bearer_token = os.getenv(
-    "UDEMY_BEARER"
-)  # you can find this in the network tab, its a request header under Authorization/x-udemy-authorization
-header_bearer = "Bearer " + bearer_token
+course_id = None
+header_bearer = None
 download_dir = "%s\out_dir" % os.getcwd()
 working_dir = "%s\working_dir" % os.getcwd(
 )  # set the folder to download segments for DRM videos
@@ -26,6 +21,7 @@ home_dir = os.getcwd()
 keyfile_path = "%s\keyfile.json" % os.getcwd()
 dl_assets = False
 dl_captions = False
+skip_lectures = False
 caption_locale = "en"
 quality = None  # None will download the best possible
 valid_qualities = [144, 360, 480, 720, 1080]
@@ -361,53 +357,55 @@ def process_caption(caption,
 def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
     lecture_title = lecture["title"]
     lecture_asset = lecture["asset"]
-    if lecture_asset["media_license_token"] == None:
-        # not encrypted
-        media_sources = lecture_asset["media_sources"]
-        if quality:  # if quality is specified, try to find the requested quality
-            lecture_url = next(
-                (x["src"]
-                 for x in media_sources if x["label"] == str(quality)),
-                media_sources[0]["src"]
-            )  # find the quality requested or return the best available
-        else:
-            lecture_url = media_sources[0][
-                "src"]  # best quality is the first index
+    if not skip_lectures:
+        if lecture_asset["media_license_token"] == None:
+            # not encrypted
+            media_sources = lecture_asset["media_sources"]
+            if quality:  # if quality is specified, try to find the requested quality
+                lecture_url = next(
+                    (x["src"]
+                     for x in media_sources if x["label"] == str(quality)),
+                    media_sources[0]["src"]
+                )  # find the quality requested or return the best available
+            else:
+                lecture_url = media_sources[0][
+                    "src"]  # best quality is the first index
 
-        if not os.path.isfile(lecture_path):
-            try:
-                download(lecture_url, lecture_path, lecture_title)
-            except Exception as e:
-                # We could add a retry here
-                print(f"> Error downloading lecture: {e}. Skipping...")
-        else:
-            print(f"> Lecture '%s' is already downloaded, skipping..." %
-                  lecture_title)
-    else:
-        # encrypted
-        print(f"> Lecture '%s' has DRM, attempting to download" %
-              lecture_title)
-        lecture_working_dir = "%s\%s" % (
-            working_dir, lecture_asset["id"]
-        )  # set the folder to download ephemeral files
-        media_sources = lecture_asset["media_sources"]
-        if not os.path.exists(lecture_working_dir):
-            os.mkdir(lecture_working_dir)
-        if not os.path.isfile(lecture_path):
-            mpd_url = next((x["src"] for x in media_sources
-                            if x["type"] == "application/dash+xml"), None)
-            if not mpd_url:
-                print("> Couldn't find dash url for lecture '%s', skipping...",
+            if not os.path.isfile(lecture_path):
+                try:
+                    download(lecture_url, lecture_path, lecture_title)
+                except Exception as e:
+                    # We could add a retry here
+                    print(f"> Error downloading lecture: {e}. Skipping...")
+            else:
+                print(f"> Lecture '%s' is already downloaded, skipping..." %
                       lecture_title)
-                return
-            base_url = mpd_url.split("index.mpd")[0]
-            media_info = manifest_parser(mpd_url)
-            handle_irregular_segments(media_info, lecture_title,
-                                      lecture_working_dir, lecture_path)
-            cleanup(lecture_working_dir)
         else:
-            print("> Lecture '%s' is already downloaded, skipping..." %
+            # encrypted
+            print(f"> Lecture '%s' has DRM, attempting to download" %
                   lecture_title)
+            lecture_working_dir = "%s\%s" % (
+                working_dir, lecture_asset["id"]
+            )  # set the folder to download ephemeral files
+            media_sources = lecture_asset["media_sources"]
+            if not os.path.exists(lecture_working_dir):
+                os.mkdir(lecture_working_dir)
+            if not os.path.isfile(lecture_path):
+                mpd_url = next((x["src"] for x in media_sources
+                                if x["type"] == "application/dash+xml"), None)
+                if not mpd_url:
+                    print(
+                        "> Couldn't find dash url for lecture '%s', skipping...",
+                        lecture_title)
+                    return
+                base_url = mpd_url.split("index.mpd")[0]
+                media_info = manifest_parser(mpd_url)
+                handle_irregular_segments(media_info, lecture_title,
+                                          lecture_working_dir, lecture_path)
+                cleanup(lecture_working_dir)
+            else:
+                print("> Lecture '%s' is already downloaded, skipping..." %
+                      lecture_title)
 
     # process assets
     if dl_assets:
@@ -506,12 +504,25 @@ if __name__ == "__main__":
         help="Use test_data.json rather than fetch from the udemy api.",
     )
     parser.add_argument(
+        "-b",
+        "--bearer",
+        dest="bearer_token",
+        type=str,
+        help="The Bearer token to use",
+    )
+    parser.add_argument(
+        "-c",
+        "--course-id",
+        dest="course_id",
+        type=str,
+        help="The ID of the course to download",
+    )
+    parser.add_argument(
         "-q",
         "--quality",
         dest="quality",
         type=int,
         help="Download specific video quality. (144, 360, 480, 720, 1080)",
-        metavar="",
     )
     parser.add_argument(
         "-l",
@@ -519,7 +530,12 @@ if __name__ == "__main__":
         dest="lang",
         type=str,
         help="The language to download for captions (Default is en)",
-        metavar="",
+    )
+    parser.add_argument(
+        "--skip-lectures",
+        dest="skip_lectures",
+        action="store_true",
+        help="If specified, lectures won't be downloaded.",
     )
     parser.add_argument(
         "--download-assets",
@@ -541,12 +557,33 @@ if __name__ == "__main__":
         caption_locale = args.lang
     if args.download_captions:
         dl_captions = True
+    if args.skip_lectures:
+        skip_lectures = True
     if args.quality:
         if not args.quality in valid_qualities:
             print("Invalid quality specified! %s" % quality)
             sys.exit(1)
         else:
             quality = args.quality
+
+    load_dotenv()
+    if args.bearer_token:
+        header_bearer = f"Bearer %s" % args.bearer_token
+    else:
+        header_bearer = f"Bearer %s" % os.getenv("UDEMY_BEARER")
+    if args.course_id:
+        course_id = args.course_id
+    else:
+        course_id = os.getenv("UDEMY_COURSE_ID")
+
+    if not course_id:
+        print("> Missing Course ID!")
+        sys.exit(1)
+    if not header_bearer:
+        print("> Missing Bearer Token!")
+        sys.exit(1)
+
+    print(f"> Using course ID {course_id}")
 
     if args.debug:
         # this is for development purposes so we dont need to make tons of requests when testing
