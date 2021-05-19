@@ -474,12 +474,12 @@ def parse(data):
                 # This is caused by there not being a starting chapter
                 lectures.append(obj)
                 lecture_index = lectures.index(obj) + 1
-                lecture_path = f"%s\\%s. %s.mp4" % (
-                    download_dir, lecture_index, sanitize(obj["title"]))
+                lecture_path = f"%s\\%s\\%s. %s.mp4" % (
+                    download_dir, course_id, lecture_index, sanitize(obj["title"]))
                 process_lecture(obj, lecture_index, lecture_path, download_dir)
 
     for chapter in chapters:
-        chapter_dir = f"%s\\%s. %s" % (download_dir, chapters.index(chapter) +
+        chapter_dir = f"%s\\%s\\%s. %s" % (download_dir, course_id, chapters.index(chapter) +
                                        1, sanitize(chapter["title"]))
         if not os.path.exists(chapter_dir):
             os.mkdir(chapter_dir)
