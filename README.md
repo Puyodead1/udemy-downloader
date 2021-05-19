@@ -3,6 +3,9 @@
 ### NOTE
 This program is WIP, the code is provided as-is and i am not held resposible for any legal repercussions resulting from the use of this program.
 
+## Support
+if you want help using the program, join [my discord server](https://discord.gg/5B3XVb4RRX) or use [github issues](https://github.com/Puyodead1/udemy-downloader/issues)
+
 ## License
 All code is licensed under the MIT license
 
@@ -13,7 +16,20 @@ Simple and hacky program to download a udemy course, has support for DRM videos 
 1. You would need to download ffmpeg and mp4decrypter from Bento4 SDK and ensure they are in path(typing their name in cmd invokes them).
 
 ## Usage
-todo
+*quick and dirty how-to*
+1. you need to open the network tab, and find the index.mpd file url
+![index mpd](https://i.imgur.com/MW78CAu.png)
+2. open the `dashdownloader_multisegment.py` file and replace ``mpd url`` with the url
+![mpd url](https://i.imgur.com/YfGSPKd.png)
+3. Change the video title and output path to whatever you want the video to be called
+![title](https://i.imgur.com/lymSmag.png)
+- ``175. Inverse Transforming Vectors`` is what your would replace
+4. rename ``keyfile.example.json`` to ``keyfile.json``
+5. open ``keyfile.json`` and enter the key id and decryption key for the video
+![keyfile example](https://i.imgur.com/naABWva.png)
+![example key and kid from console](https://i.imgur.com/awgndZA.png)
+6. run ``python dashdownloader_multisegment.py`` in the terminal to start the download.
+- make sure you have ffmpeg and mp4decrypt installed in your path
 
 # Credits
 https://github.com/Jayapraveen/Drm-Dash-stream-downloader - for the original code which this is based on
