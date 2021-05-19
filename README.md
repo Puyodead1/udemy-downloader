@@ -90,13 +90,14 @@ optional arguments:
   - `python main.py --download-assets`
 - Download assets and specify a quality
   - `python main.py -q 360 --download-assets`
-- Download captions
+- Download captions (Defaults to English)
   - `python main.py --download-captions`
 - Download captions with specific language
   - `python main.py --download-captions -l en` - English subtitles
   - `python main.py --download-captions -l es` - Spanish subtitles
   - `python main.py --download-captions -l it` - Italian subtitles
   - `python main.py --download-captions -l pl` - Polish Subtitles
+  - `python main.py --download-captions -l all` - Downloads all subtitles
   - etc
 
 # Getting an error about "Accepting the latest terms of service"?
