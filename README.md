@@ -41,18 +41,18 @@ You will need to get a few things before you can use this program:
 - open dev tools
 - go to network tab
 - in the search field, enter `api-2.0/courses`
-  ![Valid udemy api requests](https://i.imgur.com/Or371l7.png)
+- ![Valid udemy api requests](https://i.imgur.com/Or371l7.png)
 - click a random request
 - locate the `Request Headers` section
 - copy the the text after `Authorization`, it should look like `Bearer xxxxxxxxxxx`
-  ![bearer token example](https://i.imgur.com/FhQdwgD.png)
+- ![bearer token example](https://i.imgur.com/FhQdwgD.png)
 - enter this in the `.env` file after `UDEMY_BEARER=`
 
 ### Aquire Course ID
 
 - Follow above before following this
 - locate the request url field
-  ![request url](https://i.imgur.com/EUIV3bk.png)
+- ![request url](https://i.imgur.com/EUIV3bk.png)
 - copy the number after `/api-2.0/courses/` as seen highlighed in the above picture
 - enter this in the `.env` file after `UDEMY_COURSE_ID=`
 
@@ -61,8 +61,8 @@ You will need to get a few things before you can use this program:
 It is up to you to aquire the key and key id.
 
 - Enter the key and key id in the `keyfile.json`
-  ![keyfile example](https://i.imgur.com/wLPsqOR.png)
-  ![example key and kid from console](https://i.imgur.com/awgndZA.png)
+- ![keyfile example](https://i.imgur.com/wLPsqOR.png)
+- ![example key and kid from console](https://i.imgur.com/awgndZA.png)
 
 ### Start Downloading
 
