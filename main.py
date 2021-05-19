@@ -64,7 +64,7 @@ def download_media(filename,url,lecture_working_dir,epoch = 0):
                 print("Segment already downloaded.. skipping write to disk..")
             else:
                 try:
-                    pbar = tqdm(total=media_length, initial=0,unit='MB', unit_scale=True, desc=filename)
+                    pbar = tqdm(total=media_length, initial=0,unit='B', unit_scale=True, desc=filename)
                     with open(f"{lecture_working_dir}\\{filename}", 'wb') as video_file:
                         for chunk in media.iter_content(chunk_size=1024):
                             if chunk:
@@ -221,7 +221,7 @@ def download(url, path, filename):
     header = {"Range": "bytes=%s-%s" % (first_byte, file_size)}
     pbar = tqdm(
         total=file_size, initial=first_byte,
-        unit='MB', unit_scale=True, desc=filename)
+        unit='B', unit_scale=True, desc=filename)
     req = requests.get(url, headers=header, stream=True)
     with(open(path, 'ab')) as f:
         for chunk in req.iter_content(chunk_size=1024):
@@ -256,10 +256,10 @@ def parse(data):
                 if not os.path.isfile(lecture_path):
                     download(lecture_url, lecture_path, lecture_title)
                 else:
-                    print("Lecture " + lecture_title + " is already downloaded, skipping...")
+                    print(f"> Lecture '%s' is already downloaded, skipping..." % lecture_title)
             else:
                 # encrypted
-                print(f"Lecture %s has DRM, attempting to download" % lecture_title)
+                print(f"> Lecture '%s' has DRM, attempting to download" % lecture_title)
                 lecture_working_dir = "%s\%s" % (working_dir, lecture_asset["id"]) # set the folder to download ephemeral files
                 if not os.path.exists(lecture_working_dir):
                     os.mkdir(lecture_working_dir)
@@ -270,7 +270,7 @@ def parse(data):
                     handle_irregular_segments(media_info,lecture_title,lecture_working_dir,lecture_path)
                     cleanup(lecture_working_dir)
                 else:
-                    print("Lecture " + lecture_title + " is already downloaded, skipping...")
+                    print("> Lecture '%s' is already downloaded, skipping..." % lecture_title)
 
 if __name__ == "__main__":
     if debug:

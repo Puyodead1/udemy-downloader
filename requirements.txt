@@ -3,3 +3,4 @@ sanitize_filename
 tqdm
 requests
 python-dotenv
+protobuf
