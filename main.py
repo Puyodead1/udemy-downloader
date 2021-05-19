@@ -21,6 +21,7 @@ working_dir = "%s\working_dir" % os.getcwd() # set the folder to download segmen
 retry = 3
 home_dir = os.getcwd();
 keyfile_path = "%s\keyfile.json" % os.getcwd()
+debug = False # keep this to False unless you can tell what its for
 
 if not os.path.exists(working_dir):
     os.makedirs(working_dir)
@@ -271,15 +272,19 @@ def parse(data):
                 else:
                     print("Lecture " + lecture_title + " is already downloaded, skipping...")
 
-r = requests.get(f"https://udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,title,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,media_license_token,course_is_drmed,media_sources,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000".format(course_id), headers={"Authorization": header_bearer, "x-udemy-authorization": header_bearer})
-if r.status_code == 200:
-    # loop
-    data = r.json()
-    parse(data["results"])
-else:
-    print("An error occurred while trying to fetch coure data!")
-    print(r.text)
-
-# with open("test_data.json", encoding="utf8") as f:
-#     data = json.loads(f.read())["results"]
-#     parse(data)
+if __name__ == "__main__":
+    if debug:
+        # this is for development purposes so we dont need to make tons of requests when testing
+        # course data json is just stored and read from a file
+        with open("test_data.json", encoding="utf8") as f:
+            data = json.loads(f.read())["results"]
+            parse(data)
+    else:
+        print("Fetching Course data, this may take a minute...")
+        r = requests.get(f"https://udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,title,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,media_license_token,course_is_drmed,media_sources,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000".format(course_id), headers={"Authorization": header_bearer, "x-udemy-authorization": header_bearer})
+        if r.status_code == 200:
+            print("Course data retrieved!")
+            data = r.json()
+            parse(data["results"])
+        else:
+            print("An error occurred while trying to fetch the course data! " + r.text)
