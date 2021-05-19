@@ -231,15 +231,47 @@ def download(url, path, filename):
     pbar.close()
     return file_size
 
+def process_lecture(lecture, lecture_path):
+    lecture_title = lecture["title"]
+    lecture_asset = lecture["asset"]
+    if lecture_asset["media_license_token"] == None:
+        # not encrypted
+        lecture_url = lecture_asset["media_sources"][0]["src"] # best quality is the first index
+        if not os.path.isfile(lecture_path):
+            download(lecture_url, lecture_path, lecture_title)
+        else:
+            print(f"> Lecture '%s' is already downloaded, skipping..." % lecture_title)
+    else:
+        # encrypted
+        print(f"> Lecture '%s' has DRM, attempting to download" % lecture_title)
+        lecture_working_dir = "%s\%s" % (working_dir, lecture_asset["id"]) # set the folder to download ephemeral files
+        if not os.path.exists(lecture_working_dir):
+            os.mkdir(lecture_working_dir)
+        if not os.path.isfile(lecture_path):
+            mpd_url = lecture_asset["media_sources"][1]["src"] # index 1 is the dash
+            base_url = mpd_url.split("index.mpd")[0]
+            media_info = manifest_parser(mpd_url)
+            handle_irregular_segments(media_info,lecture_title,lecture_working_dir,lecture_path)
+            cleanup(lecture_working_dir)
+        else:
+            print("> Lecture '%s' is already downloaded, skipping..." % lecture_title)
+
 def parse(data):
     chapters = []
+    lectures = []
 
     for obj in data:
         if obj["_class"] == "chapter":
             obj["lectures"] = []
             chapters.append(obj)
         elif obj["_class"] == "lecture" and obj["asset"]["asset_type"] == "Video":
-            chapters[-1]["lectures"].append(obj)
+            try:
+                chapters[-1]["lectures"].append(obj)
+            except IndexError:
+                # This is caused by there not being a starting chapter
+                lectures.append(obj)
+                lecture_path = f"%s\\%s. %s.mp4" % (download_dir, lectures.index(obj) + 1, sanitize(obj["title"]))
+                process_lecture(obj, lecture_path)
     
     for chapter in chapters:
         chapter_dir = f"%s\\%s. %s" % (download_dir,chapters.index(chapter) + 1,sanitize(chapter["title"]))
@@ -247,30 +279,8 @@ def parse(data):
             os.mkdir(chapter_dir)
 
         for lecture in chapter["lectures"]:
-            lecture_title = lecture["title"]
-            lecture_path = f"%s\\%s. %s.mp4" % (chapter_dir, chapter["lectures"].index(lecture) + 1,sanitize(lecture_title))
-            lecture_asset = lecture["asset"]
-            if lecture_asset["media_license_token"] == None:
-                # not encrypted
-                lecture_url = lecture_asset["media_sources"][0]["src"] # best quality is the first index
-                if not os.path.isfile(lecture_path):
-                    download(lecture_url, lecture_path, lecture_title)
-                else:
-                    print(f"> Lecture '%s' is already downloaded, skipping..." % lecture_title)
-            else:
-                # encrypted
-                print(f"> Lecture '%s' has DRM, attempting to download" % lecture_title)
-                lecture_working_dir = "%s\%s" % (working_dir, lecture_asset["id"]) # set the folder to download ephemeral files
-                if not os.path.exists(lecture_working_dir):
-                    os.mkdir(lecture_working_dir)
-                if not os.path.isfile(lecture_path):
-                    mpd_url = lecture_asset["media_sources"][1]["src"] # index 1 is the dash
-                    base_url = mpd_url.split("index.mpd")[0]
-                    media_info = manifest_parser(mpd_url)
-                    handle_irregular_segments(media_info,lecture_title,lecture_working_dir,lecture_path)
-                    cleanup(lecture_working_dir)
-                else:
-                    print("> Lecture '%s' is already downloaded, skipping..." % lecture_title)
+            lecture_path = f"%s\\%s. %s.mp4" % (chapter_dir, chapter["lectures"].index(lecture) + 1,sanitize(lecture["title"]))
+            process_lecture(lecture, lecture_path)
 
 if __name__ == "__main__":
     if debug:
