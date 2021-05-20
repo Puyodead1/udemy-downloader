@@ -398,7 +398,6 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
                         "> Couldn't find dash url for lecture '%s', skipping...",
                         lecture_title)
                     return
-                base_url = mpd_url.split("index.mpd")[0]
                 media_info = manifest_parser(mpd_url)
                 handle_irregular_segments(media_info, lecture_title,
                                           lecture_working_dir, lecture_path)
@@ -428,6 +427,19 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
                             f"> Error downloading lecture asset: {e}. Skipping"
                         )
                         continue
+            elif asset["asset_type"] == "Article":
+                assets.append(asset)
+                asset_path = f"%s\\%s.html" % (lecture_dir,
+                                               sanitize(lecture_title))
+                with open(asset_path, 'w') as f:
+                    f.write(asset["body"])
+            elif asset["asset_type"] == "ExternalLink":
+                assets.append(asset)
+                asset_path = f"%s\\%s. External URLs.txt" % (lecture_dir,
+                                                             lecture_index)
+                with open(asset_path, 'wa') as f:
+                    f.write(f"%s : %s\n" %
+                            (asset["title"], asset["external_url"]))
         print("> Found %s assets for lecture '%s'" %
               (len(assets), lecture_title))
 
