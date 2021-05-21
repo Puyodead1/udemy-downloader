@@ -1,5 +1,9 @@
 # Udemy Downloader with DRM support
 
+![GitHub](https://img.shields.io/github/license/Puyodead1/udemy-downloader?style=for-the-badge)
+![GitHub top language](https://img.shields.io/github/languages/top/Puyodead1/udemy-downloader?style=for-the-badge)
+![Codacy grade](https://img.shields.io/codacy/grade/e14b03f576ab4b1897624dcdf6dd9557?style=for-the-badge)
+
 # NOTE
 
 This program is WIP, the code is provided as-is and I am not held resposible for any legal issues resulting from the use of this program.
