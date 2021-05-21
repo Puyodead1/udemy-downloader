@@ -437,7 +437,7 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
                 assets.append(asset)
                 asset_path = f"%s\\%s. External URLs.txt" % (lecture_dir,
                                                              lecture_index)
-                with open(asset_path, 'wa') as f:
+                with open(asset_path, 'a') as f:
                     f.write(f"%s : %s\n" %
                             (asset["title"], asset["external_url"]))
         print("> Found %s assets for lecture '%s'" %
