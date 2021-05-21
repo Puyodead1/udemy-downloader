@@ -1,5 +1,7 @@
 # Udemy Downloader with DRM support
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/27b7baba08f0412282b71d734b70f777)](https://app.codacy.com/gh/Puyodead1/udemy-downloader?utm_source=github.com&utm_medium=referral&utm_content=Puyodead1/udemy-downloader&utm_campaign=Badge_Grade_Settings)
+
 # NOTE
 
 This program is WIP, the code is provided as-is and I am not held resposible for any legal issues resulting from the use of this program.
