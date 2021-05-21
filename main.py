@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from mpegdash.parser import MPEGDASHParser
 from utils import extract_kid
 from vtt_to_srt import convert
+from downloader import FileDownloader
 
 download_dir = os.path.join(os.getcwd(), "out_dir")
 working_dir = os.path.join(os.getcwd(), "working_dir")
@@ -12,6 +13,7 @@ retry = 3
 home_dir = os.getcwd()
 keyfile_path = os.path.join(os.getcwd(), "keyfile.json")
 valid_qualities = [144, 360, 480, 720, 1080]
+downloader = None
 
 if not os.path.exists(working_dir):
     os.makedirs(working_dir)
@@ -115,13 +117,12 @@ def cleanup(path):
     @author Jayapraveen
     """
     leftover_files = glob.glob(path + '/*.mp4', recursive=True)
-    mpd_files = glob.glob(path + '/*.mpd', recursive=True)
-    leftover_files = leftover_files + mpd_files
     for file_list in leftover_files:
         try:
             os.remove(file_list)
         except OSError:
             print(f"Error deleting file: {file_list}")
+    os.removedirs(path)
 
 
 def mux_process(video_title, lecture_working_dir, outfile):
@@ -147,30 +148,30 @@ def decrypt(kid, filename, lecture_working_dir):
     """
     try:
         key = keyfile[kid.lower()]
-    except KeyError as error:
+    except KeyError:
         exit("Key not found")
     if (os.name == "nt"):
-        os.system("mp4decrypt --key 1:{} \"{}\" \"{}\"".format(
+        code = os.system("mp4decrypt --key 1:{0} \"{1}\" \"{2}\"".format(
             key,
             os.path.join(lecture_working_dir,
-                         "encrypted_{}.mp4".format(filename)),
+                         "encrypted_{0}.mp4".format(filename)),
             os.path.join(lecture_working_dir,
-                         "decrypted{}.mp4".format(filename))))
+                         "decrypted_{0}.mp4".format(filename))))
     else:
-        os.system("nice -n 7 mp4decrypt --key 1:{} \"{}\" \"{}\"".format(
+        os.system("nice -n 7 mp4decrypt --key 1:{0} \"{1}\" \"{2}\"".format(
             key,
             os.path.join(lecture_working_dir,
-                         "encrypted_{}.mp4".format(filename)),
+                         "encrypted_{0}.mp4".format(filename)),
             os.path.join(lecture_working_dir,
-                         "decrypted{}.mp4".format(filename))))
+                         "decrypted_{0}.mp4".format(filename))))
 
 
-def handle_irregular_segments(media_info, video_title, lecture_working_dir,
-                              output_path):
+def handle_segments(media_info, video_title, lecture_working_dir, output_path):
     """
     @author Jayapraveen
     """
     no_segment, video_url, video_init, video_extension, no_segment, audio_url, audio_init, audio_extension = media_info
+    no_segment += 10  # because the download_media function relies on hittin a 404 to know when to finish
     download_media("video_0.seg.mp4", video_init, lecture_working_dir)
     video_kid = extract_kid(
         os.path.join(lecture_working_dir, "video_0.seg.mp4"))
@@ -179,7 +180,7 @@ def handle_irregular_segments(media_info, video_title, lecture_working_dir,
     audio_kid = extract_kid(
         os.path.join(lecture_working_dir, "audio_0.seg.mp4"))
     print("KID for audio file is: " + audio_kid)
-    for count in range(1, no_segment):
+    for count in range(1, no_segment + 4):
         video_segment_url = video_url.replace("$Number$", str(count))
         audio_segment_url = audio_url.replace("$Number$", str(count))
         video_status = download_media(
@@ -214,73 +215,138 @@ def handle_irregular_segments(media_info, video_title, lecture_working_dir,
             decrypt(audio_kid, "audio", lecture_working_dir)
             os.chdir(home_dir)
             mux_process(video_title, lecture_working_dir, output_path)
+            cleanup(lecture_working_dir)
             break
 
 
-def manifest_parser(mpd_url):
+def handle_segments_threaded(media_info, video_title, lecture_working_dir,
+                             output_path):
+    """
+    @author Jayapraveen
+    """
+    no_segment, video_url, video_init, video_extension, no_segment, audio_url, audio_init, audio_extension = media_info
+    download_media("video_0.seg.mp4", video_init, lecture_working_dir)
+    video_kid = extract_kid(
+        os.path.join(lecture_working_dir, "video_0.seg.mp4"))
+    print("KID for video file is: " + video_kid)
+    download_media("audio_0.seg.mp4", audio_init, lecture_working_dir)
+    audio_kid = extract_kid(
+        os.path.join(lecture_working_dir, "audio_0.seg.mp4"))
+    print("KID for audio file is: " + audio_kid)
+
+    vbar = tqdm(total=no_segment,
+                initial=1,
+                unit='Video Segments',
+                desc=video_title + " (Video)")
+    abar = tqdm(total=no_segment,
+                initial=1,
+                unit='Audio Segments',
+                desc=video_title + " (Audio)")
+
+    threads = []
+
+    for count in range(1, no_segment):
+        video_filename = f"video_{str(count)}.seg.{video_extension}"
+        video_path = os.path.join(lecture_working_dir, video_filename)
+        video_segment_url = video_url.replace("$Number$", str(count))
+        video = downloader.get_file(video_segment_url, video_path,
+                                    video_filename, vbar)
+        threads.append(video)
+
+    for count in range(1, no_segment):
+        audio_filename = f"audio_{str(count)}.seg.{audio_extension}"
+        audio_path = os.path.join(lecture_working_dir, audio_filename)
+        audio_segment_url = audio_url.replace("$Number$", str(count))
+        audio = downloader.get_file(audio_segment_url, audio_path,
+                                    audio_filename, abar)
+        threads.append(audio)
+
+    for x in threads:
+        x.join()
+
+    os.chdir(lecture_working_dir)
+    if os.name == "nt":
+        video_concat_command = "copy /b " + "+".join(
+            [f"video_{i}.seg.{video_extension}"
+             for i in range(0, count)]) + " encrypted_video.mp4"
+        audio_concat_command = "copy /b " + "+".join(
+            [f"audio_{i}.seg.{audio_extension}"
+             for i in range(0, count)]) + " encrypted_audio.mp4"
+    else:
+        video_concat_command = "cat " + " ".join(
+            [f"video_{i}.seg.{video_extension}"
+             for i in range(0, count)]) + " > encrypted_video.mp4"
+        audio_concat_command = "cat " + " ".join(
+            [f"audio_{i}.seg.{audio_extension}"
+             for i in range(0, count)]) + " > encrypted_audio.mp4"
+    os.system(video_concat_command)
+    os.system(audio_concat_command)
+    decrypt(video_kid, "video", lecture_working_dir)
+    decrypt(audio_kid, "audio", lecture_working_dir)
+    os.chdir(home_dir)
+    mux_process(video_title, lecture_working_dir, output_path)
+    cleanup(lecture_working_dir)
+
+
+def manifest_parser(mpd_url, quality):
     """
     @author Jayapraveen
     """
     video = []
     audio = []
-    manifest = requests.get(mpd_url).text
-    with open("manifest.mpd", 'w') as manifest_handler:
-        manifest_handler.write(manifest)
-    mpd = MPEGDASHParser.parse("./manifest.mpd")
-    running_time = durationtoseconds(mpd.media_presentation_duration)
+    mpd = MPEGDASHParser.parse(mpd_url)
     for period in mpd.periods:
         for adapt_set in period.adaptation_sets:
             print("Processing " + adapt_set.mime_type)
             content_type = adapt_set.mime_type
-            if quality and content_type == "video/mp4":
-                print(adapt_set.representations[0].height, quality)
-                repr = next((x for x in adapt_set.representations
-                             if x.height == quality), None)
-                if not repr:
-                    qualities = []
-                    for rep in adapt_set.representations:
-                        qualities.append(rep.height)
-                    print(quality, qualities)
-                    if quality < qualities[0]:
-                        # they want a lower quality than whats available
-                        repr = adapt_set.representations[0]  # Lowest Quality
-                    elif quality > qualities[-1]:
-                        # they want a higher quality than whats available
-                        repr = adapt_set.representations[-1]  # Max Quality
-                    print(
-                        "> Could not find video with requested quality, falling back to closest!"
-                    )
-                    print("> Using quality of %s" % repr.height)
+            if content_type == "video/mp4":
+                if quality:
+                    repr = next((x for x in adapt_set.representations
+                                 if x.height == quality), None)
+                    if not repr:
+                        qualities = []
+                        for rep in adapt_set.representations:
+                            qualities.append(rep.height)
+                        if quality < qualities[0]:
+                            # they want a lower quality than whats available
+                            repr = adapt_set.representations[
+                                0]  # Lowest Quality
+                        elif quality > qualities[-1]:
+                            # they want a higher quality than whats available
+                            repr = adapt_set.representations[-1]  # Max Quality
+                        print(
+                            "> Could not find video with requested quality, falling back to closest!"
+                        )
+                        print("> Using quality of %s" % repr.height)
+                    else:
+                        print("> Found MPD representation with quality %s" %
+                              repr.height)
                 else:
-                    print("> Found MPD representation with quality %s" %
-                          repr.height)
-            else:
-                repr = adapt_set.representations[-1]  # Max Quality
-                print("> Using max quality of %s" % repr.height)
-            for segment in repr.segment_templates:
-                if (segment.duration):
-                    print("Media segments are of equal timeframe")
-                    segment_time = segment.duration / segment.timescale
-                    total_segments = running_time / segment_time
-                else:
-                    print("Media segments are of inequal timeframe")
+                    repr = adapt_set.representations[-1]  # Max Quality
+                    print("> Using max quality of %s" % repr.height)
+            segment_count = 0
 
-                    approx_no_segments = round(
-                        running_time /
-                        6) + 10  # aproximate of 6 sec per segment
-                    print("Expected No of segments:", approx_no_segments)
-                    if (content_type == "audio/mp4"):
-                        segment_extension = segment.media.split(".")[-1]
-                        audio.append(approx_no_segments)
-                        audio.append(segment.media)
-                        audio.append(segment.initialization)
-                        audio.append(segment_extension)
-                    elif (content_type == "video/mp4"):
-                        segment_extension = segment.media.split(".")[-1]
-                        video.append(approx_no_segments)
-                        video.append(segment.media)
-                        video.append(segment.initialization)
-                        video.append(segment_extension)
+            segment = repr.segment_templates[0]
+            timeline = segment.segment_timelines[0]
+            segment_count += len(timeline.Ss)
+            for s in timeline.Ss:
+                if s.r:
+                    segment_count += s.r
+
+            print("Expected No of segments:", segment_count)
+            if (content_type == "audio/mp4"):
+                segment_extension = segment.media.split(".")[-1]
+                audio.append(segment_count)
+                audio.append(segment.media)
+                audio.append(segment.initialization)
+                audio.append(segment_extension)
+            elif (content_type == "video/mp4"):
+                segment_extension = segment.media.split(".")[-1]
+                video.append(segment_count)
+                video.append(segment.media)
+                video.append(segment.initialization)
+                video.append(segment_extension)
+
     return video + audio
 
 
@@ -316,6 +382,8 @@ def process_caption(caption,
                     lecture_index,
                     lecture_title,
                     lecture_dir,
+                    use_threaded_downloader,
+                    threads,
                     tries=0):
     filename = f"%s. %s_%s.%s" % (lecture_index, sanitize(lecture_title),
                                   caption.get("locale_id"), caption.get("ext"))
@@ -328,7 +396,12 @@ def process_caption(caption,
     else:
         print(f"> Downloading captions: '%s'" % filename)
         try:
-            download(caption.get("url"), filepath, filename)
+            if use_threaded_downloader:
+                thread = downloader.get_file(caption.get("url"), filepath,
+                                             filename)
+                thread.join()
+            else:
+                download(caption.get("url"), filepath, filename)
         except Exception as e:
             if tries >= 3:
                 print(
@@ -340,7 +413,8 @@ def process_caption(caption,
                     f"> Error downloading captions: {e}. Will retry {3-tries} more times."
                 )
                 process_caption(caption, lecture_index, lecture_title,
-                                lecture_dir, tries + 1)
+                                lecture_dir, use_threaded_downloader, threads,
+                                tries + 1)
         if caption.get("ext") == "vtt":
             try:
                 print("> Converting captions to SRT format...")
@@ -352,7 +426,8 @@ def process_caption(caption,
 
 
 def process_lecture(lecture, lecture_index, lecture_path, lecture_dir, quality,
-                    skip_lectures, dl_assets, dl_captions, caption_locale):
+                    skip_lectures, dl_assets, dl_captions, caption_locale,
+                    use_threaded_downloader):
     lecture_title = lecture["title"]
     lecture_asset = lecture["asset"]
     if not skip_lectures:
@@ -371,7 +446,12 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir, quality,
 
             if not os.path.isfile(lecture_path):
                 try:
-                    download(lecture_url, lecture_path, lecture_title)
+                    if use_threaded_downloader:
+                        thread = downloader.get_file(lecture_url, lecture_path,
+                                                     lecture_title)
+                        thread.join()
+                    else:
+                        download(lecture_url, lecture_path, lecture_title)
                 except Exception as e:
                     # We could add a retry here
                     print(f"> Error downloading lecture: {e}. Skipping...")
@@ -396,10 +476,13 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir, quality,
                         "> Couldn't find dash url for lecture '%s', skipping...",
                         lecture_title)
                     return
-                media_info = manifest_parser(mpd_url)
-                handle_irregular_segments(media_info, lecture_title,
-                                          lecture_working_dir, lecture_path)
-                cleanup(lecture_working_dir)
+                media_info = manifest_parser(mpd_url, quality)
+                if use_threaded_downloader:
+                    handle_segments_threaded(media_info, lecture_title,
+                                             lecture_working_dir, lecture_path)
+                else:
+                    handle_segments(media_info, lecture_title,
+                                    lecture_working_dir, lecture_path)
             else:
                 print("> Lecture '%s' is already downloaded, skipping..." %
                       lecture_title)
@@ -418,9 +501,16 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir, quality,
                                      if x["label"] == "download"), None)
                 if download_url:
                     try:
-                        download(download_url,
-                                 os.path.join(lecture_dir, asset_filename),
-                                 asset_filename)
+                        if use_threaded_downloader:
+                            thread = downloader.get_file(
+                                download_url,
+                                os.path.join(lecture_dir, asset_filename),
+                                asset_filename)
+                            thread.join()
+                        else:
+                            download(download_url,
+                                     os.path.join(lecture_dir, asset_filename),
+                                     asset_filename)
                     except Exception as e:
                         print(
                             f"> Error downloading lecture asset: {e}. Skipping"
@@ -472,11 +562,12 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir, quality,
                 })
 
         for caption in captions:
-            process_caption(caption, lecture_index, lecture_title, lecture_dir)
+            process_caption(caption, lecture_index, lecture_title, lecture_dir,
+                            use_threaded_downloader)
 
 
 def parse(data, course_id, course_name, skip_lectures, dl_assets, dl_captions,
-          quality, caption_locale):
+          quality, caption_locale, use_threaded_downloader):
     course_dir = os.path.join(download_dir, course_name)
     if not os.path.exists(course_dir):
         os.mkdir(course_dir)
@@ -498,9 +589,18 @@ def parse(data, course_id, course_name, skip_lectures, dl_assets, dl_captions,
                 lecture_path = os.path.join(
                     course_dir, "{}. {}.mp4".format(lecture_index,
                                                     sanitize(obj["title"])))
-                process_lecture(obj, lecture_index, lecture_path, download_dir,
-                                quality, skip_lectures, dl_assets, dl_captions,
-                                caption_locale)
+                process_lecture(
+                    obj,
+                    lecture_index,
+                    lecture_path,
+                    download_dir,
+                    quality,
+                    skip_lectures,
+                    dl_assets,
+                    dl_captions,
+                    caption_locale,
+                    use_threaded_downloader,
+                )
 
     for chapter in chapters:
         chapter_dir = os.path.join(
@@ -516,7 +616,7 @@ def parse(data, course_id, course_name, skip_lectures, dl_assets, dl_captions,
                                                  sanitize(lecture["title"])))
             process_lecture(lecture, lecture_index, lecture_path, chapter_dir,
                             quality, skip_lectures, dl_assets, dl_captions,
-                            caption_locale)
+                            caption_locale, use_threaded_downloader)
     print("\n\n\n\n\n\n\n\n=====================")
     print("All downloads completed for course!")
     print("=====================")
@@ -572,18 +672,19 @@ if __name__ == "__main__":
         help="The Bearer token to use",
     )
     parser.add_argument(
-        "-d",
-        "--debug",
-        dest="debug",
-        action="store_true",
-        help="Use test_data.json rather than fetch from the udemy api.",
-    )
-    parser.add_argument(
         "-q",
         "--quality",
         dest="quality",
         type=int,
         help="Download specific video quality. (144, 360, 480, 720, 1080)",
+    )
+    parser.add_argument(
+        "-t",
+        "--threads",
+        dest="threads",
+        type=int,
+        help=
+        "Max number of threads to use when using the threaded downloader (default 10)",
     )
     parser.add_argument(
         "-l",
@@ -610,6 +711,19 @@ if __name__ == "__main__":
         action="store_true",
         help="If specified, captions will be downloaded.",
     )
+    parser.add_argument(
+        "--use-threaded-downloader",
+        dest="use_threaded_downloader",
+        action="store_true",
+        help="If specified, the experimental threaded downloader will be used",
+    )
+    parser.add_argument(
+        "-d",
+        "--debug",
+        dest="debug",
+        action="store_true",
+        help="Use test_data.json rather than fetch from the udemy api.",
+    )
 
     dl_assets = False
     skip_lectures = False
@@ -619,6 +733,8 @@ if __name__ == "__main__":
     bearer_token = None
     portal_name = None
     course_name = None
+    use_threaded_downloader = False
+    threads = 10
 
     args = parser.parse_args()
     if args.download_assets:
@@ -635,6 +751,11 @@ if __name__ == "__main__":
             sys.exit(1)
         else:
             quality = args.quality
+    if args.use_threaded_downloader:
+        use_threaded_downloader = args.use_threaded_downloader
+    if args.threads:
+        threads = args.threads
+    downloader = FileDownloader(max_threads=threads)
 
     load_dotenv()
     if args.bearer_token:
@@ -693,7 +814,8 @@ if __name__ == "__main__":
             course_data = json.loads(f.read())
             parse(course_data["results"], course_id, course_name,
                   skip_lectures, dl_assets, dl_captions, quality,
-                  caption_locale)
+                  caption_locale, use_threaded_downloader)
     else:
         parse(course_data["results"], course_id, course_name, skip_lectures,
-              dl_assets, dl_captions, quality, caption_locale)
+              dl_assets, dl_captions, quality, caption_locale,
+              use_threaded_downloader)

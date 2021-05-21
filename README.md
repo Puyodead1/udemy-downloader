@@ -68,8 +68,8 @@ You can now run `python main.py` to start downloading. The course will download 
 # Advanced Usage
 
 ```
-usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-d] [-q QUALITY] [-l LANG] [--skip-lectures] [--download-assets]
-               [--download-captions]
+usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-t THREADS] [-l LANG] [--skip-lectures] [--download-assets]
+               [--download-captions] [--use-threaded-downloader] [-d]
 
 Udemy Downloader
 
@@ -79,13 +79,15 @@ optional arguments:
                         The URL of the course to download
   -b BEARER_TOKEN, --bearer BEARER_TOKEN
                         The Bearer token to use
-  -d, --debug           Use test_data.json rather than fetch from the udemy api.
   -q QUALITY, --quality QUALITY
                         Download specific video quality. (144, 360, 480, 720, 1080)
+  -t THREADS, --threads THREADS
+                        Max number of threads to use when using the threaded downloader (default 10)
   -l LANG, --lang LANG  The language to download for captions (Default is en)
   --skip-lectures       If specified, lectures won't be downloaded.
   --download-assets     If specified, lecture assets will be downloaded.
   --download-captions   If specified, captions will be downloaded.
+  --use-threaded-downloader If specified, the experimental threaded downloader will be used
 ```
 
 - Passing a Bearer Token and Course ID as an argument
@@ -107,8 +109,12 @@ optional arguments:
   - `python main.py -c <Course URL> --download-captions -l all` - Downloads all subtitles
   - etc
 - Skip downloading lecture videos
-  - `python main.py --skip-lectures --download-captions` - Downloads only captions
-  - `python main.py --skip-lectures --download-assets` - Downloads only assets
+  - `python main.py -c <Course URL> --skip-lectures --download-captions` - Downloads only captions
+  - `python main.py -c <Course URL> --skip-lectures --download-assets` - Downloads only assets
+- Use threaded downloader
+  - `python main.py -c <Course URL> --use-threaded-downloader`
+- Use threaded downloader with custom max threads
+  - `python main.py -c <Course URL> --use-threaded-downloader --threads 15`
 
 # Credits
 
