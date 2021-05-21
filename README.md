@@ -2,7 +2,7 @@
 
 # NOTE
 
-This program is WIP, the code is provided as-is and i am not held resposible for any legal repercussions resulting from the use of this program.
+This program is WIP, the code is provided as-is and I am not held resposible for any legal issues resulting from the use of this program.
 
 # Support
 
@@ -14,11 +14,12 @@ All code is licensed under the MIT license
 
 # Description
 
-Simple and hacky program to download a udemy course, has support for DRM videos but requires the user to aquire the decryption key (for legal reasons).
+Simple program to download a Udemy course, has support for DRM videos but requires the user to aquire the decryption key (for legal reasons).<br>
+Current only Windows is supported but with some small modifications it should work on linux also (and maybe mac)
 
 # Requirements
 
-1. You would need to download ffmpeg and mp4decrypter from Bento4 SDK and ensure they are in path(typing their name in cmd invokes them).
+1. You would need to download `ffmpeg` and `mp4decrypter`from Bento4 SDK and ensure they are in path (typing their name in cmd invokes them).
 
 # Usage
 
@@ -117,7 +118,7 @@ optional arguments:
 
 # Credits
 
-- https://github.com/Jayapraveen/Drm-Dash-stream-downloader - for the original code which this is based on
+- https://github.com/Jayapraveen/Drm-Dash-stream-downloader - For the original code which this is based on
 - https://github.com/alastairmccormack/pywvpssh - For code related to PSSH extraction
 - https://github.com/alastairmccormack/pymp4parse/ - For code related to mp4 box parsing (used by pywvpssh)
 - https://github.com/lbrayner/vtt-to-srt - For code related to converting subtitles from vtt to srt format
