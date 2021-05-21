@@ -1,4 +1,4 @@
-import os, requests, shutil, json, glob, urllib.request, argparse, sys
+import os, requests, shutil, json, glob, urllib.request, argparse, sys, re
 from sanitize_filename import sanitize
 import urllib.request
 from tqdm import tqdm
@@ -11,19 +11,12 @@ from mpegdash.utils import (parse_attr_value, parse_child_nodes,
 from utils import extract_kid
 from vtt_to_srt import convert
 
-course_id = None
-header_bearer = None
 download_dir = "%s\out_dir" % os.getcwd()
 working_dir = "%s\working_dir" % os.getcwd(
 )  # set the folder to download segments for DRM videos
 retry = 3
 home_dir = os.getcwd()
 keyfile_path = "%s\keyfile.json" % os.getcwd()
-dl_assets = False
-dl_captions = False
-skip_lectures = False
-caption_locale = "en"
-quality = None  # None will download the best possible
 valid_qualities = [144, 360, 480, 720, 1080]
 
 if not os.path.exists(working_dir):
@@ -36,12 +29,25 @@ if not os.path.exists(download_dir):
 with open(keyfile_path, 'r') as keyfile:
     keyfile = keyfile.read()
 keyfile = json.loads(keyfile)
-"""
-@author Jayapraveen
-"""
+
+
+def extract_course_name(url):
+    """
+    @author r0oth3x49
+    """
+    obj = re.search(
+        r"(?i)(?://(?P<portal_name>.+?).udemy.com/(?:course(/draft)*/)?(?P<name_or_id>[a-zA-Z0-9_-]+))",
+        url,
+    )
+    if obj:
+        return obj.group("portal_name"), obj.group("name_or_id")
 
 
 def durationtoseconds(period):
+    """
+    @author Jayapraveen
+    """
+
     #Duration format in PTxDxHxMxS
     if (period[:2] == "PT"):
         period = period[2:]
@@ -110,12 +116,10 @@ def download_media(filename, url, lecture_working_dir, epoch=0):
             download_media(filename, url, lecture_working_dir, epoch + 1)
 
 
-"""
-@author Jayapraveen
-"""
-
-
 def cleanup(path):
+    """
+    @author Jayapraveen
+    """
     leftover_files = glob.glob(path + '/*.mp4', recursive=True)
     mpd_files = glob.glob(path + '/*.mpd', recursive=True)
     leftover_files = leftover_files + mpd_files
@@ -126,25 +130,21 @@ def cleanup(path):
             print(f"Error deleting file: {file_list}")
 
 
-"""
-@author Jayapraveen
-"""
-
-
 def mux_process(video_title, lecture_working_dir, outfile):
+    """
+    @author Jayapraveen
+    """
     if os.name == "nt":
-        command = f"ffmpeg -y -i \"{lecture_working_dir}\\decrypted_audio.mp4\" -i \"{lecture_working_dir}\\decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=2020-00-00T70:05:30.000000Z \"{outfile}\""
+        command = f"ffmpeg -y -i \"{lecture_working_dir}\\decrypted_audio.mp4\" -i \"{lecture_working_dir}\\decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" \"{outfile}\""
     else:
-        command = f"nice -n 7 ffmpeg -y -i \"{lecture_working_dir}\\decrypted_audio.mp4\" -i \"{lecture_working_dir}\\decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=2020-00-00T70:05:30.000000Z \"{outfile}\""
+        command = f"nice -n 7 ffmpeg -y -i \"{lecture_working_dir}\\decrypted_audio.mp4\" -i \"{lecture_working_dir}\\decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" \"{outfile}\""
     os.system(command)
 
 
-"""
-@author Jayapraveen
-"""
-
-
 def decrypt(kid, filename, lecture_working_dir):
+    """
+    @author Jayapraveen
+    """
     try:
         key = keyfile[kid.lower()]
     except KeyError as error:
@@ -159,13 +159,11 @@ def decrypt(kid, filename, lecture_working_dir):
         )
 
 
-"""
-@author Jayapraveen
-"""
-
-
 def handle_irregular_segments(media_info, video_title, lecture_working_dir,
                               output_path):
+    """
+    @author Jayapraveen
+    """
     no_segment, video_url, video_init, video_extension, no_segment, audio_url, audio_init, audio_extension = media_info
     download_media("video_0.seg.mp4", video_init, lecture_working_dir)
     video_kid = extract_kid(f"{lecture_working_dir}\\video_0.seg.mp4")
@@ -211,12 +209,10 @@ def handle_irregular_segments(media_info, video_title, lecture_working_dir,
             break
 
 
-"""
-@author Jayapraveen
-"""
-
-
 def manifest_parser(mpd_url):
+    """
+    @author Jayapraveen
+    """
     video = []
     audio = []
     manifest = requests.get(mpd_url).text
@@ -280,16 +276,9 @@ def manifest_parser(mpd_url):
     return video + audio
 
 
-"""
-@author Puyodead1
-"""
-
-
 def download(url, path, filename):
     """
-    @param: url to download file
-    @param: path place to put the file
-    @oaram: filename used for progress bar
+    @author Puyodead1
     """
     file_size = int(requests.head(url).headers["Content-Length"])
     if os.path.exists(path):
@@ -354,7 +343,8 @@ def process_caption(caption,
                 print(f"> Error converting captions: {e}")
 
 
-def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
+def process_lecture(lecture, lecture_index, lecture_path, lecture_dir, quality,
+                    skip_lectures, dl_assets, dl_captions, caption_locale):
     lecture_title = lecture["title"]
     lecture_asset = lecture["asset"]
     if not skip_lectures:
@@ -409,6 +399,7 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
     # process assets
     if dl_assets:
         assets = []
+        text_assets = ""
         all_assets = lecture["supplementary_assets"]
         for asset in all_assets:
             if asset["asset_type"] == "File":
@@ -437,9 +428,16 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
                 assets.append(asset)
                 asset_path = f"%s\\%s. External URLs.txt" % (lecture_dir,
                                                              lecture_index)
-                with open(asset_path, 'a') as f:
-                    f.write(f"%s : %s\n" %
-                            (asset["title"], asset["external_url"]))
+                # with open(asset_path, 'a') as f:
+                #     f.write(f"%s : %s\n" %
+                #             (asset["title"], asset["external_url"]))
+                text_assets += f"%s: %s\n" % (asset["title"],
+                                              asset["external_url"])
+
+        if not text_assets == "":
+            with open(asset_path, 'w') as f:
+                f.write(text_assets)
+
         print("> Found %s assets for lecture '%s'" %
               (len(assets), lecture_title))
 
@@ -470,8 +468,9 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
             process_caption(caption, lecture_index, lecture_title, lecture_dir)
 
 
-def parse(data):
-    course_dir = f"%s\\%s" % (download_dir, course_id)
+def parse(data, course_id, course_name, skip_lectures, dl_assets, dl_captions,
+          quality, caption_locale):
+    course_dir = f"%s\\%s" % (download_dir, course_name)
     if not os.path.exists(course_dir):
         os.mkdir(course_dir)
     chapters = []
@@ -491,7 +490,9 @@ def parse(data):
                 lecture_index = lectures.index(obj) + 1
                 lecture_path = f"%s\\%s. %s.mp4" % (course_dir, lecture_index,
                                                     sanitize(obj["title"]))
-                process_lecture(obj, lecture_index, lecture_path, download_dir)
+                process_lecture(obj, lecture_index, lecture_path, download_dir,
+                                quality, skip_lectures, dl_assets, dl_captions,
+                                caption_locale)
 
     for chapter in chapters:
         chapter_dir = f"%s\\%s. %s" % (course_dir, chapters.index(chapter) + 1,
@@ -503,21 +504,56 @@ def parse(data):
             lecture_index = chapter["lectures"].index(lecture) + 1
             lecture_path = f"%s\\%s. %s.mp4" % (chapter_dir, lecture_index,
                                                 sanitize(lecture["title"]))
-            process_lecture(lecture, lecture_index, lecture_path, chapter_dir)
+            process_lecture(lecture, lecture_index, lecture_path, chapter_dir,
+                            quality, skip_lectures, dl_assets, dl_captions,
+                            caption_locale)
     print("\n\n\n\n\n\n\n\n=====================")
     print("All downloads completed for course!")
     print("=====================")
 
 
+def fetch_subscribed_courses_json(bearer_token, portal_name):
+    res = requests.get(
+        "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,title,published_title&ordering=-last_accessed,-access_time&page=1&page_size=10000"
+        .format(portal_name=portal_name),
+        headers={
+            "Authorization":
+            bearer_token,
+            "x-udemy-authorization":
+            bearer_token,
+            "Host":
+            "{portal_name}.udemy.com".format(portal_name=portal_name),
+            "Referer":
+            "https://{portal_name}.udemy.com/home/my-courses/search/?q={course_name}"
+            .format(portal_name=portal_name, course_name=course_name)
+        })
+    res.raise_for_status()
+    data = res.json()
+    return data
+
+
+def fetch_course_json(course_id, bearer_token, portal_name, course_name):
+    res = requests.get(
+        "https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,title,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,media_license_token,course_is_drmed,media_sources,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000"
+        .format(portal_name=portal_name, course_id=course_id),
+        headers={
+            "Authorization": bearer_token,
+            "x-udemy-authorization": bearer_token,
+            "Host": "{portal_name}.udemy.com".format(portal_name=portal_name),
+            "Referer": "https://{portal_name}.udemy.com/"
+        })
+    res.raise_for_status()
+    return res.json()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Udemy Downloader')
-    parser.add_argument(
-        "-d",
-        "--debug",
-        dest="debug",
-        action="store_true",
-        help="Use test_data.json rather than fetch from the udemy api.",
-    )
+    parser.add_argument("-c",
+                        "--course-url",
+                        dest="course_url",
+                        type=str,
+                        help="The URL of the course to download",
+                        required=True)
     parser.add_argument(
         "-b",
         "--bearer",
@@ -526,11 +562,11 @@ if __name__ == "__main__":
         help="The Bearer token to use",
     )
     parser.add_argument(
-        "-c",
-        "--course-id",
-        dest="course_id",
-        type=str,
-        help="The ID of the course to download",
+        "-d",
+        "--debug",
+        dest="debug",
+        action="store_true",
+        help="Use test_data.json rather than fetch from the udemy api.",
     )
     parser.add_argument(
         "-q",
@@ -565,6 +601,15 @@ if __name__ == "__main__":
         help="If specified, captions will be downloaded.",
     )
 
+    dl_assets = False
+    skip_lectures = False
+    dl_captions = False
+    caption_locale = "en"
+    quality = None
+    bearer_token = None
+    portal_name = None
+    course_name = None
+
     args = parser.parse_args()
     if args.download_assets:
         dl_assets = True
@@ -583,42 +628,62 @@ if __name__ == "__main__":
 
     load_dotenv()
     if args.bearer_token:
-        header_bearer = f"Bearer %s" % args.bearer_token
+        bearer_token = f"Bearer %s" % args.bearer_token
     else:
-        header_bearer = f"Bearer %s" % os.getenv("UDEMY_BEARER")
-    if args.course_id:
-        course_id = args.course_id
-    else:
-        course_id = os.getenv("UDEMY_COURSE_ID")
+        bearer_token = f"Bearer %s" % os.getenv("UDEMY_BEARER")
 
-    if not course_id:
-        print("> Missing Course ID!")
+    if args.course_url:
+        portal_name, course_name = extract_course_name(args.course_url)
+
+    if not course_name:
+        print("> Unable to extract course name from URL!")
         sys.exit(1)
-    if not header_bearer:
+    if not portal_name:
+        print("> Unable to extract portal name from URL!")
+        sys.exit(1)
+    if not bearer_token:
         print("> Missing Bearer Token!")
         sys.exit(1)
 
-    print(f"> Using course ID {course_id}")
+    print(f"> Fetching subscribed course data...")
+    try:
+        subscribed_courses = fetch_subscribed_courses_json(
+            bearer_token, portal_name)
+    except Exception as e:
+        print("> Failed to fetch subscribed course information: %s" % e)
+
+    course = next((x for x in subscribed_courses["results"]
+                   if x["published_title"] == course_name), None)
+    if not course:
+        print("> Failed to find course in course list!")
+        sys.exit(1)
+
+    course_id = course["id"]
+    course_title = course["title"]
+
+    print(
+        f"> Fetching information for course '%s', this might take a minute..."
+        % course_name)
+    try:
+        course_data = fetch_course_json(course_id, bearer_token, portal_name,
+                                        course_name)
+    except Exception as e:
+        print("> Failed to fetch course information: %s" % e)
+        sys.exit(1)
+
+    if not course_data:
+        print("> Failed to fetch course data!")
+
+    print("> Course information retrieved!")
 
     if args.debug:
         # this is for development purposes so we dont need to make tons of requests when testing
         # course data json is just stored and read from a file
         with open("test_data.json", encoding="utf8") as f:
-            data = json.loads(f.read())["results"]
-            parse(data)
+            course_data = json.loads(f.read())
+            parse(course_data["results"], course_id, course_name,
+                  skip_lectures, dl_assets, dl_captions, quality,
+                  caption_locale)
     else:
-        print("Fetching Course data, this may take a minute...")
-        r = requests.get(
-            f"https://udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,title,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,media_license_token,course_is_drmed,media_sources,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000"
-            .format(course_id),
-            headers={
-                "Authorization": header_bearer,
-                "x-udemy-authorization": header_bearer
-            })
-        if r.status_code == 200:
-            print("Course data retrieved!")
-            data = r.json()
-            parse(data["results"])
-        else:
-            print("An error occurred while trying to fetch the course data! " +
-                  r.text)
+        parse(course_data["results"], course_id, course_name, skip_lectures,
+              dl_assets, dl_captions, quality, caption_locale)

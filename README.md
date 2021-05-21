@@ -29,12 +29,12 @@ You will need to get a few things before you can use this program:
 
 - Decryption Key ID
 - Decryption Key
-- Udemy Course ID
+- Udemy Course URL
 - Udemy Bearer Token
 
 ### Setting up
 
-- rename `.env.sample` to `.env`
+- rename `.env.sample` to `.env` _(you only need to do this if you plan to use the .env file to store your bearer token)_
 - rename `keyfile.example.json` to `keyfile.json`
 
 ### Aquire bearer token
@@ -49,17 +49,9 @@ You will need to get a few things before you can use this program:
 - ![bearer token example](https://i.imgur.com/FhQdwgD.png)
 - enter this in the `.env` file after `UDEMY_BEARER=` (you can also pass this as an argument, see advanced usage for more information)
 
-### Aquire Course ID
-
-- Follow above before following this
-- locate the request url field
-- ![request url](https://i.imgur.com/EUIV3bk.png)
-- copy the number after `/api-2.0/courses/` as seen highlighed in the above picture
-- enter this in the `.env` file after `UDEMY_COURSE_ID=` (you can also pass this as an argument, see advanced usage for more information)
-
 ### Key ID and Key
 
-It is up to you to aquire the key and key id.
+It is up to you to aquire the key and key id. Please don't ask me for help acquiring these, decrypting DRM protected content can be considered piracy.
 
 - Enter the key and key id in the `keyfile.json`
 - ![keyfile example](https://i.imgur.com/wLPsqOR.png)
@@ -72,17 +64,18 @@ You can now run `python main.py` to start downloading. The course will download 
 # Advanced Usage
 
 ```
-usage: main.py [-h] [-d] [-b BEARER_TOKEN] [-c COURSE_ID] [-q QUALITY] [-l LANG] [--skip-lectures] [--download-assets] [--download-captions]
+usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-d] [-q QUALITY] [-l LANG] [--skip-lectures] [--download-assets]
+               [--download-captions]
 
 Udemy Downloader
 
 optional arguments:
   -h, --help            show this help message and exit
-  -d, --debug           Use test_data.json rather than fetch from the udemy api.
+  -c COURSE_URL, --course-url COURSE_URL
+                        The URL of the course to download
   -b BEARER_TOKEN, --bearer BEARER_TOKEN
                         The Bearer token to use
-  -c COURSE_ID, --course-id COURSE_ID
-                        The ID of the course to download
+  -d, --debug           Use test_data.json rather than fetch from the udemy api.
   -q QUALITY, --quality QUALITY
                         Download specific video quality. (144, 360, 480, 720, 1080)
   -l LANG, --lang LANG  The language to download for captions (Default is en)
@@ -92,33 +85,31 @@ optional arguments:
 ```
 
 - Passing a Bearer Token and Course ID as an argument
-  - `python main.py -b <Bearer Token> -c <Course ID>`
+  - `python main.py -c <Course URL> -b <Bearer Token>`
+  - `python main.py -c https://www.udemy.com/courses/myawesomecourse -b <Bearer Token>`
 - Download a specific quality
-  - `python main.py -q 720`
+  - `python main.py -c <Course URL> -q 720`
 - Download assets along with lectures
-  - `python main.py --download-assets`
+  - `python main.py -c <Course URL> --download-assets`
 - Download assets and specify a quality
-  - `python main.py -q 360 --download-assets`
+  - `python main.py -c <Course URL> -q 360 --download-assets`
 - Download captions (Defaults to English)
-  - `python main.py --download-captions`
+  - `python main.py -c <Course URL> --download-captions`
 - Download captions with specific language
-  - `python main.py --download-captions -l en` - English subtitles
-  - `python main.py --download-captions -l es` - Spanish subtitles
-  - `python main.py --download-captions -l it` - Italian subtitles
-  - `python main.py --download-captions -l pl` - Polish Subtitles
-  - `python main.py --download-captions -l all` - Downloads all subtitles
+  - `python main.py -c <Course URL> --download-captions -l en` - English subtitles
+  - `python main.py -c <Course URL> --download-captions -l es` - Spanish subtitles
+  - `python main.py -c <Course URL> --download-captions -l it` - Italian subtitles
+  - `python main.py -c <Course URL> --download-captions -l pl` - Polish Subtitles
+  - `python main.py -c <Course URL> --download-captions -l all` - Downloads all subtitles
   - etc
 - Skip downloading lecture videos
   - `python main.py --skip-lectures --download-captions` - Downloads only captions
   - `python main.py --skip-lectures --download-assets` - Downloads only assets
 
-# Getting an error about "Accepting the latest terms of service"?
-
-- If you are using Udemy business, you must edit `main.py` and change `udemy.com` to `<portal name>.udemy.com`
-
 # Credits
 
 - https://github.com/Jayapraveen/Drm-Dash-stream-downloader - For the original code which this is based on
 - https://github.com/alastairmccormack/pywvpssh - For code related to PSSH extraction
-- https://github.com/alastairmccormack/pymp4parse/ - For code related to mp4 box parsing (used by pywvpssh)
+- https://github.com/alastairmccormack/pymp4parse - For code related to mp4 box parsing (used by pywvpssh)
 - https://github.com/lbrayner/vtt-to-srt - For code related to converting subtitles from vtt to srt format
+- https://github.com/r0oth3x49/udemy-dl - For some of the informaton related to using the udemy api
