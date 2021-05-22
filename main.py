@@ -392,7 +392,6 @@ def process_caption(caption,
                     lecture_index,
                     lecture_title,
                     lecture_dir,
-                    threads,
                     tries=0):
     filename = f"%s. %s_%s.%s" % (lecture_index, sanitize(lecture_title),
                                   caption.get("locale_id"), caption.get("ext"))
