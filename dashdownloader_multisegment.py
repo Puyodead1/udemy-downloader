@@ -10,9 +10,9 @@ from utils import extract_kid
 
 #global ids
 retry = 3
-download_dir = os.getcwd() + '\out_dir' # set the folder to output
-working_dir = os.getcwd() + "\working_dir" # set the folder to download ephemeral files
-keyfile_path = os.getcwd() + "\keyfile.json"
+download_dir = os.path.join(os.getcwd(), 'out_dir') # set the folder to output
+working_dir = os.path.join(os.getcwd(), "working_dir") # set the folder to download ephemeral files
+keyfile_path = os.path.join(os.getcwd(), "keyfile.json")
 
 if not os.path.exists(working_dir):
     os.makedirs(working_dir)
@@ -198,6 +198,6 @@ if __name__ == "__main__":
     os.chdir(working_dir)
     media_info = manifest_parser(mpd)
     video_title = "175. Inverse Transforming Vectors" # the video title that gets embeded into the mp4 file metadata
-    output_path = download_dir + "\\175. Inverse Transforming Vectors" # video title used in the filename, dont append .mp4
+    output_path = os.path.join(download_dir, "175. Inverse Transforming Vectors") # video title used in the filename, dont append .mp4
     handle_irregular_segments(media_info,video_title,output_path)
     cleanup(working_dir)
