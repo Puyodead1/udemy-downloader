@@ -1,4 +1,4 @@
-import os, requests, shutil, json, glob, urllib.request, argparse, sys
+import os, requests, shutil, json, glob, urllib.request, argparse, sys, datetime
 from sanitize_filename import sanitize
 import urllib.request
 from tqdm import tqdm
@@ -131,10 +131,11 @@ def cleanup(path):
 
 
 def mux_process(video_title, lecture_working_dir, outfile):
+    time_stamp = datetime.datetime.now().isoformat()+'Z'
     if os.name == "nt":
-        command = f"ffmpeg -y -i \"{lecture_working_dir}\\decrypted_audio.mp4\" -i \"{lecture_working_dir}\\decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=2020-00-00T70:05:30.000000Z \"{outfile}\""
+        command = f"ffmpeg -y -i \"{lecture_working_dir}\\decrypted_audio.mp4\" -i \"{lecture_working_dir}\\decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=\"{time_stamp}\" \"{outfile}\""
     else:
-        command = f"nice -n 7 ffmpeg -y -i \"{lecture_working_dir}//decrypted_audio.mp4\" -i \"{lecture_working_dir}//decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=\"$(/bin/date -u \"+%FT%T.%6NZ\")\" \"{outfile}\""
+        command = f"nice -n 7 ffmpeg -y -i \"{lecture_working_dir}//decrypted_audio.mp4\" -i \"{lecture_working_dir}//decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=\"{time_stamp}\" \"{outfile}\""
     os.system(command)
 
 
@@ -434,7 +435,7 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
                     f.write(asset["body"])
             elif asset["asset_type"] == "ExternalLink":
                 assets.append(asset)
-                asset_path = os.path.join(lecture_dir, f"{lecture_index} . External URLs.txt")
+                asset_path = os.path.join(lecture_dir, f"{lecture_index}. External URLs.txt")
                 with open(asset_path, 'a') as f:
                     f.write(f"%s : %s\n" %
                             (asset["title"], asset["external_url"]))
