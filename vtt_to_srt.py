@@ -6,8 +6,8 @@ from pysrt.srttime import SubRipTime
 
 def convert(directory, filename):
     index = 0
-    vtt_filepath = f"%s\\%s.vtt" % (directory, filename)
-    srt_filepath = f"%s\\%s.srt" % (directory, filename)
+    vtt_filepath = os.path.join(directory, f"{filename}.vtt")
+    srt_filepath = os.path.join(directory, f"{filename}.srt")
     srt = open(srt_filepath, "w")
 
     for caption in WebVTT().read(vtt_filepath):

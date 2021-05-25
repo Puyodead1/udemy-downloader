@@ -1,4 +1,4 @@
-import os, requests, shutil, json, glob, urllib.request, argparse, sys
+import os, requests, shutil, json, glob, urllib.request, argparse, sys, datetime
 from sanitize_filename import sanitize
 import urllib.request
 from tqdm import tqdm
@@ -13,12 +13,11 @@ from vtt_to_srt import convert
 
 course_id = None
 header_bearer = None
-download_dir = "%s\out_dir" % os.getcwd()
-working_dir = "%s\working_dir" % os.getcwd(
-)  # set the folder to download segments for DRM videos
+download_dir = os.path.join(os.getcwd(), "out_dir")
+working_dir = os.path.join(os.getcwd(), "working_dir")  # set the folder to download segments for DRM videos
 retry = 3
 home_dir = os.getcwd()
-keyfile_path = "%s\keyfile.json" % os.getcwd()
+keyfile_path = os.path.join(os.getcwd(), "keyfile.json")
 dl_assets = False
 dl_captions = False
 skip_lectures = False
@@ -80,7 +79,7 @@ def download_media(filename, url, lecture_working_dir, epoch=0):
                                 unit='B',
                                 unit_scale=True,
                                 desc=filename)
-                    with open(f"{lecture_working_dir}\\{filename}",
+                    with open(os.path.join(lecture_working_dir, filename),
                               'wb') as video_file:
                         for chunk in media.iter_content(chunk_size=1024):
                             if chunk:
@@ -132,10 +131,11 @@ def cleanup(path):
 
 
 def mux_process(video_title, lecture_working_dir, outfile):
+    time_stamp = datetime.datetime.now().isoformat()+'Z'
     if os.name == "nt":
-        command = f"ffmpeg -y -i \"{lecture_working_dir}\\decrypted_audio.mp4\" -i \"{lecture_working_dir}\\decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=2020-00-00T70:05:30.000000Z \"{outfile}\""
+        command = f"ffmpeg -y -i \"{lecture_working_dir}\\decrypted_audio.mp4\" -i \"{lecture_working_dir}\\decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=\"{time_stamp}\" \"{outfile}\""
     else:
-        command = f"nice -n 7 ffmpeg -y -i \"{lecture_working_dir}\\decrypted_audio.mp4\" -i \"{lecture_working_dir}\\decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=2020-00-00T70:05:30.000000Z \"{outfile}\""
+        command = f"nice -n 7 ffmpeg -y -i \"{lecture_working_dir}//decrypted_audio.mp4\" -i \"{lecture_working_dir}//decrypted_video.mp4\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{video_title}\" -metadata creation_time=\"{time_stamp}\" \"{outfile}\""
     os.system(command)
 
 
@@ -155,7 +155,7 @@ def decrypt(kid, filename, lecture_working_dir):
         )
     else:
         os.system(
-            f"nice -n 7 mp4decrypt --key 1:{key} \"{lecture_working_dir}\\encrypted_{filename}.mp4\" \"{lecture_working_dir}\\decrypted_{filename}.mp4\""
+            f"nice -n 7 mp4decrypt --key 1:{key} \"{lecture_working_dir}//encrypted_{filename}.mp4\" \"{lecture_working_dir}//decrypted_{filename}.mp4\""
         )
 
 
@@ -168,10 +168,10 @@ def handle_irregular_segments(media_info, video_title, lecture_working_dir,
                               output_path):
     no_segment, video_url, video_init, video_extension, no_segment, audio_url, audio_init, audio_extension = media_info
     download_media("video_0.seg.mp4", video_init, lecture_working_dir)
-    video_kid = extract_kid(f"{lecture_working_dir}\\video_0.seg.mp4")
+    video_kid = extract_kid(os.path.join(lecture_working_dir, "video_0.seg.mp4"))
     print("KID for video file is: " + video_kid)
     download_media("audio_0.seg.mp4", audio_init, lecture_working_dir)
-    audio_kid = extract_kid(f"{lecture_working_dir}\\audio_0.seg.mp4")
+    audio_kid = extract_kid(os.path.join(lecture_working_dir, "audio_0.seg.mp4"))
     print("KID for audio file is: " + audio_kid)
     for count in range(1, no_segment):
         video_segment_url = video_url.replace("$Number$", str(count))
@@ -324,7 +324,7 @@ def process_caption(caption,
                                   caption.get("locale_id"), caption.get("ext"))
     filename_no_ext = f"%s. %s_%s" % (lecture_index, sanitize(lecture_title),
                                       caption.get("locale_id"))
-    filepath = f"%s\\%s" % (lecture_dir, filename)
+    filepath = os.path.join(lecture_dir, filename)
 
     if os.path.isfile(filepath):
         print("> Captions '%s' already downloaded." % filename)
@@ -384,8 +384,8 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
             # encrypted
             print(f"> Lecture '%s' has DRM, attempting to download" %
                   lecture_title)
-            lecture_working_dir = "%s\%s" % (
-                working_dir, lecture_asset["id"]
+            lecture_working_dir = os.path.join(
+                working_dir, str(lecture_asset["id"])
             )  # set the folder to download ephemeral files
             media_sources = lecture_asset["media_sources"]
             if not os.path.exists(lecture_working_dir):
@@ -420,7 +420,7 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
                 if download_url:
                     try:
                         download(download_url,
-                                 f"%s\\%s" % (lecture_dir, asset_filename),
+                                 os.path.join(lecture_dir, asset_filename),
                                  asset_filename)
                     except Exception as e:
                         print(
@@ -429,14 +429,13 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
                         continue
             elif asset["asset_type"] == "Article":
                 assets.append(asset)
-                asset_path = f"%s\\%s.html" % (lecture_dir,
+                asset_path = os.path.join(lecture_dir,
                                                sanitize(lecture_title))
                 with open(asset_path, 'w') as f:
                     f.write(asset["body"])
             elif asset["asset_type"] == "ExternalLink":
                 assets.append(asset)
-                asset_path = f"%s\\%s. External URLs.txt" % (lecture_dir,
-                                                             lecture_index)
+                asset_path = os.path.join(lecture_dir, f"{lecture_index}. External URLs.txt")
                 with open(asset_path, 'a') as f:
                     f.write(f"%s : %s\n" %
                             (asset["title"], asset["external_url"]))
@@ -471,7 +470,7 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir):
 
 
 def parse(data):
-    course_dir = f"%s\\%s" % (download_dir, course_id)
+    course_dir = os.path.join(download_dir, course_id)
     if not os.path.exists(course_dir):
         os.mkdir(course_dir)
     chapters = []
@@ -489,20 +488,17 @@ def parse(data):
                 # This is caused by there not being a starting chapter
                 lectures.append(obj)
                 lecture_index = lectures.index(obj) + 1
-                lecture_path = f"%s\\%s. %s.mp4" % (course_dir, lecture_index,
-                                                    sanitize(obj["title"]))
+                lecture_path = os.path.join(course_dir, f'{lecture_index}. {sanitize(obj["title"])}.mp4')
                 process_lecture(obj, lecture_index, lecture_path, download_dir)
 
     for chapter in chapters:
-        chapter_dir = f"%s\\%s. %s" % (course_dir, chapters.index(chapter) + 1,
-                                       sanitize(chapter["title"]))
+        chapter_dir = os.path.join(course_dir, f'{chapters.index(chapter) + 1}. {sanitize(chapter["title"])}')
         if not os.path.exists(chapter_dir):
             os.mkdir(chapter_dir)
 
         for lecture in chapter["lectures"]:
             lecture_index = chapter["lectures"].index(lecture) + 1
-            lecture_path = f"%s\\%s. %s.mp4" % (chapter_dir, lecture_index,
-                                                sanitize(lecture["title"]))
+            lecture_path = os.path.join(chapter_dir, f'{lecture_index}. {sanitize(lecture["title"])}.mp4')
             process_lecture(lecture, lecture_index, lecture_path, chapter_dir)
     print("\n\n\n\n\n\n\n\n=====================")
     print("All downloads completed for course!")
