@@ -1,5 +1,5 @@
 from webvtt import WebVTT
-import html
+import html, os
 from pysrt.srtitem import SubRipItem
 from pysrt.srttime import SubRipTime
 
