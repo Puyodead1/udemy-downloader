@@ -69,7 +69,7 @@ You can now run `python main.py` to start downloading. The course will download 
 
 ```
 usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [--skip-lectures] [--download-assets] [--download-captions]
-               [--keep-vtt]
+               [--keep-vtt] [--skip-hls]
 
 Udemy Downloader
 
@@ -87,6 +87,8 @@ optional arguments:
   --download-assets     If specified, lecture assets will be downloaded
   --download-captions   If specified, captions will be downloaded
   --keep-vtt            If specified, .vtt files won't be removed
+  --skip-hls            If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p quality for non-drm
+                        lectures)
 ```
 
 - Passing a Bearer Token and Course ID as an argument
@@ -112,6 +114,8 @@ optional arguments:
   - `python main.py -c <Course URL> --skip-lectures --download-assets` - Downloads only assets
 - Keep .VTT caption files:
   - `python main.py -c <Course URL> --download-captions --keep-vtt`
+- Skip parsing HLS Streams (HLS streams usually contain 1080p quality for Non-DRM lectures):
+  - `python main.py -c <Course URL> --skip-hls`
 
 # Credits
 

@@ -1,14 +1,13 @@
-import os, requests, json, glob, argparse, sys, re, time, asyncio, json
-# from sanitize_filename import sanitize
+import os, requests, json, glob, argparse, sys, re, time, asyncio, json, cloudscraper, m3u8
 from tqdm import tqdm
 from dotenv import load_dotenv
 from mpegdash.parser import MPEGDASHParser
 from utils import extract_kid
 from vtt_to_srt import convert
-import cloudscraper
 from requests.exceptions import ConnectionError as conn_error
 from html.parser import HTMLParser as compat_HTMLParser
 from sanitize import sanitize, slugify, SLUG_OK
+from ffmpeg import FFMPeg
 
 home_dir = os.getcwd()
 download_dir = os.path.join(os.getcwd(), "out_dir")
@@ -167,7 +166,7 @@ class Udemy:
             })
         return _temp
 
-    def _extract_sources(self, sources):
+    def _extract_sources(self, sources, skip_hls):
         _temp = []
         if sources and isinstance(sources, list):
             for source in sources:
@@ -195,17 +194,21 @@ class Udemy:
                 else:
                     width = "256"
                 if (source.get("type") == "application/x-mpegURL"
-                        or "m3u8" in download_url or height == "Audio"):
-                    continue
-
-                _type = source.get("type")
-                _temp.append({
-                    "type": "video",
-                    "height": height,
-                    "width": width,
-                    "extension": _type.replace("video/", ""),
-                    "download_url": download_url,
-                })
+                        or "m3u8" in download_url):
+                    if not skip_hls:
+                        out = self._extract_m3u8(download_url)
+                        print(out)
+                        if out:
+                            _temp.extend(out)
+                else:
+                    _type = source.get("type")
+                    _temp.append({
+                        "type": "video",
+                        "height": height,
+                        "width": width,
+                        "extension": _type.replace("video/", ""),
+                        "download_url": download_url,
+                    })
         return _temp
 
     def _extract_media_sources(self, sources):
@@ -245,6 +248,38 @@ class Udemy:
                     "extension": ext,
                     "download_url": download_url,
                 })
+        return _temp
+
+    def _extract_m3u8(self, url):
+        """extracts m3u8 streams"""
+        _temp = []
+        try:
+            resp = self.session._get(url)
+            resp.raise_for_status()
+            raw_data = resp.text
+            m3u8_object = m3u8.loads(raw_data)
+            playlists = m3u8_object.playlists
+            seen = set()
+            for pl in playlists:
+                resolution = pl.stream_info.resolution
+                codecs = pl.stream_info.codecs
+                if not resolution:
+                    continue
+                if not codecs:
+                    continue
+                width, height = resolution
+                download_url = pl.uri
+                if height not in seen:
+                    seen.add(height)
+                    _temp.append({
+                        "type": "hls",
+                        "height": height,
+                        "width": width,
+                        "extension": "mp4",
+                        "download_url": download_url,
+                    })
+        except Exception as error:
+            print(f"Udemy Says : '{error}' while fetching hls streams..")
         return _temp
 
     def _extract_mpd(self, url):
@@ -922,13 +957,8 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
                 print(f"> Error converting caption: {e}")
 
 
-def process_lecture(
-    lecture,
-    lecture_index,
-    lecture_path,
-    lecture_dir,
-    quality,
-):
+def process_lecture(lecture, lecture_index, lecture_path, lecture_dir, quality,
+                    access_token):
     # TODO: Make this more efficent, some lectures are html articles not videos so we should check if the extension is html
     index = lecture.get("index")
     lecture_index = lecture.get("lecture_index")
@@ -984,7 +1014,17 @@ def process_lecture(
                         key=lambda x: abs(int(x.get("height")) - quality))
                 try:
                     url = source.get("download_url")
-                    download(url, lecture_path, lecture_title)
+                    source_type = source.get("type")
+                    if source_type == "hls":
+                        temp_filepath = lecture_path.replace(".mp4", "")
+                        temp_filepath = temp_filepath + ".hls-part.mp4"
+                        retVal = FFMPeg(None, url, access_token,
+                                        temp_filepath).download()
+                        if retVal:
+                            os.rename(temp_filepath, lecture_path)
+                            print("> HLS Download success")
+                    else:
+                        download(url, lecture_path, lecture_title)
                 except Exception as e:
                     print(f"> Error downloading lecture: ", e)
             else:
@@ -995,7 +1035,7 @@ def process_lecture(
 
 
 def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
-              caption_locale, keep_vtt):
+              caption_locale, keep_vtt, access_token):
     total_chapters = _udemy.get("total_chapters")
     total_lectures = _udemy.get("total_lectures")
     print(f"Chapter(s) ({total_chapters})")
@@ -1040,7 +1080,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                     lecture_path = os.path.join(
                         chapter_dir, "{}.mp4".format(sanitize(lecture_title)))
                     process_lecture(lecture, lecture_index, lecture_path,
-                                    chapter_dir, quality)
+                                    chapter_dir, quality, access_token)
 
             if dl_assets:
                 assets = lecture.get("assets")
@@ -1148,6 +1188,13 @@ if __name__ == "__main__":
         action="store_true",
         help="If specified, .vtt files won't be removed",
     )
+    parser.add_argument(
+        "--skip-hls",
+        dest="skip_hls",
+        action="store_true",
+        help=
+        "If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p quality for non-drm lectures)",
+    )
 
     parser.add_argument(
         "--save-to-file",
@@ -1171,6 +1218,7 @@ if __name__ == "__main__":
     portal_name = None
     course_name = None
     keep_vtt = False
+    skip_hls = False
 
     args = parser.parse_args()
     if args.download_assets:
@@ -1185,6 +1233,8 @@ if __name__ == "__main__":
         quality = args.quality
     if args.keep_vtt:
         keep_vtt = args.keep_vtt
+    if args.skip_hls:
+        skip_hls = args.skip_hls
 
     if args.load_from_file:
         print(
@@ -1237,7 +1287,7 @@ if __name__ == "__main__":
         _udemy = json.loads(
             open(os.path.join(os.getcwd(), "saved", "_udemy.json")).read())
         parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
-                  caption_locale, keep_vtt)
+                  caption_locale, keep_vtt, access_token)
     else:
         _udemy = {}
         _udemy["access_token"] = access_token
@@ -1328,7 +1378,8 @@ if __name__ == "__main__":
                                 sources = data.get("Video")
                                 tracks = asset.get("captions")
                                 #duration = asset.get("time_estimation")
-                                sources = udemy._extract_sources(sources)
+                                sources = udemy._extract_sources(
+                                    sources, skip_hls)
                                 subtitles = udemy._extract_subtitles(tracks)
                                 sources_count = len(sources)
                                 subtitle_count = len(subtitles)
@@ -1463,6 +1514,7 @@ if __name__ == "__main__":
                       'w') as f:
                 f.write(json.dumps(_udemy))
                 f.close()
+            print("Saved parsed data to json")
 
         parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
-                  caption_locale, keep_vtt)
+                  caption_locale, keep_vtt, access_token)
