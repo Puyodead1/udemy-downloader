@@ -6,6 +6,3 @@ python-dotenv
 protobuf
 webvtt-py
 pysrt
-aiohttp
-aiofiles
-bitfield
