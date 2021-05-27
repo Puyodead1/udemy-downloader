@@ -959,7 +959,6 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
 
 def process_lecture(lecture, lecture_index, lecture_path, lecture_dir, quality,
                     access_token):
-    # TODO: Make this more efficent, some lectures are html articles not videos so we should check if the extension is html
     index = lecture.get("index")
     lecture_index = lecture.get("lecture_index")
     lecture_id = lecture.get("lecture_id")
