@@ -681,43 +681,53 @@ def download_media(filename, url, lecture_working_dir, epoch=0):
     if (os.path.isfile(filename)):
         print("Segment already downloaded.. skipping..")
     else:
-        media = requests.get(url, stream=True)
-        media_length = int(media.headers.get("content-length"))
-        if media.status_code == 200:
-            if (os.path.isfile(filename)
-                    and os.path.getsize(filename) >= media_length):
-                print("Segment already downloaded.. skipping write to disk..")
-            else:
-                try:
-                    pbar = tqdm(total=media_length,
-                                initial=0,
-                                unit='B',
-                                unit_scale=True,
-                                desc=filename)
-                    with open(os.path.join(lecture_working_dir, filename),
-                              'wb') as video_file:
-                        for chunk in media.iter_content(chunk_size=1024):
-                            if chunk:
-                                video_file.write(chunk)
-                                pbar.update(1024)
-                    pbar.close()
-                    print("Segment downloaded: " + filename)
-                    return False  #Successfully downloaded the file
-                except:
+        try:
+            media = requests.get(url, stream=True)
+            media_length = int(media.headers.get("content-length"))
+            if media.status_code == 200:
+                if (os.path.isfile(filename)
+                        and os.path.getsize(filename) >= media_length):
                     print(
-                        "Connection error: Reattempting download of segment..")
+                        "Segment already downloaded.. skipping write to disk.."
+                    )
+                else:
+                    try:
+                        pbar = tqdm(total=media_length,
+                                    initial=0,
+                                    unit='B',
+                                    unit_scale=True,
+                                    desc=filename)
+                        with open(os.path.join(lecture_working_dir, filename),
+                                  'wb') as video_file:
+                            for chunk in media.iter_content(chunk_size=1024):
+                                if chunk:
+                                    video_file.write(chunk)
+                                    pbar.update(1024)
+                        pbar.close()
+                        print("Segment downloaded: " + filename)
+                        return False  #Successfully downloaded the file
+                    except:
+                        print(
+                            "Connection error: Reattempting download of segment.."
+                        )
+                        download_media(filename, url, lecture_working_dir,
+                                       epoch + 1)
+
+                if os.path.getsize(filename) >= media_length:
+                    pass
+                else:
+                    print("Segment is faulty.. Redownloading...")
                     download_media(filename, url, lecture_working_dir,
                                    epoch + 1)
-
-            if os.path.getsize(filename) >= media_length:
-                pass
+            elif (media.status_code == 404):
+                print("Probably end hit!\n", url)
+                return True  #Probably hit the last of the file
             else:
-                print("Segment is faulty.. Redownloading...")
+                if (epoch > retry):
+                    exit("Error fetching segment, exceeded retry times.")
+                print("Error fetching segment file.. Redownloading...")
                 download_media(filename, url, lecture_working_dir, epoch + 1)
-        elif (media.status_code == 404):
-            print("Probably end hit!\n", url)
-            return True  #Probably hit the last of the file
-        else:
+        except:
             if (epoch > retry):
                 exit("Error fetching segment, exceeded retry times.")
             print("Error fetching segment file.. Redownloading...")
