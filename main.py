@@ -7,7 +7,7 @@ from vtt_to_srt import convert
 from requests.exceptions import ConnectionError as conn_error
 from html.parser import HTMLParser as compat_HTMLParser
 from sanitize import sanitize, slugify, SLUG_OK
-from ffmpeg import FFMPeg
+from pyffmpeg import FFMPeg as FFMPEG
 
 home_dir = os.getcwd()
 download_dir = os.path.join(os.getcwd(), "out_dir")
@@ -787,12 +787,12 @@ def mux_process(video_title, lecture_working_dir, output_path):
     @author Jayapraveen
     """
     if os.name == "nt":
-        command = "ffmpeg.exe -y -i \"{}\" -i \"{}\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
+        command = "ffmpeg -y -i \"{}\" -i \"{}\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
             os.path.join(lecture_working_dir, "decrypted_audio.mp4"),
             os.path.join(lecture_working_dir, "decrypted_video.mp4"),
             video_title, output_path)
     else:
-        command = "nice -n 7 ffmpeg.exe -y -i \"{}\" -i \"{}\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
+        command = "nice -n 7 ffmpeg -y -i \"{}\" -i \"{}\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
             os.path.join(lecture_working_dir, "decrypted_audio.mp4"),
             os.path.join(lecture_working_dir, "decrypted_video.mp4"),
             video_title, output_path)
@@ -1016,7 +1016,7 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir, quality,
                     if source_type == "hls":
                         temp_filepath = lecture_path.replace(".mp4", "")
                         temp_filepath = temp_filepath + ".hls-part.mp4"
-                        retVal = FFMPeg(None, url, access_token,
+                        retVal = FFMPEG(None, url, access_token,
                                         temp_filepath).download()
                         if retVal:
                             os.rename(temp_filepath, lecture_path)
