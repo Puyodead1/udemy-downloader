@@ -848,68 +848,6 @@ def handle_segments(video_source, audio_source, video_title,
             break
 
 
-def manifest_parser(mpd_url, quality):
-    """
-    @author Jayapraveen
-    """
-    video = []
-    audio = []
-    mpd = MPEGDASHParser.parse(mpd_url)
-    for period in mpd.periods:
-        for adapt_set in period.adaptation_sets:
-            content_type = adapt_set.mime_type
-            if content_type == "video/mp4":
-                if quality:
-                    repr = next((x for x in adapt_set.representations
-                                 if x.height == quality), None)
-                    if not repr:
-                        qualities = []
-                        for rep in adapt_set.representations:
-                            qualities.append(rep.height)
-                        if quality < qualities[0]:
-                            # they want a lower quality than whats available
-                            repr = adapt_set.representations[
-                                0]  # Lowest Quality
-                        elif quality > qualities[-1]:
-                            # they want a higher quality than whats available
-                            repr = adapt_set.representations[-1]  # Max Quality
-                        print(
-                            "> Could not find video with requested quality, falling back to closest!"
-                        )
-                        print("> Using quality of %s" % repr.height)
-                    else:
-                        print("> Found MPD representation with quality %s" %
-                              repr.height)
-                else:
-                    repr = adapt_set.representations[-1]  # Max Quality
-                    print("> Using max quality of %s" % repr.height)
-            elif content_type == "audio/mp4":
-                repr = adapt_set.representations[-1]  # Best
-
-            for segment in repr.segment_templates:
-                segment_count = 1
-                timeline = segment.segment_timelines[0]
-                segment_count += len(timeline.Ss)
-                for s in timeline.Ss:
-                    if s.r:
-                        segment_count += s.r
-                print("Expected No of segments:", segment_count)
-                if (content_type == "audio/mp4"):
-                    segment_extension = segment.media.split(".")[-1]
-                    audio.append(segment_count)
-                    audio.append(segment.media)
-                    audio.append(segment.initialization)
-                    audio.append(segment_extension)
-                elif (content_type == "video/mp4"):
-                    segment_extension = segment.media.split(".")[-1]
-                    video.append(segment_count)
-                    video.append(segment.media)
-                    video.append(segment.initialization)
-                    video.append(segment_extension)
-
-    return video + audio
-
-
 def download(url, path, filename):
     """
     @author Puyodead1
@@ -1166,7 +1104,7 @@ if __name__ == "__main__":
         dest="quality",
         type=int,
         help=
-        "Download specific video quality. If the requested quality isn't available, the closest quality will be used.",
+        "Download specific video quality. If the requested quality isn't available, the closest quality will be used. If not specified, the best quality will be downloaded for each lecture",
     )
     parser.add_argument(
         "-l",

@@ -80,7 +80,8 @@ optional arguments:
   -b BEARER_TOKEN, --bearer BEARER_TOKEN
                         The Bearer token to use
   -q QUALITY, --quality QUALITY
-                        Download specific video quality. If the requested quality isn't available, the closest quality will be used.
+                        Download specific video quality. If the requested quality isn't available, the closest quality will be used. If not
+                        specified, the best quality will be downloaded for each lecture
   -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is 'en')
   --skip-lectures       If specified, lectures won't be downloaded
   --download-assets     If specified, lecture assets will be downloaded
