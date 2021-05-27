@@ -787,12 +787,12 @@ def mux_process(video_title, lecture_working_dir, output_path):
     @author Jayapraveen
     """
     if os.name == "nt":
-        command = "ffmpeg -y -i \"{}\" -i \"{}\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
+        command = "ffmpeg.exe -y -i \"{}\" -i \"{}\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
             os.path.join(lecture_working_dir, "decrypted_audio.mp4"),
             os.path.join(lecture_working_dir, "decrypted_video.mp4"),
             video_title, output_path)
     else:
-        command = "nice -n 7 ffmpeg -y -i \"{}\" -i \"{}\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
+        command = "nice -n 7 ffmpeg.exe -y -i \"{}\" -i \"{}\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
             os.path.join(lecture_working_dir, "decrypted_audio.mp4"),
             os.path.join(lecture_working_dir, "decrypted_video.mp4"),
             video_title, output_path)
@@ -807,13 +807,12 @@ def decrypt(kid, filename, lecture_working_dir):
     try:
         key = keyfile[kid.lower()]
         if (os.name == "nt"):
-            code = os.system(
-                f"mp4decrypt --key 1:%s \"%s\" \"%s\"" %
-                (key,
-                 os.path.join(lecture_working_dir,
-                              "encrypted_{}.mp4".format(filename)),
-                 os.path.join(lecture_working_dir,
-                              "decrypted_{}.mp4".format(filename))))
+            os.system(f"mp4decrypt --key 1:%s \"%s\" \"%s\"" %
+                      (key,
+                       os.path.join(lecture_working_dir,
+                                    "encrypted_{}.mp4".format(filename)),
+                       os.path.join(lecture_working_dir,
+                                    "decrypted_{}.mp4".format(filename))))
         else:
             os.system(f"nice -n 7 mp4decrypt --key 1:%s \"%s\" \"%s\"" %
                       (key,
