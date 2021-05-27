@@ -1,13 +1,13 @@
 from webvtt import WebVTT
-import html
+import html, os
 from pysrt.srtitem import SubRipItem
 from pysrt.srttime import SubRipTime
 
 
 def convert(directory, filename):
     index = 0
-    vtt_filepath = f"%s\\%s.vtt" % (directory, filename)
-    srt_filepath = f"%s\\%s.srt" % (directory, filename)
+    vtt_filepath = os.path.join(directory, filename + ".vtt")
+    srt_filepath = os.path.join(directory, filename + ".srt")
     srt = open(srt_filepath, "w")
 
     for caption in WebVTT().read(vtt_filepath):

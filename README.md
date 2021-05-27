@@ -68,7 +68,8 @@ You can now run `python main.py` to start downloading. The course will download 
 # Advanced Usage
 
 ```
-usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [--skip-lectures] [--download-assets] [--download-captions] [-d]
+usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [--skip-lectures] [--download-assets] [--download-captions]
+               [--keep-vtt]
 
 Udemy Downloader
 
@@ -79,11 +80,12 @@ optional arguments:
   -b BEARER_TOKEN, --bearer BEARER_TOKEN
                         The Bearer token to use
   -q QUALITY, --quality QUALITY
-                        Download specific video quality. (144, 360, 480, 720, 1080)
-  -l LANG, --lang LANG  The language to download for captions (Default is en)
-  --skip-lectures       If specified, lectures won't be downloaded.
-  --download-assets     If specified, lecture assets will be downloaded.
-  --download-captions   If specified, captions will be downloaded.
+                        Download specific video quality. If the requested quality isn't available, the closest quality will be used.
+  -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is 'en')
+  --skip-lectures       If specified, lectures won't be downloaded
+  --download-assets     If specified, lecture assets will be downloaded
+  --download-captions   If specified, captions will be downloaded
+  --keep-vtt            If specified, .vtt files won't be removed
 ```
 
 - Passing a Bearer Token and Course ID as an argument
@@ -107,6 +109,8 @@ optional arguments:
 - Skip downloading lecture videos
   - `python main.py -c <Course URL> --skip-lectures --download-captions` - Downloads only captions
   - `python main.py -c <Course URL> --skip-lectures --download-assets` - Downloads only assets
+- Keep .VTT caption files:
+  - `python main.py -c <Course URL> --download-captions --keep-vtt`
 
 # Credits
 

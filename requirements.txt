@@ -8,3 +8,4 @@ webvtt-py
 pysrt
 aiohttp
 aiofiles
+bitfield
