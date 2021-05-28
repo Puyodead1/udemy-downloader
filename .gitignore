@@ -122,3 +122,4 @@ manifest.mpd
 .vscode
 saved
 *.aria2
+info.py

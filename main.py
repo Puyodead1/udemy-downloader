@@ -986,12 +986,12 @@ def download_aria(url, file_dir, filename):
     """
     @author Puyodead1
     """
-    print("> Downloading File...")
+    print("    > Downloading File...")
     ret_code = subprocess.Popen([
         "aria2c", url, "-o", filename, "-d", file_dir, "-j16", "-s20", "-x16",
         "-c", "--auto-file-renaming=false", "--summary-interval=0"
     ]).wait()
-    print("> File Downloaded")
+    print("    > File Downloaded")
 
     print("Return code: " + str(ret_code))
 
@@ -1004,32 +1004,32 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
     filepath = os.path.join(lecture_dir, filename)
 
     if os.path.isfile(filepath):
-        print("> Caption '%s' already downloaded." % filename)
+        print("    > Caption '%s' already downloaded." % filename)
     else:
-        print(f"> Downloading caption: '%s'" % filename)
+        print(f"    >  Downloading caption: '%s'" % filename)
         try:
             download_aria(caption.get("download_url"), lecture_dir, filename)
         except Exception as e:
             if tries >= 3:
                 print(
-                    f"> Error downloading caption: {e}. Exceeded retries, skipping."
+                    f"    > Error downloading caption: {e}. Exceeded retries, skipping."
                 )
                 return
             else:
                 print(
-                    f"> Error downloading caption: {e}. Will retry {3-tries} more times."
+                    f"    > Error downloading caption: {e}. Will retry {3-tries} more times."
                 )
                 process_caption(caption, lecture_title, lecture_dir, keep_vtt,
                                 tries + 1)
         if caption.get("extension") == "vtt":
             try:
-                print("> Converting caption to SRT format...")
+                print("    > Converting caption to SRT format...")
                 convert(lecture_dir, filename_no_ext)
-                print("> Caption conversion complete.")
+                print("    > Caption conversion complete.")
                 if not keep_vtt:
                     os.remove(filepath)
             except Exception as e:
-                print(f"> Error converting caption: {e}")
+                print(f"    > Error converting caption: {e}")
 
 
 def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
@@ -1040,8 +1040,6 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
 
     if is_encrypted:
         if len(lecture_audio_sources) > 0 and len(lecture_video_sources) > 0:
-            print(f"> Lecture '%s' has DRM, attempting to download" %
-                  lecture_title)
             lecture_working_dir = os.path.join(working_dir,
                                                str(lecture.get("asset_id")))
 
@@ -1055,16 +1053,19 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
                         key=lambda x: abs(int(x.get("height")) - quality))
                 if not os.path.exists(lecture_working_dir):
                     os.mkdir(lecture_working_dir)
+                print(f"      > Lecture '%s' has DRM, attempting to download" %
+                      lecture_title)
                 handle_segments(video_source, audio_source, lecture_title,
                                 lecture_working_dir, lecture_path)
             else:
-                print("> Lecture '%s' is already downloaded, skipping..." %
-                      lecture_title)
+                print(
+                    "      > Lecture '%s' is already downloaded, skipping..." %
+                    lecture_title)
         else:
-            print(f"> Lecture '%s' is missing media links" % lecture_title)
+            print(f"      > Lecture '%s' is missing media links" %
+                  lecture_title)
             print(len(lecture_audio_sources), len(lecture_video_sources))
     else:
-        print("> Lecture doesn't have DRM, attempting to download...")
         sources = lecture.get("sources")
         sources = sorted(sources,
                          key=lambda x: int(x.get("height")),
@@ -1075,14 +1076,17 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
             if not os.path.exists(lecture_working_dir):
                 os.mkdir(lecture_working_dir)
             if not os.path.isfile(lecture_path):
+                print(
+                    "      > Lecture doesn't have DRM, attempting to download..."
+                )
                 source = sources[0]  # first index is the best quality
                 if isinstance(quality, int):
                     source = min(
                         sources,
                         key=lambda x: abs(int(x.get("height")) - quality))
                 try:
-                    print("====== Selected quality: ", source.get("type"),
-                          source.get("height"))
+                    print("      ====== Selected quality: ",
+                          source.get("type"), source.get("height"))
                     url = source.get("download_url")
                     source_type = source.get("type")
                     if source_type == "hls":
@@ -1092,16 +1096,17 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
                                         temp_filepath).download()
                         if retVal:
                             os.rename(temp_filepath, lecture_path)
-                            print("> HLS Download success")
+                            print("      > HLS Download success")
                     else:
                         download_aria(url, lecture_dir, lecture_title + ".mp4")
                 except Exception as e:
-                    print(f"> Error downloading lecture: ", e)
+                    print(f"      > Error downloading lecture: ", e)
             else:
-                print("> Lecture '%s' is already downloaded, skipping..." %
-                      lecture_title)
+                print(
+                    "      > Lecture '%s' is already downloaded, skipping..." %
+                    lecture_title)
         else:
-            print("Missing sources for lecture", lecture)
+            print("      > Missing sources for lecture", lecture)
 
 
 def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
@@ -1131,7 +1136,8 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
             lecture_index = lecture.get("lecture_index")
 
             extension = lecture.get("extension")
-            print(f"> Processing lecture {lecture_index} of {total_lectures}")
+            print(
+                f"  > Processing lecture {lecture_index} of {total_lectures}")
             if not skip_lectures:
                 if extension == "html":
                     html_content = lecture.get("html_content").encode(
@@ -1143,7 +1149,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                             f.write(html_content)
                             f.close()
                     except Exception as e:
-                        print("Failed to write html file: ", e)
+                        print("    > Failed to write html file: ", e)
                         continue
                 else:
                     lecture_path = os.path.join(
@@ -1153,7 +1159,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
 
             if dl_assets:
                 assets = lecture.get("assets")
-                print("> Processing {} asset(s) for lecture...".format(
+                print("    > Processing {} asset(s) for lecture...".format(
                     len(assets)))
 
                 for asset in assets:
@@ -1220,6 +1226,75 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                                         keep_vtt)
 
 
+def course_info(course_data):
+    print("\n\n\n\n")
+    course_title = course_data.get("title")
+    chapter_count = course_data.get("total_chapters")
+    lecture_count = course_data.get("total_lectures")
+
+    print("> Course: {}".format(course_title))
+    print("> Total Chapters: {}".format(chapter_count))
+    print("> Total Lectures: {}".format(lecture_count))
+    print("\n")
+
+    chapters = course_data.get("chapters")
+    for chapter in chapters:
+        chapter_title = chapter.get("chapter_title")
+        chapter_index = chapter.get("chapter_index")
+        chapter_lecture_count = chapter.get("lecture_count")
+        chapter_lectures = chapter.get("lectures")
+
+        print("> Chapter: {} ({} of {})".format(chapter_title, chapter_index,
+                                                chapter_count))
+
+        for lecture in chapter_lectures:
+            lecture_title = lecture.get("lecture_title")
+            lecture_index = lecture.get("index")
+            lecture_asset_count = lecture.get("assets_count")
+            lecture_is_encrypted = lecture.get("is_encrypted")
+            lecture_subtitles = lecture.get("subtitles")
+            lecture_extension = lecture.get("extension")
+            lecture_sources = lecture.get("sources")
+            lecture_video_sources = lecture.get("video_sources")
+
+            if lecture_sources:
+                lecture_sources = sorted(lecture.get("sources"),
+                                         key=lambda x: int(x.get("height")),
+                                         reverse=True)
+            if lecture_video_sources:
+                lecture_video_sources = sorted(
+                    lecture.get("video_sources"),
+                    key=lambda x: int(x.get("height")),
+                    reverse=True)
+
+            if lecture_is_encrypted:
+                lecture_qualities = [
+                    "{}@{}x{}".format(x.get("type"), x.get("width"),
+                                      x.get("height"))
+                    for x in lecture_video_sources
+                ]
+            elif not lecture_is_encrypted and lecture_sources:
+                lecture_qualities = [
+                    "{}@{}x{}".format(x.get("type"), x.get("height"),
+                                      x.get("width")) for x in lecture_sources
+                ]
+
+            if lecture_extension:
+                continue
+
+            print("  > Lecture: {} ({} of {})".format(lecture_title,
+                                                      lecture_index,
+                                                      chapter_lecture_count))
+            print("    > DRM: {}".format(lecture_is_encrypted))
+            print("    > Asset Count: {}".format(lecture_asset_count))
+            print("    > Captions: {}".format(
+                [x.get("language") for x in lecture_subtitles]))
+            print("    > Qualities: {}".format(lecture_qualities))
+
+        if chapter_index != chapter_count:
+            print("\n\n")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Udemy Downloader')
     parser.add_argument("-c",
@@ -1281,6 +1356,13 @@ if __name__ == "__main__":
         action="store_true",
         help=
         "If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p quality for non-drm lectures)",
+    )
+    parser.add_argument(
+        "--info",
+        dest="info",
+        action="store_true",
+        help=
+        "If specified, only course information will be printed, nothing will be downloaded",
     )
 
     parser.add_argument(
@@ -1360,20 +1442,24 @@ if __name__ == "__main__":
         access_token = os.getenv("UDEMY_BEARER")
 
     udemy = Udemy(access_token)
-    print("> Fetching course information, this may take a minute...")
 
-    course_id, course_info = udemy._extract_course_info(args.course_url)
-    print("> Course information retrieved!")
-    if course_info and isinstance(course_info, dict):
-        title = _clean(course_info.get("title"))
-        course_title = course_info.get("published_title")
-        portal_name = course_info.get("portal_name")
+    print("> Fetching course information, this may take a minute...")
+    if not args.load_from_file:
+        course_id, course_info = udemy._extract_course_info(args.course_url)
+        print("> Course information retrieved!")
+        if course_info and isinstance(course_info, dict):
+            title = _clean(course_info.get("title"))
+            course_title = course_info.get("published_title")
+            portal_name = course_info.get("portal_name")
 
     print("> Fetching course content, this may take a minute...")
     if args.load_from_file:
         course_json = json.loads(
             open(os.path.join(os.getcwd(), "saved", "course_content.json"),
                  'r').read())
+        title = course_json.get("title")
+        course_title = course_json.get("published_title")
+        portal_name = course_json.get("portal_name")
     else:
         course_json = udemy._extract_course_json(args.course_url, course_id,
                                                  portal_name)
@@ -1390,8 +1476,11 @@ if __name__ == "__main__":
     if args.load_from_file:
         _udemy = json.loads(
             open(os.path.join(os.getcwd(), "saved", "_udemy.json")).read())
-        parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
-                  caption_locale, keep_vtt, access_token)
+        if args.info:
+            course_info(_udemy)
+        else:
+            parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
+                      caption_locale, keep_vtt, access_token)
     else:
         _udemy = {}
         _udemy["access_token"] = access_token
@@ -1620,5 +1709,8 @@ if __name__ == "__main__":
                 f.close()
             print("Saved parsed data to json")
 
-        parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
-                  caption_locale, keep_vtt, access_token)
+        if args.info:
+            course_info(_udemy)
+        else:
+            parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
+                      caption_locale, keep_vtt, access_token)
