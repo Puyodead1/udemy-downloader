@@ -904,7 +904,8 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
     else:
         print(f"> Downloading caption: '%s'" % filename)
         try:
-            download_aria(caption.get("download_url"), lecture_dir, filename)
+            download_aria(caption.get("download_url"), lecture_dir,
+                          filename + caption.get("extension"))
         except Exception as e:
             if tries >= 3:
                 print(
@@ -984,7 +985,7 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
                             os.rename(temp_filepath, lecture_path)
                             print("> HLS Download success")
                     else:
-                        download_aria(url, lecture_dir, lecture_title)
+                        download_aria(url, lecture_dir, lecture_title + ".mp4")
                 except Exception as e:
                     print(f"> Error downloading lecture: ", e)
             else:
@@ -1050,6 +1051,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                     asset_type = asset.get("type")
                     filename = asset.get("filename")
                     download_url = asset.get("download_url")
+                    ext = asset.get("extension")
 
                     if asset_type == "article":
                         print(
@@ -1073,7 +1075,8 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                         print("AssetType: Video; AssetData: ", asset)
                     elif asset_type == "audio" or asset_type == "e-book" or asset_type == "file" or asset_type == "presentation":
                         try:
-                            download_aria(download_url, chapter_dir, filename)
+                            download_aria(download_url, chapter_dir,
+                                          filename + ext)
                         except Exception as e:
                             print("> Error downloading asset: ", e)
                             continue
