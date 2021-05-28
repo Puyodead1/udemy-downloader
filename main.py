@@ -1089,14 +1089,15 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
 
             if dl_assets:
                 assets = lecture.get("assets")
-                print("> Processing {} assets for lecture...".format(
+                print("> Processing {} asset(s) for lecture...".format(
                     len(assets)))
 
                 for asset in assets:
                     asset_type = asset.get("type")
                     filename = asset.get("filename")
                     download_url = asset.get("download_url")
-                    ext = asset.get("extension")
+
+                    print(asset_type)
 
                     if asset_type == "article":
                         print(
@@ -1127,7 +1128,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
 
             subtitles = lecture.get("subtitles")
             if dl_captions and subtitles:
-                print("Processing {} captions...".format(len(subtitles)))
+                print("Processing {} caption(s)...".format(len(subtitles)))
                 for subtitle in subtitles:
                     lang = subtitle.get("language")
                     if lang == caption_locale or caption_locale == "all":
