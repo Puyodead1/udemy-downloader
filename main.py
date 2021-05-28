@@ -1008,8 +1008,7 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
     else:
         print(f"> Downloading caption: '%s'" % filename)
         try:
-            download_aria(caption.get("download_url"), lecture_dir,
-                          filename + caption.get("extension"))
+            download_aria(caption.get("download_url"), lecture_dir, filename)
         except Exception as e:
             if tries >= 3:
                 print(
