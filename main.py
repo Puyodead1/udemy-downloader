@@ -847,7 +847,7 @@ def handle_segments(video_source, audio_source, video_title,
         mux_process(video_title, lecture_working_dir, output_path)
         cleanup(lecture_working_dir)
     except Exception as e:
-        print(f"Error: " + e)
+        print(f"Error: ", e)
 
 
 def download(url, path, filename):
