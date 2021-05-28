@@ -28,6 +28,8 @@ LOGOUT_URL = "https://www.udemy.com/user/logout"
 COURSE_URL = "https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,title,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,media_license_token,course_is_drmed,media_sources,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000"
 COURSE_SEARCH = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,title,published_title&page=1&page_size=500&search={course_name}"
 SUBSCRIBED_COURSES = "https://www.udemy.com/api-2.0/users/me/subscribed-courses/?ordering=-last_accessed&fields[course]=id,title,url&page=1&page_size=12"
+MY_COURSES_URL = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,title,published_title&ordering=-last_accessed,-access_time&page=1&page_size=10000"
+COLLECTION_URL = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses-collections/?collection_has_courses=True&course_limit=20&fields[course]=last_accessed_time,title,published_title&fields[user_has_subscribed_courses_collection]=@all&page=1&page_size=1000"
 
 
 def _clean(text):
@@ -456,6 +458,63 @@ class Udemy:
                     break
         return _temp
 
+    def _my_courses(self, portal_name):
+        results = []
+        try:
+            url = MY_COURSES_URL.format(portal_name=portal_name)
+            webpage = self.session._get(url).json()
+        except conn_error as error:
+            print(f"Udemy Says: Connection error, {error}")
+            time.sleep(0.8)
+            sys.exit(0)
+        except (ValueError, Exception) as error:
+            print(f"Udemy Says: {error}")
+            time.sleep(0.8)
+            sys.exit(0)
+        else:
+            results = webpage.get("results", [])
+        return results
+
+    def _subscribed_collection_courses(self, portal_name):
+        url = COLLECTION_URL.format(portal_name=portal_name)
+        courses_lists = []
+        try:
+            webpage = self.session._get(url).json()
+        except conn_error as error:
+            print(f"Udemy Says: Connection error, {error}")
+            time.sleep(0.8)
+            sys.exit(0)
+        except (ValueError, Exception) as error:
+            print(f"Udemy Says: {error}")
+            time.sleep(0.8)
+            sys.exit(0)
+        else:
+            results = webpage.get("results", [])
+            if results:
+                [
+                    courses_lists.extend(courses.get("courses", []))
+                    for courses in results if courses.get("courses", [])
+                ]
+        return courses_lists
+
+    def _archived_courses(self, portal_name):
+        results = []
+        try:
+            url = MY_COURSES_URL.format(portal_name=portal_name)
+            url = f"{url}&is_archived=true"
+            webpage = self.session._get(url).json()
+        except conn_error as error:
+            print(f"Udemy Says: Connection error, {error}")
+            time.sleep(0.8)
+            sys.exit(0)
+        except (ValueError, Exception) as error:
+            print(f"Udemy Says: {error}")
+            time.sleep(0.8)
+            sys.exit(0)
+        else:
+            results = webpage.get("results", [])
+        return results
+
     def _extract_course_info(self, url):
         portal_name, course_name = self.extract_course_name(url)
         course = {}
@@ -486,7 +545,7 @@ class Udemy:
                 "It seems either you are not enrolled or you have to visit the course atleast once while you are logged in.",
             )
             print("Trying to logout now...", )
-            session.terminate()
+            self.session.terminate()
             print("Logged out successfully.", )
             sys.exit(0)
 
