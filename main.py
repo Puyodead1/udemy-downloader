@@ -198,7 +198,6 @@ class Udemy:
                         or "m3u8" in download_url):
                     if not skip_hls:
                         out = self._extract_m3u8(download_url)
-                        print(out)
                         if out:
                             _temp.extend(out)
                 else:
