@@ -1064,7 +1064,11 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
             print(f"> Lecture '%s' is missing media links" % lecture_title)
             print(len(lecture_audio_sources), len(lecture_video_sources))
     else:
+        print("> Lecture doesn't have DRM, attempting to download...")
         sources = lecture.get("sources")
+        sources = sorted(sources,
+                         key=lambda x: int(x.get("height")),
+                         reverse=True)
         if sources:
             lecture_working_dir = os.path.join(working_dir,
                                                str(lecture.get("asset_id")))
@@ -1077,6 +1081,8 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
                         sources,
                         key=lambda x: abs(int(x.get("height")) - quality))
                 try:
+                    print("====== Selected quality: ", source.get("type"),
+                          source.get("height"))
                     url = source.get("download_url")
                     source_type = source.get("type")
                     if source_type == "hls":
