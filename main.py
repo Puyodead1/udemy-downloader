@@ -1097,8 +1097,6 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                     filename = asset.get("filename")
                     download_url = asset.get("download_url")
 
-                    print(asset_type)
-
                     if asset_type == "article":
                         print(
                             "If you're seeing this message, that means that you reached a secret area that I haven't finished! jk I haven't implemented handling for this asset type, please report this at https://github.com/Puyodead1/udemy-downloader/issues so I can add it. When reporting, please provide the following information: "
@@ -1125,6 +1123,28 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                         except Exception as e:
                             print("> Error downloading asset: ", e)
                             continue
+                    elif asset_type == "external_link":
+                        filepath = os.path.join(chapter_dir, filename)
+                        savedirs, name = os.path.split(filepath)
+                        filename = u"external-assets-links.txt"
+                        filename = os.path.join(savedirs, filename)
+                        file_data = []
+                        if os.path.isfile(filename):
+                            file_data = [
+                                i.strip().lower()
+                                for i in open(filename,
+                                              encoding="utf-8",
+                                              errors="ignore") if i
+                            ]
+
+                        content = u"\n{}\n{}\n".format(name, download_url)
+                        if name.lower() not in file_data:
+                            with open(filename,
+                                      'a',
+                                      encoding="utf-8",
+                                      errors="ignore") as f:
+                                f.write(content)
+                                f.close()
 
             subtitles = lecture.get("subtitles")
             if dl_captions and subtitles:
