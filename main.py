@@ -850,6 +850,51 @@ def handle_segments(video_source, audio_source, video_title,
         print(f"Error: ", e)
 
 
+def check_for_aria():
+    try:
+        subprocess.Popen(["aria2c", "-v"],
+                         stdout=subprocess.DEVNULL,
+                         stdin=subprocess.DEVNULL).wait()
+        return True
+    except FileNotFoundError:
+        return False
+    except Exception as e:
+        print(
+            "> Unexpected exception while checking for Aria2c, please tell the program author about this! ",
+            e)
+        return True
+
+
+def check_for_ffmpeg():
+    try:
+        subprocess.Popen(["ffmpeg"],
+                         stdout=subprocess.DEVNULL,
+                         stdin=subprocess.DEVNULL).wait()
+        return True
+    except FileNotFoundError:
+        return False
+    except Exception as e:
+        print(
+            "> Unexpected exception while checking for FFMPEG, please tell the program author about this! ",
+            e)
+        return True
+
+
+def check_for_mp4decrypt():
+    try:
+        subprocess.Popen(["mp4decrypt"],
+                         stdout=subprocess.DEVNULL,
+                         stdin=subprocess.DEVNULL).wait()
+        return True
+    except FileNotFoundError:
+        return False
+    except Exception as e:
+        print(
+            "> Unexpected exception while checking for MP4Decrypt, please tell the program author about this! ",
+            e)
+        return True
+
+
 def download(url, path, filename):
     """
     @author Puyodead1
@@ -1075,8 +1120,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                         print("AssetType: Video; AssetData: ", asset)
                     elif asset_type == "audio" or asset_type == "e-book" or asset_type == "file" or asset_type == "presentation":
                         try:
-                            download_aria(download_url, chapter_dir,
-                                          filename + ext)
+                            download_aria(download_url, chapter_dir, filename)
                         except Exception as e:
                             print("> Error downloading asset: ", e)
                             continue
@@ -1193,6 +1237,23 @@ if __name__ == "__main__":
         keep_vtt = args.keep_vtt
     if args.skip_hls:
         skip_hls = args.skip_hls
+
+    aria_ret_val = check_for_aria()
+    if not aria_ret_val:
+        print("> Aria2c is missing from your system or path!")
+        sys.exit(1)
+
+    ffmpeg_ret_val = check_for_aria()
+    if not ffmpeg_ret_val:
+        print("> FFMPEG is missing from your system or path!")
+        sys.exit(1)
+
+    mp4decrypt_ret_val = check_for_mp4decrypt()
+    if not mp4decrypt_ret_val:
+        print(
+            "> MP4Decrypt is missing from your system or path! (This is part of Bento4 tools)"
+        )
+        sys.exit(1)
 
     if args.load_from_file:
         print(
