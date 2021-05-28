@@ -968,7 +968,7 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
             if not os.path.exists(lecture_working_dir):
                 os.mkdir(lecture_working_dir)
             if not os.path.isfile(lecture_path):
-                source = sources[-1]  # last index is the best quality
+                source = sources[0]  # first index is the best quality
                 if isinstance(quality, int):
                     source = min(
                         sources,
