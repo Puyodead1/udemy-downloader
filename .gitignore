@@ -121,3 +121,4 @@ working_dir
 manifest.mpd
 .vscode
 saved
+*.aria2

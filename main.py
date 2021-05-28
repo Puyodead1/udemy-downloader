@@ -8,6 +8,7 @@ from requests.exceptions import ConnectionError as conn_error
 from html.parser import HTMLParser as compat_HTMLParser
 from sanitize import sanitize, slugify, SLUG_OK
 from pyffmpeg import FFMPeg as FFMPEG
+import subprocess
 
 home_dir = os.getcwd()
 download_dir = os.path.join(os.getcwd(), "out_dir")
@@ -830,66 +831,81 @@ def handle_segments(video_source, audio_source, video_title,
     """
     @author Jayapraveen
     """
-    no_segments = video_source.get("segment_count")
+    no_vid_segments = video_source.get("segment_count")
+    no_aud_segments = audio_source.get("segment_count")
 
-    audio_url = audio_source.get("media")
+    audio_media = audio_source.get("media")
     audio_init = audio_source.get("initialization")
     audio_extension = audio_source.get("extension")
 
-    video_url = video_source.get("media")
+    video_media = video_source.get("media")
     video_init = video_source.get("initialization")
     video_extension = video_source.get("extension")
 
-    no_segments += 10  # because the download_media function relies on hitting a 404 to know when to finish
+    audio_urls = audio_init + "\n  dir={}\n  out=audio_0.mp4\n".format(
+        lecture_working_dir)
+    video_urls = video_init + "\n  dir={}\n  out=video_0.mp4\n".format(
+        lecture_working_dir)
 
-    download_media("video_0.seg.mp4", video_init, lecture_working_dir)
-    video_kid = extract_kid(
-        os.path.join(lecture_working_dir, "video_0.seg.mp4"))
+    list_path = os.path.join(lecture_working_dir, "list.txt")
+
+    for i in range(1, no_aud_segments):
+        audio_urls += audio_media.replace(
+            "$Number$", str(i)) + "\n  dir={}\n  out=audio_{}.mp4\n".format(
+                lecture_working_dir, i)
+    for i in range(1, no_vid_segments):
+        video_urls += video_media.replace(
+            "$Number$", str(i)) + "\n  dir={}\n  out=video_{}.mp4\n".format(
+                lecture_working_dir, i)
+
+    with open(list_path, 'w') as f:
+        f.write("{}\n{}".format(audio_urls, video_urls))
+        f.close()
+
+    print("> Downloading Lecture Segments...")
+    ret_code = subprocess.Popen([
+        "aria2c", "-i", list_path, "-j16", "-s20", "-x16", "-c",
+        "--auto-file-renaming=false", "--summary-interval=0"
+    ]).wait()
+    print("> Lecture Segments Downloaded")
+
+    print("Return code: " + str(ret_code))
+
+    os.remove(list_path)
+
+    video_kid = extract_kid(os.path.join(lecture_working_dir, "video_0.mp4"))
     print("KID for video file is: " + video_kid)
-    download_media("audio_0.seg.mp4", audio_init, lecture_working_dir)
-    audio_kid = extract_kid(
-        os.path.join(lecture_working_dir, "audio_0.seg.mp4"))
+
+    audio_kid = extract_kid(os.path.join(lecture_working_dir, "audio_0.mp4"))
     print("KID for audio file is: " + audio_kid)
-    for count in range(1, no_segments):
-        video_segment_url = video_url.replace("$Number$", str(count))
-        audio_segment_url = audio_url.replace("$Number$", str(count))
-        video_status = download_media(
-            f"video_{str(count)}.seg.{video_extension}", video_segment_url,
-            lecture_working_dir)
-        audio_status = download_media(
-            f"audio_{str(count)}.seg.{audio_extension}", audio_segment_url,
-            lecture_working_dir)
-        os.chdir(lecture_working_dir)
-        if (video_status):
-            if os.name == "nt":
-                video_concat_command = "copy /b " + "+".join([
-                    f"video_{i}.seg.{video_extension}"
-                    for i in range(0, count)
-                ]) + " encrypted_video.mp4"
-                audio_concat_command = "copy /b " + "+".join([
-                    f"audio_{i}.seg.{audio_extension}"
-                    for i in range(0, count)
-                ]) + " encrypted_audio.mp4"
-            else:
-                video_concat_command = "cat " + " ".join([
-                    f"video_{i}.seg.{video_extension}"
-                    for i in range(0, count)
-                ]) + " > encrypted_video.mp4"
-                audio_concat_command = "cat " + " ".join([
-                    f"audio_{i}.seg.{audio_extension}"
-                    for i in range(0, count)
-                ]) + " > encrypted_audio.mp4"
-            os.system(video_concat_command)
-            os.system(audio_concat_command)
-            try:
-                decrypt(video_kid, "video", lecture_working_dir)
-                decrypt(audio_kid, "audio", lecture_working_dir)
-                os.chdir(home_dir)
-                mux_process(video_title, lecture_working_dir, output_path)
-                cleanup(lecture_working_dir)
-            except Exception as e:
-                print(f"Error: " + e)
-            break
+
+    os.chdir(lecture_working_dir)
+
+    if os.name == "nt":
+        video_concat_command = "copy /b " + "+".join([
+            f"video_{i}.{video_extension}" for i in range(0, no_vid_segments)
+        ]) + " encrypted_video.mp4"
+        audio_concat_command = "copy /b " + "+".join([
+            f"audio_{i}.{audio_extension}" for i in range(0, no_aud_segments)
+        ]) + " encrypted_audio.mp4"
+    else:
+        video_concat_command = "cat " + " ".join([
+            f"video_{i}.{video_extension}" for i in range(0, no_aud_segments)
+        ]) + " > encrypted_video.mp4"
+        audio_concat_command = "cat " + " ".join([
+            f"audio_{i}.{audio_extension}" for i in range(0, no_vid_segments)
+        ]) + " > encrypted_audio.mp4"
+    os.system(video_concat_command)
+    os.system(audio_concat_command)
+    os.chdir(home_dir)
+    try:
+        decrypt(video_kid, "video", lecture_working_dir)
+        decrypt(audio_kid, "audio", lecture_working_dir)
+        os.chdir(home_dir)
+        mux_process(video_title, lecture_working_dir, output_path)
+        cleanup(lecture_working_dir)
+    except Exception as e:
+        print(f"Error: " + e)
 
 
 def download(url, path, filename):
