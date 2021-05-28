@@ -16,7 +16,6 @@ THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 import re
 import time
-import logging
 import subprocess
 import sys
 from colorama import Fore, Style
