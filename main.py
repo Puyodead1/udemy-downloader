@@ -878,6 +878,20 @@ def download(url, path, filename):
     return file_size
 
 
+def download_aria(url, file_dir, filename):
+    """
+    @author Puyodead1
+    """
+    print("> Downloading File...")
+    ret_code = subprocess.Popen([
+        "aria2c", url, "-o", filename, "-d", file_dir, "-j16", "-s20", "-x16",
+        "-c", "--auto-file-renaming=false", "--summary-interval=0"
+    ]).wait()
+    print("> File Downloaded")
+
+    print("Return code: " + str(ret_code))
+
+
 def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
     filename = f"%s_%s.%s" % (sanitize(lecture_title), caption.get("language"),
                               caption.get("extension"))
@@ -890,7 +904,7 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
     else:
         print(f"> Downloading caption: '%s'" % filename)
         try:
-            download(caption.get("download_url"), filepath, filename)
+            download_aria(caption.get("download_url"), lecture_dir, filename)
         except Exception as e:
             if tries >= 3:
                 print(
@@ -914,19 +928,9 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
                 print(f"> Error converting caption: {e}")
 
 
-def process_lecture(lecture, lecture_index, lecture_path, lecture_dir, quality,
-                    access_token):
-    index = lecture.get("index")
-    lecture_index = lecture.get("lecture_index")
-    lecture_id = lecture.get("lecture_id")
+def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
     lecture_title = lecture.get("lecture_title")
-    extension = lecture.get("extension")
-    assets = lecture.get("assets")
-    assets_count = lecture.get("assets_count")
-    subtitle_count = lecture.get("subtitle_count")
-    sources_count = lecture.get("sources_count")
     is_encrypted = lecture.get("is_encrypted")
-    asset_id = lecture.get("asset_id")
     lecture_video_sources = lecture.get("video_sources")
     lecture_audio_sources = lecture.get("audio_sources")
 
@@ -980,7 +984,7 @@ def process_lecture(lecture, lecture_index, lecture_path, lecture_dir, quality,
                             os.rename(temp_filepath, lecture_path)
                             print("> HLS Download success")
                     else:
-                        download(url, lecture_path, lecture_title)
+                        download_aria(url, lecture_dir, lecture_title)
                 except Exception as e:
                     print(f"> Error downloading lecture: ", e)
             else:
@@ -1004,7 +1008,6 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
 
     for chapter in _udemy.get("chapters"):
         chapter_title = chapter.get("chapter_title")
-        chapter_id = chapter.get("id")
         chapter_index = chapter.get("chapter_index")
         chapter_dir = os.path.join(course_dir, chapter_title)
         if not os.path.exists(chapter_dir):
@@ -1015,7 +1018,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
 
         for lecture in chapter.get("lectures"):
             lecture_title = lecture.get("lecture_title")
-            lecture_index = lecture.get("index")
+            lecture_index = lecture.get("lecture_index")
 
             extension = lecture.get("extension")
             print(f"> Processing lecture {lecture_index} of {total_lectures}")
@@ -1035,12 +1038,11 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                 else:
                     lecture_path = os.path.join(
                         chapter_dir, "{}.mp4".format(sanitize(lecture_title)))
-                    process_lecture(lecture, lecture_index, lecture_path,
-                                    chapter_dir, quality, access_token)
+                    process_lecture(lecture, lecture_path, chapter_dir,
+                                    quality, access_token)
 
             if dl_assets:
                 assets = lecture.get("assets")
-                asset_count = lecture.get("asset_count")
                 print("> Processing {} assets for lecture...".format(
                     len(assets)))
 
@@ -1071,16 +1073,13 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                         print("AssetType: Video; AssetData: ", asset)
                     elif asset_type == "audio" or asset_type == "e-book" or asset_type == "file" or asset_type == "presentation":
                         try:
-                            download(download_url,
-                                     os.path.join(chapter_dir, filename),
-                                     filename)
+                            download_aria(download_url, chapter_dir, filename)
                         except Exception as e:
                             print("> Error downloading asset: ", e)
                             continue
 
             subtitles = lecture.get("subtitles")
             if dl_captions and subtitles:
-                subtitle_count = lecture.get("subtitle_count")
                 print("Processing {} captions...".format(len(subtitles)))
                 for subtitle in subtitles:
                     lang = subtitle.get("language")
