@@ -56,12 +56,12 @@ You will need to get a few things before you can use this program:
 It is up to you to aquire the key and key id. Please don't ask me for help acquiring these, decrypting DRM protected content can be considered piracy.
 
 - Enter the key and key id in the `keyfile.json`
-- ![keyfile example](https://i.imgur.com/wLPsqOR.png)
+- ![keyfile example](https://i.imgur.com/e5aU0ng.png)
 - ![example key and kid from console](https://i.imgur.com/awgndZA.png)
 
 ### Start Downloading
 
-You can now run `python main.py` to start downloading. The course will download to `out_dir`, chapters are seperated into folders.
+You can now run the program, see the examples below. The course will download to `out_dir`.
 
 # Advanced Usage
 
