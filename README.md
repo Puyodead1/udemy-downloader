@@ -27,7 +27,7 @@ Windows is the primary development OS, but I've made an effort to support linux 
 
 # Requirements
 
-1. You would need to download `ffmpeg` and `mp4decrypter`from Bento4 SDK and ensure they are in path (typing their name in cmd invokes them).
+1. You would need to download `ffmpeg`, `aria2c` and `mp4decrypter` (from Bento4 SDK) and ensure they are in path (typing their name in cmd should invoke them).
 
 # Usage
 
@@ -38,24 +38,18 @@ You will need to get a few things before you can use this program:
 - Decryption Key ID
 - Decryption Key
 - Udemy Course URL
-- Udemy Bearer Token
+- Udemy Bearer Token (aka acccess token for udemy-dl users)
 
 ### Setting up
 
 - rename `.env.sample` to `.env` _(you only need to do this if you plan to use the .env file to store your bearer token)_
 - rename `keyfile.example.json` to `keyfile.json`
 
-### Aquire bearer token
+### Aquire Bearer Token
 
-- open dev tools
-- go to network tab
-- in the search field, enter `api-2.0/courses`
-- ![Valid udemy api requests](https://i.imgur.com/Or371l7.png)
-- click a random request
-- locate the `Request Headers` section
-- copy the the text after `Authorization`, it should look like `Bearer xxxxxxxxxxx`
-- ![bearer token example](https://i.imgur.com/FhQdwgD.png)
-- enter this in the `.env` file after `UDEMY_BEARER=` (you can also pass this as an argument, see advanced usage for more information)
+- Firefox: [Udemy-DL Guide](https://github.com/r0oth3x49/udemy-dl/issues/389#issuecomment-491903900)
+- Chrome: [Udemy-DL Guide](https://github.com/r0oth3x49/udemy-dl/issues/389#issuecomment-492569372)
+- If you want to use the .env file to store your Bearer Token, edit the .env and add your token.
 
 ### Key ID and Key
 
