@@ -1,8 +1,12 @@
 # Udemy Downloader with DRM support
 
+[![forthebadge](https://forthebadge.com/images/badges/built-with-love.svg)](https://forthebadge.com)
+[![forthebadge](https://forthebadge.com/images/badges/designed-in-ms-paint.svg)](https://forthebadge.com)
+[![forthebadge](https://forthebadge.com/images/badges/made-with-python.svg)](https://forthebadge.com)
+[![forthebadge](https://forthebadge.com/images/badges/approved-by-george-costanza.svg)](https://forthebadge.com)
+![GitHub forks](https://img.shields.io/github/forks/Puyodead1/udemy-downloader?style=for-the-badge)
+![GitHub Repo stars](https://img.shields.io/github/stars/Puyodead1/udemy-downloader?style=for-the-badge)
 ![GitHub](https://img.shields.io/github/license/Puyodead1/udemy-downloader?style=for-the-badge)
-![GitHub top language](https://img.shields.io/github/languages/top/Puyodead1/udemy-downloader?style=for-the-badge)
-![Codacy grade](https://img.shields.io/codacy/grade/e14b03f576ab4b1897624dcdf6dd9557?style=for-the-badge)
 
 # NOTE
 
