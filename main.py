@@ -515,6 +515,63 @@ class Udemy:
             results = webpage.get("results", [])
         return results
 
+    def _my_courses(self, portal_name):
+        results = []
+        try:
+            url = MY_COURSES_URL.format(portal_name=portal_name)
+            webpage = self.session._get(url).json()
+        except conn_error as error:
+            print(f"Udemy Says: Connection error, {error}")
+            time.sleep(0.8)
+            sys.exit(0)
+        except (ValueError, Exception) as error:
+            print(f"Udemy Says: {error}")
+            time.sleep(0.8)
+            sys.exit(0)
+        else:
+            results = webpage.get("results", [])
+        return results
+
+    def _subscribed_collection_courses(self, portal_name):
+        url = COLLECTION_URL.format(portal_name=portal_name)
+        courses_lists = []
+        try:
+            webpage = self.session._get(url).json()
+        except conn_error as error:
+            print(f"Udemy Says: Connection error, {error}")
+            time.sleep(0.8)
+            sys.exit(0)
+        except (ValueError, Exception) as error:
+            print(f"Udemy Says: {error}")
+            time.sleep(0.8)
+            sys.exit(0)
+        else:
+            results = webpage.get("results", [])
+            if results:
+                [
+                    courses_lists.extend(courses.get("courses", []))
+                    for courses in results if courses.get("courses", [])
+                ]
+        return courses_lists
+
+    def _archived_courses(self, portal_name):
+        results = []
+        try:
+            url = MY_COURSES_URL.format(portal_name=portal_name)
+            url = f"{url}&is_archived=true"
+            webpage = self.session._get(url).json()
+        except conn_error as error:
+            print(f"Udemy Says: Connection error, {error}")
+            time.sleep(0.8)
+            sys.exit(0)
+        except (ValueError, Exception) as error:
+            print(f"Udemy Says: {error}")
+            time.sleep(0.8)
+            sys.exit(0)
+        else:
+            results = webpage.get("results", [])
+        return results
+
     def _extract_course_info(self, url):
         portal_name, course_name = self.extract_course_name(url)
         course = {}
