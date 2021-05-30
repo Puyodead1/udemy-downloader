@@ -1467,7 +1467,7 @@ if __name__ == "__main__":
         print("> Aria2c is missing from your system or path!")
         sys.exit(1)
 
-    ffmpeg_ret_val = check_for_aria()
+    ffmpeg_ret_val = check_for_ffmpeg()
     if not ffmpeg_ret_val:
         print("> FFMPEG is missing from your system or path!")
         sys.exit(1)
