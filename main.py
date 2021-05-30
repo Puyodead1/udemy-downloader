@@ -1305,7 +1305,7 @@ if __name__ == "__main__":
         dest="concurrent_downloads",
         type=int,
         help=
-        "The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-50)",
+        "The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-30)",
     )
     parser.add_argument(
         "--skip-lectures",
@@ -1392,9 +1392,9 @@ if __name__ == "__main__":
         if concurrent_downloads <= 0:
             # if the user gave a number that is less than or equal to 0, set cc to default of 10
             concurrent_downloads = 10
-        elif concurrent_downloads > 50:
-            # if the user gave a number thats greater than 50, set cc to the max of 50
-            concurrent_downloads = 50
+        elif concurrent_downloads > 30:
+            # if the user gave a number thats greater than 30, set cc to the max of 30
+            concurrent_downloads = 30
 
     aria_ret_val = check_for_aria()
     if not aria_ret_val:
