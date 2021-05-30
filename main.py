@@ -7,7 +7,6 @@ from vtt_to_srt import convert
 from requests.exceptions import ConnectionError as conn_error
 from html.parser import HTMLParser as compat_HTMLParser
 from sanitize import sanitize, slugify, SLUG_OK
-from pyffmpeg import FFMPeg as FFMPEG
 import subprocess
 import yt_dlp
 
@@ -838,7 +837,7 @@ def decrypt(kid, in_filepath, out_filepath):
 
 
 def handle_segments(url, format_id, video_title, lecture_working_dir,
-                    output_path):
+                    output_path, concurrent_connections):
     temp_filepath = output_path.replace(".mp4", "")
     temp_filepath = temp_filepath + ".mpd-part"
     video_filepath_enc = temp_filepath + ".mp4"
@@ -848,8 +847,9 @@ def handle_segments(url, format_id, video_title, lecture_working_dir,
     print("> Downloading Lecture Tracks...")
     ret_code = subprocess.Popen([
         "yt-dlp", "--force-generic-extractor", "--allow-unplayable-formats",
-        "--downloader", "aria2c", "--fixup", "never", "-k", "-o",
-        f"{temp_filepath}.%(ext)s", "-f", format_id, f"{url}"
+        "--concurrent-fragments", f"{concurrent_connections}", "--downloader",
+        "aria2c", "--fixup", "never", "-k", "-o", f"{temp_filepath}.%(ext)s",
+        "-f", format_id, f"{url}"
     ]).wait()
     print("> Lecture Tracks Downloaded")
 
@@ -997,7 +997,8 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
                 print(f"    > Error converting caption: {e}")
 
 
-def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
+def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token,
+                    concurrent_connections):
     lecture_title = lecture.get("lecture_title")
     is_encrypted = lecture.get("is_encrypted")
     lecture_sources = lecture.get("video_sources")
@@ -1019,7 +1020,8 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
                       lecture_title)
                 handle_segments(source.get("download_url"),
                                 source.get("format_id"), lecture_title,
-                                lecture_working_dir, lecture_path)
+                                lecture_working_dir, lecture_path,
+                                concurrent_connections)
             else:
                 print(
                     "      > Lecture '%s' is already downloaded, skipping..." %
@@ -1055,8 +1057,14 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
                     if source_type == "hls":
                         temp_filepath = lecture_path.replace(".mp4", "")
                         temp_filepath = temp_filepath + ".hls-part.mp4"
-                        retVal = FFMPEG(None, url, access_token,
-                                        temp_filepath).download()
+                        # retVal = FFMPEG(None, url, access_token,
+                        #                 temp_filepath).download()
+                        ret_code = subprocess.Popen([
+                            "yt-dlp", "--force-generic-extractor",
+                            "--concurrent-fragments",
+                            f"{concurrent_connections}", "--downloader",
+                            "aria2c", "-o", f"{temp_filepath}", f"{url}"
+                        ]).wait()
                         if retVal:
                             os.rename(temp_filepath, lecture_path)
                             print("      > HLS Download success")
@@ -1073,7 +1081,7 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
 
 
 def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
-              caption_locale, keep_vtt, access_token):
+              caption_locale, keep_vtt, access_token, concurrent_connections):
     total_chapters = _udemy.get("total_chapters")
     total_lectures = _udemy.get("total_lectures")
     print(f"Chapter(s) ({total_chapters})")
@@ -1119,7 +1127,8 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                         chapter_dir,
                         sanitize(lecture_title) + ".mp4")
                     process_lecture(lecture, lecture_path, chapter_dir,
-                                    quality, access_token)
+                                    quality, access_token,
+                                    concurrent_connections)
 
             if dl_assets:
                 assets = lecture.get("assets")
@@ -1291,6 +1300,14 @@ if __name__ == "__main__":
         "The language to download for captions, specify 'all' to download all captions (Default is 'en')",
     )
     parser.add_argument(
+        "-cd",
+        "--concurrent-downloads",
+        dest="concurrent_downloads",
+        type=int,
+        help=
+        "The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-50)",
+    )
+    parser.add_argument(
         "--skip-lectures",
         dest="skip_lectures",
         action="store_true",
@@ -1352,6 +1369,7 @@ if __name__ == "__main__":
     course_name = None
     keep_vtt = False
     skip_hls = False
+    concurrent_downloads = 10
 
     args = parser.parse_args()
     if args.download_assets:
@@ -1368,6 +1386,15 @@ if __name__ == "__main__":
         keep_vtt = args.keep_vtt
     if args.skip_hls:
         skip_hls = args.skip_hls
+    if args.concurrent_downloads:
+        concurrent_downloads = args.concurrent_downloads
+
+        if concurrent_downloads <= 0:
+            # if the user gave a number that is less than or equal to 0, set cc to default of 10
+            concurrent_downloads = 10
+        elif concurrent_downloads > 50:
+            # if the user gave a number thats greater than 50, set cc to the max of 50
+            concurrent_downloads = 50
 
     aria_ret_val = check_for_aria()
     if not aria_ret_val:
@@ -1444,7 +1471,8 @@ if __name__ == "__main__":
             course_info(_udemy)
         else:
             parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
-                      caption_locale, keep_vtt, access_token)
+                      caption_locale, keep_vtt, access_token,
+                      concurrent_downloads)
     else:
         _udemy = {}
         _udemy["access_token"] = access_token
@@ -1678,4 +1706,5 @@ if __name__ == "__main__":
             course_info(_udemy)
         else:
             parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
-                      caption_locale, keep_vtt, access_token)
+                      caption_locale, keep_vtt, access_token,
+                      concurrent_downloads)
