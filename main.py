@@ -9,6 +9,7 @@ from html.parser import HTMLParser as compat_HTMLParser
 from sanitize import sanitize, slugify, SLUG_OK
 from pyffmpeg import FFMPeg as FFMPEG
 import subprocess
+import yt_dlp
 
 home_dir = os.getcwd()
 download_dir = os.path.join(os.getcwd(), "out_dir")
@@ -214,19 +215,17 @@ class Udemy:
         return _temp
 
     def _extract_media_sources(self, sources):
-        _audio = []
-        _video = []
+        _temp = []
         if sources and isinstance(sources, list):
             for source in sources:
                 _type = source.get("type")
                 src = source.get("src")
 
                 if _type == "application/dash+xml":
-                    video, audio = self._extract_mpd(src)
-                    if video and audio:
-                        _video.extend(video)
-                        _audio.extend(audio)
-        return (_video, _audio)
+                    out = self._extract_mpd(src)
+                    if out:
+                        _temp.extend(out)
+        return _temp
 
     def _extract_subtitles(self, tracks):
         _temp = []
@@ -285,83 +284,49 @@ class Udemy:
         return _temp
 
     def _extract_mpd(self, url):
-        """extract mpd streams"""
-        _video = []
-        _audio = []
+        """extracts mpd streams"""
+        _temp = []
         try:
-            resp = self.session._get(url)
-            resp.raise_for_status()
-            raw_data = resp.text
-            mpd_object = MPEGDASHParser.parse(raw_data)
+            ytdl = yt_dlp.YoutubeDL({
+                'quiet': True,
+                'no_warnings': True,
+                "allow_unplayable_formats": True
+            })
+            results = ytdl.extract_info(url,
+                                        download=False,
+                                        force_generic_extractor=True)
             seen = set()
-            for period in mpd_object.periods:
-                for adapt_set in period.adaptation_sets:
-                    content_type = adapt_set.mime_type
-                    if content_type == "video/mp4":
-                        for rep in adapt_set.representations:
-                            for segment in rep.segment_templates:
-                                segment_count = 1
-                                timeline = segment.segment_timelines[0]
-                                segment_count += len(timeline.Ss)
-                                for s in timeline.Ss:
-                                    if s.r:
-                                        segment_count += s.r
+            formats = results.get("formats")
 
-                                segment_extension = segment.media.split(
-                                    ".")[-1]
-                                height = rep.height
-                                width = rep.width
+            format_id = results.get("format_id")
+            best_audio_format_id = format_id.split("+")[1]
+            best_audio = next((x for x in formats
+                               if x.get("format_id") == best_audio_format_id),
+                              None)
+            for f in formats:
+                if "video" in f.get("format_note"):
+                    # is a video stream
+                    format_id = f.get("format_id")
+                    extension = f.get("ext")
+                    height = f.get("height")
+                    width = f.get("width")
 
-                                if height not in seen:
-                                    seen.add(height)
-                                    _video.append({
-                                        "type":
-                                        "dash",
-                                        "content_type":
-                                        "video",
-                                        "height":
-                                        height,
-                                        "width":
-                                        width,
-                                        "extension":
-                                        segment_extension,
-                                        "segment_count":
-                                        segment_count,
-                                        "media":
-                                        segment.media,
-                                        "initialization":
-                                        segment.initialization
-                                    })
-                    elif content_type == "audio/mp4":
-                        for rep in adapt_set.representations:
-                            for segment in rep.segment_templates:
-                                segment_count = 1
-                                timeline = segment.segment_timelines[0]
-                                segment_count += len(timeline.Ss)
-                                for s in timeline.Ss:
-                                    if s.r:
-                                        segment_count += s.r
-
-                                segment_extension = segment.media.split(
-                                    ".")[-1]
-
-                                _audio.append({
-                                    "type":
-                                    "dash",
-                                    "content_type":
-                                    "audio",
-                                    "extension":
-                                    segment_extension,
-                                    "segment_count":
-                                    segment_count,
-                                    "media":
-                                    segment.media,
-                                    "initialization":
-                                    segment.initialization
-                                })
+                    if height and height not in seen:
+                        seen.add(height)
+                        _temp.append({
+                            "type": "dash",
+                            "height": str(height),
+                            "width": str(width),
+                            "format_id": f"{format_id},{best_audio_format_id}",
+                            "extension": extension,
+                            "download_url": f.get("manifest_url")
+                        })
+                else:
+                    # unknown format type
+                    continue
         except Exception as error:
-            print(f"Udemy Says : '{error}' while fetching mpd manifest")
-        return (_video, _audio)
+            print(f"Error fetching MPD streams: '{error}'")
+        return _temp
 
     def extract_course_name(self, url):
         """
@@ -841,24 +806,20 @@ def cleanup(path):
     os.removedirs(path)
 
 
-def mux_process(video_title, lecture_working_dir, output_path):
+def mux_process(video_title, video_filepath, audio_filepath, output_path):
     """
     @author Jayapraveen
     """
     if os.name == "nt":
         command = "ffmpeg -y -i \"{}\" -i \"{}\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
-            os.path.join(lecture_working_dir, "decrypted_audio.mp4"),
-            os.path.join(lecture_working_dir, "decrypted_video.mp4"),
-            video_title, output_path)
+            video_filepath, audio_filepath, video_title, output_path)
     else:
         command = "nice -n 7 ffmpeg -y -i \"{}\" -i \"{}\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
-            os.path.join(lecture_working_dir, "decrypted_audio.mp4"),
-            os.path.join(lecture_working_dir, "decrypted_video.mp4"),
-            video_title, output_path)
+            video_filepath, audio_filepath, video_title, output_path)
     os.system(command)
 
 
-def decrypt(kid, filename, lecture_working_dir):
+def decrypt(kid, in_filepath, out_filepath):
     """
     @author Jayapraveen
     """
@@ -867,101 +828,48 @@ def decrypt(kid, filename, lecture_working_dir):
         key = keyfile[kid.lower()]
         if (os.name == "nt"):
             os.system(f"mp4decrypt --key 1:%s \"%s\" \"%s\"" %
-                      (key,
-                       os.path.join(lecture_working_dir,
-                                    "encrypted_{}.mp4".format(filename)),
-                       os.path.join(lecture_working_dir,
-                                    "decrypted_{}.mp4".format(filename))))
+                      (key, in_filepath, out_filepath))
         else:
             os.system(f"nice -n 7 mp4decrypt --key 1:%s \"%s\" \"%s\"" %
-                      (key,
-                       os.path.join(lecture_working_dir,
-                                    "encrypted_{}.mp4".format(filename)),
-                       os.path.join(lecture_working_dir,
-                                    "decrypted_{}.mp4".format(filename))))
+                      (key, in_filepath, out_filepath))
         print("> Decryption complete")
     except KeyError:
         raise KeyError("Key not found")
 
 
-def handle_segments(video_source, audio_source, video_title,
-                    lecture_working_dir, output_path):
-    """
-    @author Jayapraveen
-    """
-    no_vid_segments = video_source.get("segment_count")
-    no_aud_segments = audio_source.get("segment_count")
-
-    audio_media = audio_source.get("media")
-    audio_init = audio_source.get("initialization")
-    audio_extension = audio_source.get("extension")
-
-    video_media = video_source.get("media")
-    video_init = video_source.get("initialization")
-    video_extension = video_source.get("extension")
-
-    audio_urls = audio_init + "\n  dir={}\n  out=audio_0.mp4\n".format(
-        lecture_working_dir)
-    video_urls = video_init + "\n  dir={}\n  out=video_0.mp4\n".format(
-        lecture_working_dir)
-
-    list_path = os.path.join(lecture_working_dir, "list.txt")
-
-    for i in range(1, no_aud_segments):
-        audio_urls += audio_media.replace(
-            "$Number$", str(i)) + "\n  dir={}\n  out=audio_{}.mp4\n".format(
-                lecture_working_dir, i)
-    for i in range(1, no_vid_segments):
-        video_urls += video_media.replace(
-            "$Number$", str(i)) + "\n  dir={}\n  out=video_{}.mp4\n".format(
-                lecture_working_dir, i)
-
-    with open(list_path, 'w') as f:
-        f.write("{}\n{}".format(audio_urls, video_urls))
-        f.close()
-
-    print("> Downloading Lecture Segments...")
+def handle_segments(url, format_id, video_title, lecture_working_dir,
+                    output_path):
+    temp_filepath = output_path.replace(".mp4", "")
+    temp_filepath = temp_filepath + ".mpd-part"
+    video_filepath_enc = temp_filepath + ".mp4"
+    audio_filepath_enc = temp_filepath + ".m4a"
+    video_filepath_dec = temp_filepath + ".decrypted.mp4"
+    audio_filepath_dec = temp_filepath + ".decrypted.m4a"
+    print("> Downloading Lecture Tracks...")
     ret_code = subprocess.Popen([
-        "aria2c", "-i", list_path, "-j16", "-s20", "-x16", "-c",
-        "--auto-file-renaming=false", "--summary-interval=0"
+        "yt-dlp", "--force-generic-extractor", "--allow-unplayable-formats",
+        "--downloader", "aria2c", "--fixup", "never", "-k", "-o",
+        f"{temp_filepath}.%(ext)s", "-f", format_id, f"{url}"
     ]).wait()
-    print("> Lecture Segments Downloaded")
+    print("> Lecture Tracks Downloaded")
 
     print("Return code: " + str(ret_code))
 
-    os.remove(list_path)
-
-    video_kid = extract_kid(os.path.join(lecture_working_dir, "video_0.mp4"))
+    video_kid = extract_kid(video_filepath_enc)
     print("KID for video file is: " + video_kid)
 
-    audio_kid = extract_kid(os.path.join(lecture_working_dir, "audio_0.mp4"))
+    audio_kid = extract_kid(audio_filepath_enc)
     print("KID for audio file is: " + audio_kid)
 
-    os.chdir(lecture_working_dir)
-
-    if os.name == "nt":
-        video_concat_command = "copy /b " + "+".join([
-            f"video_{i}.{video_extension}" for i in range(0, no_vid_segments)
-        ]) + " encrypted_video.mp4"
-        audio_concat_command = "copy /b " + "+".join([
-            f"audio_{i}.{audio_extension}" for i in range(0, no_aud_segments)
-        ]) + " encrypted_audio.mp4"
-    else:
-        video_concat_command = "cat " + " ".join([
-            f"video_{i}.{video_extension}" for i in range(0, no_aud_segments)
-        ]) + " > encrypted_video.mp4"
-        audio_concat_command = "cat " + " ".join([
-            f"audio_{i}.{audio_extension}" for i in range(0, no_vid_segments)
-        ]) + " > encrypted_audio.mp4"
-    os.system(video_concat_command)
-    os.system(audio_concat_command)
-    os.chdir(home_dir)
     try:
-        decrypt(video_kid, "video", lecture_working_dir)
-        decrypt(audio_kid, "audio", lecture_working_dir)
-        os.chdir(home_dir)
-        mux_process(video_title, lecture_working_dir, output_path)
-        cleanup(lecture_working_dir)
+        decrypt(video_kid, video_filepath_enc, video_filepath_dec)
+        decrypt(audio_kid, audio_filepath_enc, audio_filepath_dec)
+        mux_process(video_title, video_filepath_dec, audio_filepath_dec,
+                    output_path)
+        os.remove(video_filepath_enc)
+        os.remove(audio_filepath_enc)
+        os.remove(video_filepath_dec)
+        os.remove(audio_filepath_dec)
     except Exception as e:
         print(f"Error: ", e)
 
@@ -1092,27 +1000,25 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
 def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
     lecture_title = lecture.get("lecture_title")
     is_encrypted = lecture.get("is_encrypted")
-    lecture_video_sources = lecture.get("video_sources")
-    lecture_audio_sources = lecture.get("audio_sources")
+    lecture_sources = lecture.get("video_sources")
 
     if is_encrypted:
-        if len(lecture_audio_sources) > 0 and len(lecture_video_sources) > 0:
+        if len(lecture_sources) > 0:
             lecture_working_dir = os.path.join(working_dir,
                                                str(lecture.get("asset_id")))
 
             if not os.path.isfile(lecture_path):
-                video_source = lecture_video_sources[
-                    -1]  # last index is the best quality
-                audio_source = lecture_audio_sources[-1]
+                source = lecture_sources[-1]  # last index is the best quality
                 if isinstance(quality, int):
-                    video_source = min(
-                        lecture_video_sources,
+                    source = min(
+                        lecture_sources,
                         key=lambda x: abs(int(x.get("height")) - quality))
                 if not os.path.exists(lecture_working_dir):
                     os.mkdir(lecture_working_dir)
                 print(f"      > Lecture '%s' has DRM, attempting to download" %
                       lecture_title)
-                handle_segments(video_source, audio_source, lecture_title,
+                handle_segments(source.get("download_url"),
+                                source.get("format_id"), lecture_title,
                                 lecture_working_dir, lecture_path)
             else:
                 print(
@@ -1121,7 +1027,7 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token):
         else:
             print(f"      > Lecture '%s' is missing media links" %
                   lecture_title)
-            print(len(lecture_audio_sources), len(lecture_video_sources))
+            print(len(lecture_sources))
     else:
         sources = lecture.get("sources")
         sources = sorted(sources,
@@ -1210,7 +1116,8 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                         continue
                 else:
                     lecture_path = os.path.join(
-                        chapter_dir, "{}.mp4".format(sanitize(lecture_title)))
+                        chapter_dir,
+                        sanitize(lecture_title) + ".mp4")
                     process_lecture(lecture, lecture_path, chapter_dir,
                                     quality, access_token)
 
@@ -1593,6 +1500,9 @@ if __name__ == "__main__":
                             counter += 1
 
                     if lecture_id:
+                        print(
+                            f"Processing {course.index(entry)} of {len(course)}"
+                        )
                         retVal = []
 
                         if isinstance(asset, dict):
@@ -1679,12 +1589,11 @@ if __name__ == "__main__":
                             # encrypted
                             data = asset.get("media_sources")
                             if data and isinstance(data, list):
-                                video_media_sources, audio_media_sources = udemy._extract_media_sources(
-                                    data)
+                                sources = udemy._extract_media_sources(data)
                                 tracks = asset.get("captions")
                                 # duration = asset.get("time_estimation")
                                 subtitles = udemy._extract_subtitles(tracks)
-                                sources_count = len(video_media_sources)
+                                sources_count = len(sources)
                                 subtitle_count = len(subtitles)
                                 lectures.append({
                                     "index": lecture_counter,
@@ -1694,8 +1603,7 @@ if __name__ == "__main__":
                                     # "duration": duration,
                                     "assets": retVal,
                                     "assets_count": len(retVal),
-                                    "video_sources": video_media_sources,
-                                    "audio_sources": audio_media_sources,
+                                    "video_sources": sources,
                                     "subtitles": subtitles,
                                     "subtitle_count": subtitle_count,
                                     "sources_count": sources_count,
