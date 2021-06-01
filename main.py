@@ -21,7 +21,6 @@ from sanitize import sanitize, slugify, SLUG_OK
 import subprocess
 import yt_dlp
 
-home_dir = os.getcwd()
 download_dir = os.path.join(os.getcwd(), "out_dir")
 working_dir = os.path.join(os.getcwd(), "working_dir")
 keyfile_path = os.path.join(os.getcwd(), "keyfile.json")
