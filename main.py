@@ -1,4 +1,15 @@
-import os, requests, json, glob, argparse, sys, re, time, asyncio, json, cloudscraper, m3u8
+import os
+import requests
+import json
+import glob
+import argparse
+import sys
+import re
+import time
+import asyncio
+import json
+import cloudscraper
+import m3u8
 from tqdm import tqdm
 from dotenv import load_dotenv
 from mpegdash.parser import MPEGDASHParser
@@ -74,6 +85,7 @@ class Udemy:
             download_urls = entry.get("download_urls")
             external_url = entry.get("external_url")
             asset_type = entry.get("asset_type").lower()
+            id = entry.get("id")
             if asset_type == "file":
                 if download_urls and isinstance(download_urls, dict):
                     extension = filename.rsplit(
@@ -85,6 +97,7 @@ class Udemy:
                         "filename": filename,
                         "extension": extension,
                         "download_url": download_url,
+                        "id": id
                     })
             elif asset_type == "sourcecode":
                 if download_urls and isinstance(download_urls, dict):
@@ -98,6 +111,7 @@ class Udemy:
                         "filename": filename,
                         "extension": extension,
                         "download_url": download_url,
+                        "id": id
                     })
             elif asset_type == "externallink":
                 _temp.append({
@@ -106,6 +120,7 @@ class Udemy:
                     "filename": filename,
                     "extension": "txt",
                     "download_url": external_url,
+                    "id": id
                 })
         return _temp
 
@@ -113,6 +128,7 @@ class Udemy:
         _temp = []
         download_urls = assets.get("download_urls")
         filename = assets.get("filename")
+        id = asset.get("id")
         if download_urls and isinstance(download_urls, dict):
             extension = filename.rsplit(".", 1)[-1] if "." in filename else ""
             download_url = download_urls.get("Presentation", [])[0].get("file")
@@ -121,6 +137,7 @@ class Udemy:
                 "filename": filename,
                 "extension": extension,
                 "download_url": download_url,
+                "id": id
             })
         return _temp
 
@@ -128,6 +145,7 @@ class Udemy:
         _temp = []
         download_urls = assets.get("download_urls")
         filename = assets.get("filename")
+        id = asset.get("id")
         if download_urls and isinstance(download_urls, dict):
             extension = filename.rsplit(".", 1)[-1] if "." in filename else ""
             download_url = download_urls.get("File", [])[0].get("file")
@@ -136,6 +154,7 @@ class Udemy:
                 "filename": filename,
                 "extension": extension,
                 "download_url": download_url,
+                "id": id
             })
         return _temp
 
@@ -143,6 +162,7 @@ class Udemy:
         _temp = []
         download_urls = assets.get("download_urls")
         filename = assets.get("filename")
+        id = asset.get("id")
         if download_urls and isinstance(download_urls, dict):
             extension = filename.rsplit(".", 1)[-1] if "." in filename else ""
             download_url = download_urls.get("E-Book", [])[0].get("file")
@@ -151,6 +171,7 @@ class Udemy:
                 "filename": filename,
                 "extension": extension,
                 "download_url": download_url,
+                "id": id
             })
         return _temp
 
@@ -158,6 +179,7 @@ class Udemy:
         _temp = []
         download_urls = assets.get("download_urls")
         filename = assets.get("filename")
+        id = asset.get("id")
         if download_urls and isinstance(download_urls, dict):
             extension = filename.rsplit(".", 1)[-1] if "." in filename else ""
             download_url = download_urls.get("Audio", [])[0].get("file")
@@ -166,6 +188,7 @@ class Udemy:
                 "filename": filename,
                 "extension": extension,
                 "download_url": download_url,
+                "id": id
             })
         return _temp
 
@@ -642,6 +665,7 @@ class Session(object):
 # Thanks to a great open source utility youtube-dl ..
 class HTMLAttributeParser(compat_HTMLParser):  # pylint: disable=W
     """Trivial HTML parser to gather the attributes for a single element"""
+
     def __init__(self):
         self.attrs = {}
         compat_HTMLParser.__init__(self)
@@ -796,7 +820,7 @@ if not os.path.exists(working_dir):
 if not os.path.exists(download_dir):
     os.makedirs(download_dir)
 
-#Get the keys
+# Get the keys
 with open(keyfile_path, 'r') as keyfile:
     keyfile = keyfile.read()
 keyfile = json.loads(keyfile)
@@ -807,7 +831,7 @@ def durationtoseconds(period):
     @author Jayapraveen
     """
 
-    #Duration format in PTxDxHxMxS
+    # Duration format in PTxDxHxMxS
     if (period[:2] == "PT"):
         period = period[2:]
         day = int(period.split("D")[0] if 'D' in period else 0)
@@ -1223,6 +1247,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                     asset_type = asset.get("type")
                     filename = asset.get("filename")
                     download_url = asset.get("download_url")
+                    asset_id = asset.get("id")
 
                     if asset_type == "article":
                         print(
@@ -1246,7 +1271,8 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                         print("AssetType: Video; AssetData: ", asset)
                     elif asset_type == "audio" or asset_type == "e-book" or asset_type == "file" or asset_type == "presentation":
                         try:
-                            download_aria(download_url, chapter_dir, filename)
+                            download_aria(download_url, chapter_dir,
+                                          f"{asset_id}-{filename}")
                         except Exception as e:
                             print("> Error downloading asset: ", e)
                             continue
@@ -1372,16 +1398,14 @@ if __name__ == "__main__":
         "--quality",
         dest="quality",
         type=int,
-        help=
-        "Download specific video quality. If the requested quality isn't available, the closest quality will be used. If not specified, the best quality will be downloaded for each lecture",
+        help="Download specific video quality. If the requested quality isn't available, the closest quality will be used. If not specified, the best quality will be downloaded for each lecture",
     )
     parser.add_argument(
         "-l",
         "--lang",
         dest="lang",
         type=str,
-        help=
-        "The language to download for captions, specify 'all' to download all captions (Default is 'en')",
+        help="The language to download for captions, specify 'all' to download all captions (Default is 'en')",
     )
     parser.add_argument(
         "--skip-lectures",
@@ -1411,15 +1435,13 @@ if __name__ == "__main__":
         "--skip-hls",
         dest="skip_hls",
         action="store_true",
-        help=
-        "If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p quality for non-drm lectures)",
+        help="If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p quality for non-drm lectures)",
     )
     parser.add_argument(
         "--info",
         dest="info",
         action="store_true",
-        help=
-        "If specified, only course information will be printed, nothing will be downloaded",
+        help="If specified, only course information will be printed, nothing will be downloaded",
     )
 
     parser.add_argument(
