@@ -861,7 +861,7 @@ def decrypt(kid, in_filepath, out_filepath):
 
 def handle_segments(url, format_id, video_title, lecture_working_dir,
                     output_path, concurrent_connections):
-    temp_filepath = output_path.replace(".mp4", "")
+    temp_filepath = output_path.replace("%", "").replace(".mp4", "")
     temp_filepath = temp_filepath + ".mpd-part"
     video_filepath_enc = temp_filepath + ".mp4"
     audio_filepath_enc = temp_filepath + ".m4a"
