@@ -8,3 +8,4 @@ webvtt-py
 pysrt
 m3u8
 colorama
+yt-dlp
