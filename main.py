@@ -871,7 +871,7 @@ def handle_segments(url, format_id, video_title, lecture_working_dir,
     ret_code = subprocess.Popen([
         "yt-dlp", "--force-generic-extractor", "--allow-unplayable-formats",
         "--concurrent-fragments", f"{concurrent_connections}", "--downloader",
-        "aria2c", "--fixup", "never", "-k", "-o", f"{temp_filepath}.%(ext)s",
+        "aria2c", "--disable-ipv6", "--fixup", "never", "-k", "-o", f"{temp_filepath}.%(ext)s",
         "-f", format_id, f"{url}"
     ]).wait()
     print("> Lecture Tracks Downloaded")
@@ -976,7 +976,7 @@ def download_aria(url, file_dir, filename):
     """
     print("    > Downloading File...")
     ret_code = subprocess.Popen([
-        "aria2c", url, "-o", filename, "-d", file_dir, "-j16", "-s20", "-x16",
+        "aria2c", url, "--disable-ipv6", "-o", filename, "-d", file_dir, "-j16", "-s20", "-x16",
         "-c", "--auto-file-renaming=false", "--summary-interval=0"
     ]).wait()
     print("    > File Downloaded")
@@ -1086,7 +1086,7 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token,
                             "yt-dlp", "--force-generic-extractor",
                             "--concurrent-fragments",
                             f"{concurrent_connections}", "--downloader",
-                            "aria2c", "-o", f"{temp_filepath}", f"{url}"
+                            "aria2c", "--disable-ipv6", "-o", f"{temp_filepath}", f"{url}"
                         ]).wait()
                         if retVal:
                             os.rename(temp_filepath, lecture_path)
