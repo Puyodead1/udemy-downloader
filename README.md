@@ -66,8 +66,8 @@ You can now run the program, see the examples below. The course will download to
 # Advanced Usage
 
 ```
-usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [--skip-lectures] [--download-assets] [--download-captions]
-               [--keep-vtt] [--skip-hls] [--info]
+usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_DOWNLOADS] [--skip-lectures] [--download-assets]
+               [--download-captions] [--keep-vtt] [--skip-hls] [--info]
 
 Udemy Downloader
 
@@ -81,6 +81,8 @@ optional arguments:
                         Download specific video quality. If the requested quality isn't available, the closest quality will be used. If not
                         specified, the best quality will be downloaded for each lecture
   -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is 'en')
+  -cd CONCURRENT_DOWNLOADS, --concurrent-downloads CONCURRENT_DOWNLOADS
+                        The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-50)
   --skip-lectures       If specified, lectures won't be downloaded
   --download-assets     If specified, lecture assets will be downloaded
   --download-captions   If specified, captions will be downloaded
@@ -117,6 +119,9 @@ optional arguments:
   - `python main.py -c <Course URL> --skip-hls`
 - Print course information only:
   - `python main.py -c <Course URL> --info`
+- Specify max number of concurrent downloads:
+  - `python main.py -c <Course URL> --concurrent-downloads 20`
+  - `python main.py -c <Course URL> -cd 20`
 
 # Credits
 
