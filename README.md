@@ -27,7 +27,7 @@ Windows is the primary development OS, but I've made an effort to support linux 
 
 # Requirements
 
-1. You would need to download `ffmpeg`, `aria2c` and `mp4decrypter` (from Bento4 SDK) and ensure they are in path (typing their name in cmd should invoke them).
+1. You would need to download `ffmpeg`, `aria2c` and `mp4decrypt` (from Bento4 SDK) and ensure they are in path (typing their name in cmd should invoke them).
 
 # Usage
 
