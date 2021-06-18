@@ -1111,7 +1111,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
     print(f"Lecture(s) ({total_lectures})")
 
     course_name = _udemy.get("course_title")
-    course_dir = os.path.join(download_dir, course_name)
+    course_dir = os.path.join(download_dir, course_name[:255])
     if not os.path.exists(course_dir):
         os.mkdir(course_dir)
 
@@ -1137,7 +1137,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                     html_content = lecture.get("html_content").encode(
                         "ascii", "ignore").decode("utf8")
                     lecture_path = os.path.join(
-                        chapter_dir, "{}.html".format(sanitize(lecture_title)))
+                        chapter_dir, "{}.html".format(sanitize(lecture_title)[:255]))
                     try:
                         with open(lecture_path, 'w') as f:
                             f.write(html_content)
@@ -1327,8 +1327,7 @@ if __name__ == "__main__":
         "--concurrent-downloads",
         dest="concurrent_downloads",
         type=int,
-        help=
-        "The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-30)",
+        help="The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-30)",
     )
     parser.add_argument(
         "--skip-lectures",
