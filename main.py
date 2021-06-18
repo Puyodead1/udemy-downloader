@@ -901,7 +901,7 @@ def check_for_aria():
     try:
         subprocess.Popen(["aria2c", "-v"],
                          stdout=subprocess.DEVNULL,
-                         stdin=subprocess.DEVNULL).wait()
+                         stderr=subprocess.DEVNULL).wait()
         return True
     except FileNotFoundError:
         return False
@@ -915,8 +915,8 @@ def check_for_aria():
 def check_for_ffmpeg():
     try:
         subprocess.Popen(["ffmpeg"],
-                         stdout=subprocess.DEVNULL,
-                         stdin=subprocess.DEVNULL).wait()
+                         stderr=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL).wait()
         return True
     except FileNotFoundError:
         return False
@@ -930,8 +930,8 @@ def check_for_ffmpeg():
 def check_for_mp4decrypt():
     try:
         subprocess.Popen(["mp4decrypt"],
-                         stdout=subprocess.DEVNULL,
-                         stdin=subprocess.DEVNULL).wait()
+                         stderr=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL).wait()
         return True
     except FileNotFoundError:
         return False
