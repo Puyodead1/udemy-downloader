@@ -21,6 +21,7 @@ from sanitize import sanitize, slugify, SLUG_OK
 import subprocess
 import yt_dlp
 
+home_dir = os.getcwd()
 download_dir = os.path.join(os.getcwd(), "out_dir")
 working_dir = os.path.join(os.getcwd(), "working_dir")
 keyfile_path = os.path.join(os.getcwd(), "keyfile.json")
@@ -859,34 +860,36 @@ def decrypt(kid, in_filepath, out_filepath):
         raise KeyError("Key not found")
 
 
-def handle_segments(url, format_id, video_title, lecture_working_dir,
-                    output_path, concurrent_connections):
+def handle_segments(url, format_id, video_title, chapter_dir,
+                    output_path, lecture_file_name, concurrent_connections):
+    os.chdir(chapter_dir)
+    # temp_filepath = output_path.replace("%", "").replace(".mp4", "")
+    file_name = lecture_file_name.replace("%", "").repalce(".mp4", "")
+    video_filepath_enc = file_name + ".mp4"
+    audio_filepath_enc = file_name + ".m4a"
+    video_filepath_dec = file_name + ".decrypted.mp4"
+    audio_filepath_dec = file_name + ".decrypted.m4a"
+    print("> Downloading Lecture Tracks...")
+    ret_code = subprocess.Popen([
+        "yt-dlp", "--force-generic-extractor", "--allow-unplayable-formats",
+        "--concurrent-fragments", f"{concurrent_connections}", "--downloader",
+        "aria2c", "--fixup", "never", "-k", "-o", f"{file_name}.%(ext)s",
+        "-f", format_id, f"{url}"
+    ]).wait()
+    print("> Lecture Tracks Downloaded")
+
+    print("Return code: " + str(ret_code))
+    if ret_code != 0:
+        print("Return code from the downloader was non-0 (error), skipping!")
+        return
+
+    video_kid = extract_kid(video_filepath_enc)
+    print("KID for video file is: " + video_kid)
+
+    audio_kid = extract_kid(audio_filepath_enc)
+    print("KID for audio file is: " + audio_kid)
+
     try:
-        temp_filepath = output_path.replace("%", "").replace(".mp4", "")
-        video_filepath_enc = temp_filepath + ".mp4"
-        audio_filepath_enc = temp_filepath + ".m4a"
-        video_filepath_dec = temp_filepath + ".decrypted.mp4"
-        audio_filepath_dec = temp_filepath + ".decrypted.m4a"
-        print("> Downloading Lecture Tracks...")
-        ret_code = subprocess.Popen([
-            "yt-dlp", "--force-generic-extractor", "--allow-unplayable-formats",
-            "--concurrent-fragments", f"{concurrent_connections}", "--downloader",
-            "aria2c", "--fixup", "never", "-k", "-o", f"{temp_filepath}.%(ext)s",
-            "-f", format_id, f"{url}"
-        ]).wait()
-        print("> Lecture Tracks Downloaded")
-
-        print("Return code: " + str(ret_code))
-        if ret_code != 0:
-            print("Return code from the downloader was non-0 (error), skipping!")
-            return
-
-        video_kid = extract_kid(video_filepath_enc)
-        print("KID for video file is: " + video_kid)
-
-        audio_kid = extract_kid(audio_filepath_enc)
-        print("KID for audio file is: " + audio_kid)
-
         decrypt(video_kid, video_filepath_enc, video_filepath_dec)
         decrypt(audio_kid, audio_filepath_enc, audio_filepath_dec)
         mux_process(video_title, video_filepath_dec, audio_filepath_dec,
@@ -895,6 +898,7 @@ def handle_segments(url, format_id, video_title, lecture_working_dir,
         os.remove(audio_filepath_enc)
         os.remove(video_filepath_dec)
         os.remove(audio_filepath_dec)
+        os.chdir(home_dir)
     except Exception as e:
         print(f"Error: ", e)
 
@@ -1022,7 +1026,7 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
                 print(f"    > Error converting caption: {e}")
 
 
-def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token,
+def process_lecture(lecture, lecture_path, chapter_dir, lecture_file_name, quality, access_token,
                     concurrent_connections):
     lecture_title = lecture.get("lecture_title")
     is_encrypted = lecture.get("is_encrypted")
@@ -1030,8 +1034,8 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token,
 
     if is_encrypted:
         if len(lecture_sources) > 0:
-            lecture_working_dir = os.path.join(working_dir,
-                                               str(lecture.get("asset_id")))
+            # lecture_working_dir = os.path.join(working_dir,
+            #                                    str(lecture.get("asset_id")))
 
             if not os.path.isfile(lecture_path):
                 source = lecture_sources[-1]  # last index is the best quality
@@ -1039,13 +1043,13 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token,
                     source = min(
                         lecture_sources,
                         key=lambda x: abs(int(x.get("height")) - quality))
-                if not os.path.exists(lecture_working_dir):
-                    os.mkdir(lecture_working_dir)
+                # if not os.path.exists(lecture_working_dir):
+                #     os.mkdir(lecture_working_dir)
                 print(f"      > Lecture '%s' has DRM, attempting to download" %
                       lecture_title)
                 handle_segments(source.get("download_url"),
-                                source.get("format_id"), lecture_title,
-                                lecture_working_dir, lecture_path,
+                                source.get(
+                                    "format_id"), chapter_dir, lecture_title, lecture_path, lecture_file_name,
                                 concurrent_connections)
             else:
                 print(
@@ -1061,10 +1065,10 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token,
                          key=lambda x: int(x.get("height")),
                          reverse=True)
         if sources:
-            lecture_working_dir = os.path.join(working_dir,
-                                               str(lecture.get("asset_id")))
-            if not os.path.exists(lecture_working_dir):
-                os.mkdir(lecture_working_dir)
+            # lecture_working_dir = os.path.join(working_dir,
+            #                                    str(lecture.get("asset_id")))
+            # if not os.path.exists(lecture_working_dir):
+            #     os.mkdir(lecture_working_dir)
             if not os.path.isfile(lecture_path):
                 print(
                     "      > Lecture doesn't have DRM, attempting to download..."
@@ -1147,10 +1151,11 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                         print("    > Failed to write html file: ", e)
                         continue
                 else:
+                    lecture_file_name = sanitize(lecture_title + ".mp4")
                     lecture_path = os.path.join(
                         chapter_dir,
-                        sanitize(lecture_title) + ".mp4")
-                    process_lecture(lecture, lecture_path, chapter_dir,
+                        lecture_file_name)
+                    process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir,
                                     quality, access_token,
                                     concurrent_connections)
 
