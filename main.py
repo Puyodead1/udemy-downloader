@@ -860,11 +860,10 @@ def decrypt(kid, in_filepath, out_filepath):
         raise KeyError("Key not found")
 
 
-def handle_segments(url, format_id, video_title, chapter_dir,
-                    output_path, lecture_file_name, concurrent_connections):
-    os.chdir(chapter_dir)
-    # temp_filepath = output_path.replace("%", "").replace(".mp4", "")
-    file_name = lecture_file_name.replace("%", "").repalce(".mp4", "")
+def handle_segments(url, format_id, video_title,
+                    output_path, lecture_file_name, concurrent_connections, chapter_dir):
+    os.chdir(os.path.join(chapter_dir))
+    file_name = lecture_file_name.replace("%", "").replace(".mp4", "")
     video_filepath_enc = file_name + ".mp4"
     audio_filepath_enc = file_name + ".m4a"
     video_filepath_dec = file_name + ".decrypted.mp4"
@@ -1026,8 +1025,8 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
                 print(f"    > Error converting caption: {e}")
 
 
-def process_lecture(lecture, lecture_path, chapter_dir, lecture_file_name, quality, access_token,
-                    concurrent_connections):
+def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_token,
+                    concurrent_connections, chapter_dir):
     lecture_title = lecture.get("lecture_title")
     is_encrypted = lecture.get("is_encrypted")
     lecture_sources = lecture.get("video_sources")
@@ -1049,8 +1048,8 @@ def process_lecture(lecture, lecture_path, chapter_dir, lecture_file_name, quali
                       lecture_title)
                 handle_segments(source.get("download_url"),
                                 source.get(
-                                    "format_id"), chapter_dir, lecture_title, lecture_path, lecture_file_name,
-                                concurrent_connections)
+                                    "format_id"), lecture_title, lecture_path, lecture_file_name,
+                                concurrent_connections, chapter_dir)
             else:
                 print(
                     "      > Lecture '%s' is already downloaded, skipping..." %
@@ -1097,8 +1096,8 @@ def process_lecture(lecture, lecture_path, chapter_dir, lecture_file_name, quali
                             os.rename(temp_filepath, lecture_path)
                             print("      > HLS Download success")
                     else:
-                        download_aria(url, lecture_dir, lecture_title + ".mp4")
-                except Exception as e:
+                        download_aria(url, chapter_dir, lecture_title + ".mp4")
+                except EnvironmentError as e:
                     print(f"      > Error downloading lecture: ", e)
             else:
                 print(
@@ -1155,9 +1154,9 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                     lecture_path = os.path.join(
                         chapter_dir,
                         lecture_file_name)
-                    process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir,
+                    process_lecture(lecture, lecture_path, lecture_file_name,
                                     quality, access_token,
-                                    concurrent_connections)
+                                    concurrent_connections, chapter_dir)
 
             if dl_assets:
                 assets = lecture.get("assets")
