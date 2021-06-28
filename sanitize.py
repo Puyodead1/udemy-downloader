@@ -36,7 +36,7 @@ def slugify(s,
             lower=True,
             spaces=False,
             only_ascii=False,
-            space_replacement="-"):
+            space_replacement="_"):
     """
     Creates a unicode slug for given string with several options.
     L and N signify letter/number.
