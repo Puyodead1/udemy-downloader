@@ -861,30 +861,32 @@ def decrypt(kid, in_filepath, out_filepath):
 
 def handle_segments(url, format_id, video_title, lecture_working_dir,
                     output_path, concurrent_connections):
-    temp_filepath = output_path.replace("%", "").replace(".mp4", "")
-    temp_filepath = temp_filepath + ".mpd-part"
-    video_filepath_enc = temp_filepath + ".mp4"
-    audio_filepath_enc = temp_filepath + ".m4a"
-    video_filepath_dec = temp_filepath + ".decrypted.mp4"
-    audio_filepath_dec = temp_filepath + ".decrypted.m4a"
-    print("> Downloading Lecture Tracks...")
-    ret_code = subprocess.Popen([
-        "yt-dlp", "--force-generic-extractor", "--allow-unplayable-formats",
-        "--concurrent-fragments", f"{concurrent_connections}", "--downloader",
-        "aria2c", "--fixup", "never", "-k", "-o", f"{temp_filepath}.%(ext)s",
-        "-f", format_id, f"{url}"
-    ]).wait()
-    print("> Lecture Tracks Downloaded")
-
-    print("Return code: " + str(ret_code))
-
-    video_kid = extract_kid(video_filepath_enc)
-    print("KID for video file is: " + video_kid)
-
-    audio_kid = extract_kid(audio_filepath_enc)
-    print("KID for audio file is: " + audio_kid)
-
     try:
+        temp_filepath = output_path.replace("%", "").replace(".mp4", "")
+        video_filepath_enc = temp_filepath + ".mp4"
+        audio_filepath_enc = temp_filepath + ".m4a"
+        video_filepath_dec = temp_filepath + ".decrypted.mp4"
+        audio_filepath_dec = temp_filepath + ".decrypted.m4a"
+        print("> Downloading Lecture Tracks...")
+        ret_code = subprocess.Popen([
+            "yt-dlp", "--force-generic-extractor", "--allow-unplayable-formats",
+            "--concurrent-fragments", f"{concurrent_connections}", "--downloader",
+            "aria2c", "--fixup", "never", "-k", "-o", f"{temp_filepath}.%(ext)s",
+            "-f", format_id, f"{url}"
+        ]).wait()
+        print("> Lecture Tracks Downloaded")
+
+        print("Return code: " + str(ret_code))
+        if ret_code != 0:
+            print("Return code from the downloader was non-0 (error), skipping!")
+            return
+
+        video_kid = extract_kid(video_filepath_enc)
+        print("KID for video file is: " + video_kid)
+
+        audio_kid = extract_kid(audio_filepath_enc)
+        print("KID for audio file is: " + audio_kid)
+
         decrypt(video_kid, video_filepath_enc, video_filepath_dec)
         decrypt(audio_kid, audio_filepath_enc, audio_filepath_dec)
         mux_process(video_title, video_filepath_dec, audio_filepath_dec,
@@ -1079,7 +1081,6 @@ def process_lecture(lecture, lecture_path, lecture_dir, quality, access_token,
                     source_type = source.get("type")
                     if source_type == "hls":
                         temp_filepath = lecture_path.replace(".mp4", "")
-                        temp_filepath = temp_filepath + ".hls-part.mp4"
                         # retVal = FFMPEG(None, url, access_token,
                         #                 temp_filepath).download()
                         ret_code = subprocess.Popen([
@@ -1111,7 +1112,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
     print(f"Lecture(s) ({total_lectures})")
 
     course_name = _udemy.get("course_title")
-    course_dir = os.path.join(download_dir, course_name[:255])
+    course_dir = os.path.join(download_dir, course_name)
     if not os.path.exists(course_dir):
         os.mkdir(course_dir)
 
@@ -1137,7 +1138,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                     html_content = lecture.get("html_content").encode(
                         "ascii", "ignore").decode("utf8")
                     lecture_path = os.path.join(
-                        chapter_dir, "{}.html".format(sanitize(lecture_title)[:255]))
+                        chapter_dir, "{}.html".format(sanitize(lecture_title)))
                     try:
                         with open(lecture_path, 'w') as f:
                             f.write(html_content)
