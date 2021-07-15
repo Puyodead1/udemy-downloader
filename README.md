@@ -27,7 +27,7 @@ Windows is the primary development OS, but I've made an effort to support linux 
 
 # Requirements
 
-1. You would need to download `ffmpeg`, `aria2c` and `mp4decrypt` (from Bento4 SDK) and ensure they are in path (typing their name in cmd should invoke them).
+1. You would need to download `ffmpeg`, `aria2c`, `mp4decrypt` (from Bento4 SDK) and ``yt-dlp`` (``pip install yt-dlp``). Ensure they are in the system path (typing their name in cmd should invoke them).
 
 # Usage
 
@@ -53,7 +53,7 @@ You will need to get a few things before you can use this program:
 
 ### Key ID and Key
 
-It is up to you to aquire the key and key id. Please don't ask me for help acquiring these, decrypting DRM protected content can be considered piracy.
+It is up to you to aquire the key and key ID. Please don't ask me for help acquiring these, decrypting DRM protected content can be considered piracy.
 
 - Enter the key and key id in the `keyfile.json`
 - ![keyfile example](https://i.imgur.com/e5aU0ng.png)
