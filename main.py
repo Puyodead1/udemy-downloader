@@ -1,25 +1,24 @@
-import os
-import requests
-import json
-import glob
 import argparse
-import sys
-import re
-import time
-import asyncio
+import glob
 import json
+import os
+import re
+import subprocess
+import sys
+import time
+from html.parser import HTMLParser as compat_HTMLParser
+
 import cloudscraper
 import m3u8
-from tqdm import tqdm
+import requests
+import yt_dlp
 from dotenv import load_dotenv
-from mpegdash.parser import MPEGDASHParser
+from requests.exceptions import ConnectionError as conn_error
+from tqdm import tqdm
+
+from sanitize import sanitize, slugify, SLUG_OK
 from utils import extract_kid
 from vtt_to_srt import convert
-from requests.exceptions import ConnectionError as conn_error
-from html.parser import HTMLParser as compat_HTMLParser
-from sanitize import sanitize, slugify, SLUG_OK
-import subprocess
-import yt_dlp
 
 home_dir = os.getcwd()
 download_dir = os.path.join(os.getcwd(), "out_dir")
@@ -1033,17 +1032,12 @@ def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_to
 
     if is_encrypted:
         if len(lecture_sources) > 0:
-            # lecture_working_dir = os.path.join(working_dir,
-            #                                    str(lecture.get("asset_id")))
-
             if not os.path.isfile(lecture_path):
                 source = lecture_sources[-1]  # last index is the best quality
                 if isinstance(quality, int):
                     source = min(
                         lecture_sources,
                         key=lambda x: abs(int(x.get("height")) - quality))
-                # if not os.path.exists(lecture_working_dir):
-                #     os.mkdir(lecture_working_dir)
                 print(f"      > Lecture '%s' has DRM, attempting to download" %
                       lecture_title)
                 handle_segments(source.get("download_url"),
@@ -1064,10 +1058,6 @@ def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_to
                          key=lambda x: int(x.get("height")),
                          reverse=True)
         if sources:
-            # lecture_working_dir = os.path.join(working_dir,
-            #                                    str(lecture.get("asset_id")))
-            # if not os.path.exists(lecture_working_dir):
-            #     os.mkdir(lecture_working_dir)
             if not os.path.isfile(lecture_path):
                 print(
                     "      > Lecture doesn't have DRM, attempting to download..."
@@ -1083,9 +1073,7 @@ def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_to
                     url = source.get("download_url")
                     source_type = source.get("type")
                     if source_type == "hls":
-                        temp_filepath = lecture_path.replace(".mp4", "")
-                        # retVal = FFMPEG(None, url, access_token,
-                        #                 temp_filepath).download()
+                        temp_filepath = lecture_path.replace(".mp4", ".%(ext)s")
                         ret_code = subprocess.Popen([
                             "yt-dlp", "--force-generic-extractor",
                             "--concurrent-fragments",
