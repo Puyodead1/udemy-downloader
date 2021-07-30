@@ -863,15 +863,15 @@ def handle_segments(url, format_id, video_title,
                     output_path, lecture_file_name, concurrent_connections, chapter_dir):
     os.chdir(os.path.join(chapter_dir))
     file_name = lecture_file_name.replace("%", "").replace(".mp4", "")
-    video_filepath_enc = file_name + ".mp4"
-    audio_filepath_enc = file_name + ".m4a"
+    video_filepath_enc = file_name + ".encrypted.mp4"
+    audio_filepath_enc = file_name + ".encrypted.m4a"
     video_filepath_dec = file_name + ".decrypted.mp4"
     audio_filepath_dec = file_name + ".decrypted.m4a"
     print("> Downloading Lecture Tracks...")
     ret_code = subprocess.Popen([
         "yt-dlp", "--force-generic-extractor", "--allow-unplayable-formats",
         "--concurrent-fragments", f"{concurrent_connections}", "--downloader",
-        "aria2c", "--fixup", "never", "-k", "-o", f"{file_name}.%(ext)s",
+        "aria2c", "--fixup", "never", "-k", "-o", f"{file_name}.encrypted.%(ext)s",
         "-f", format_id, f"{url}"
     ]).wait()
     print("> Lecture Tracks Downloaded")
@@ -1073,7 +1073,8 @@ def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_to
                     url = source.get("download_url")
                     source_type = source.get("type")
                     if source_type == "hls":
-                        temp_filepath = lecture_path.replace(".mp4", ".%(ext)s")
+                        temp_filepath = lecture_path.replace(
+                            ".mp4", ".%(ext)s")
                         ret_code = subprocess.Popen([
                             "yt-dlp", "--force-generic-extractor",
                             "--concurrent-fragments",
