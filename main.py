@@ -1,3 +1,6 @@
+import ntpath
+ntpath.realpath = ntpath.abspath
+
 import argparse
 import glob
 import json
@@ -29,7 +32,7 @@ downloader = None
 HEADERS = {
     "Origin": "www.udemy.com",
     "User-Agent":
-    "Mozilla/5.0 (Windows NT 6.3; Win64; x64; rv:85.0) Gecko/20100101 Firefox/85.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0",
     "Accept": "*/*",
     "Accept-Encoding": None,
 }
@@ -43,15 +46,15 @@ COLLECTION_URL = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-co
 
 
 def _clean(text):
-    ok = re.compile(r'[^\\/:*?"<>|]')
+    ok = re.compile(r'[^\\/:*?!"<>|]')
     text = "".join(x if ok.match(x) else "_" for x in text)
     text = re.sub(r"\.+$", "", text.strip())
     return text
 
 
 def _sanitize(self, unsafetext):
-    text = sanitize(
-        slugify(unsafetext, lower=False, spaces=True, ok=SLUG_OK + "().[]"))
+    text = _clean(sanitize(
+        slugify(unsafetext, lower=False, spaces=True, ok=SLUG_OK + "().[]")))
     return text
 
 
@@ -989,9 +992,10 @@ def download_aria(url, file_dir, filename):
 
 
 def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
-    filename = f"%s_%s.%s" % (sanitize(lecture_title), caption.get("language"),
+    title=sanitize(lecture_title)
+    filename = f"%s_%s.%s" % (title, caption.get("language"),
                               caption.get("extension"))
-    filename_no_ext = f"%s_%s" % (sanitize(lecture_title),
+    filename_no_ext = f"%s_%s" % (title,
                                   caption.get("language"))
     filepath = os.path.join(lecture_dir, filename)
 
@@ -1081,7 +1085,7 @@ def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_to
                             f"{concurrent_connections}", "--downloader",
                             "aria2c", "-o", f"{temp_filepath}", f"{url}"
                         ]).wait()
-                        if retVal:
+                        if ret_code == 0:
                             os.rename(temp_filepath, lecture_path)
                             print("      > HLS Download success")
                     else:
@@ -1092,8 +1096,6 @@ def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_to
                 print(
                     "      > Lecture '%s' is already downloaded, skipping..." %
                     lecture_title)
-        else:
-            print("      > Missing sources for lecture", lecture)
 
 
 def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
@@ -1111,7 +1113,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
     for chapter in _udemy.get("chapters"):
         chapter_title = chapter.get("chapter_title")
         chapter_index = chapter.get("chapter_index")
-        chapter_dir = os.path.join(course_dir, chapter_title)
+        chapter_dir = os.path.join(course_dir, sanitize(chapter_title))
         if not os.path.exists(chapter_dir):
             os.mkdir(chapter_dir)
         print(
@@ -1127,12 +1129,14 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                 f"  > Processing lecture {lecture_index} of {total_lectures}")
             if not skip_lectures:
                 if extension == "html":
-                    html_content = lecture.get("html_content").encode(
-                        "ascii", "ignore").decode("utf8")
                     lecture_path = os.path.join(
                         chapter_dir, "{}.html".format(sanitize(lecture_title)))
+                    if os.path.isfile(lecture_path):
+                        print('Skipping '+ lecture_path)
+                        continue
+                    html_content = lecture.get("html_content").encode("ascii", "ignore").decode("utf8")
                     try:
-                        with open(lecture_path, 'w') as f:
+                        with open(lecture_path.replace('!',''), 'w') as f:
                             f.write(html_content)
                             f.close()
                     except Exception as e:
@@ -1143,20 +1147,25 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                     lecture_path = os.path.join(
                         chapter_dir,
                         lecture_file_name)
+                    if os.path.isfile(lecture_path) or os.path.isfile(lecture_path[:-3]+'mkv'):
+                        print('Skipping '+ lecture_path)
+                        continue
                     process_lecture(lecture, lecture_path, lecture_file_name,
                                     quality, access_token,
                                     concurrent_connections, chapter_dir)
 
             if dl_assets:
                 assets = lecture.get("assets")
-                print("    > Processing {} asset(s) for lecture...".format(
-                    len(assets)))
+                print("    > Processing {} asset(s) for lecture...".format(len(assets)))
 
                 for asset in assets:
                     asset_type = asset.get("type")
                     filename = asset.get("filename")
                     download_url = asset.get("download_url")
                     asset_id = asset.get("id")
+                    if os.path.isfile(str(asset_id)+'-'+filename):
+                        print('Skipping '+str(asset_id)+'-'+filename)
+                        continue
 
                     if asset_type == "article":
                         print(
@@ -1209,6 +1218,10 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                                 f.close()
 
             subtitles = lecture.get("subtitles")
+            title=sanitize(lecture_title)
+            if not os.path.isfile(chapter_dir + '\\' + title + '.mp4'):
+                continue
+            muxArgs=["mkvmerge", "-q","-o",chapter_dir + '\\' + title + '.mkv', '--title', title, chapter_dir + '\\' + title + '.mp4']
             if dl_captions and subtitles:
                 print("Processing {} caption(s)...".format(len(subtitles)))
                 for subtitle in subtitles:
@@ -1216,6 +1229,18 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                     if lang == caption_locale or caption_locale == "all":
                         process_caption(subtitle, lecture_title, chapter_dir,
                                         keep_vtt)
+                print("> Muxing captions with video...")
+                for i in range(len(subtitles)):
+                    filename_no_ext = f"%s_%s" % (title, subtitles[i].get("language"))
+                    muxArgs.append('--language')
+                    muxArgs.append('0:'+subtitles[i].get("language"))
+                    muxArgs.append(chapter_dir + '\\' + filename_no_ext + '.srt')
+                print(muxArgs)
+            ret_code = subprocess.Popen(muxArgs).wait()
+            if ret_code==0:
+                os.remove(chapter_dir+'\\'+title+'.mp4')
+                for s in subtitles:
+                    os.remove(chapter_dir+'\\'+title+'_'+s.get("language")+'.srt')
 
 
 def course_info(course_data):
@@ -1231,7 +1256,7 @@ def course_info(course_data):
 
     chapters = course_data.get("chapters")
     for chapter in chapters:
-        chapter_title = chapter.get("chapter_title")
+        chapter_title = sanitize(chapter.get("chapter_title"))
         chapter_index = chapter.get("chapter_index")
         chapter_lecture_count = chapter.get("lecture_count")
         chapter_lectures = chapter.get("lectures")
@@ -1426,11 +1451,12 @@ if __name__ == "__main__":
             "> MP4Decrypt is missing from your system or path! (This is part of Bento4 tools)"
         )
         sys.exit(1)
-
+    
     if args.load_from_file:
-        print(
-            "> 'load_from_file' was specified, data will be loaded from json files instead of fetched"
-        )
+        if not os.path.isfile(os.path.join(os.getcwd(), "saved", "course_content.json")):
+            args.load_from_file=False
+        else:
+            print("> 'load_from_file' was specified, data will be loaded from json files instead of fetched")
     if args.save_to_file:
         print(
             "> 'save_to_file' was specified, data will be saved to json files")
@@ -1504,6 +1530,7 @@ if __name__ == "__main__":
         if course:
             print("> Processing course data, this may take a minute. ")
             lecture_counter = 0
+            
             for entry in course:
                 clazz = entry.get("_class")
                 asset = entry.get("asset")
@@ -1513,7 +1540,7 @@ if __name__ == "__main__":
                     lecture_counter = 0
                     lectures = []
                     chapter_index = entry.get("object_index")
-                    chapter_title = "{0:02d} ".format(chapter_index) + _clean(
+                    chapter_title = "{0:02d} - ".format(chapter_index) + _clean(
                         entry.get("title"))
 
                     if chapter_title not in _udemy["chapters"]:
