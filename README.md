@@ -27,7 +27,7 @@ Windows is the primary development OS, but I've made an effort to support linux 
 
 # Requirements
 
-1. You would need to download `ffmpeg`, `aria2c`, `mp4decrypt` (from Bento4 SDK) and ``yt-dlp`` (``pip install yt-dlp``). Ensure they are in the system path (typing their name in cmd should invoke them).
+1. You would need to download `ffmpeg`, `aria2c`, `mp4decrypt` (from Bento4 SDK) and `yt-dlp` (`pip install yt-dlp`). Ensure they are in the system path (typing their name in cmd should invoke them).
 
 # Usage
 
@@ -66,8 +66,9 @@ You can now run the program, see the examples below. The course will download to
 # Advanced Usage
 
 ```
-usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_DOWNLOADS] [--skip-lectures] [--download-assets]
-               [--download-captions] [--keep-vtt] [--skip-hls] [--info]
+usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cc CONCURRENT_CONNECTIONS]
+               [--skip-lectures] [--download-assets] [--download-captions] [--keep-vtt] [--skip-hls] [--use_mkv]
+               [--info]
 
 Udemy Downloader
 
@@ -78,17 +79,21 @@ optional arguments:
   -b BEARER_TOKEN, --bearer BEARER_TOKEN
                         The Bearer token to use
   -q QUALITY, --quality QUALITY
-                        Download specific video quality. If the requested quality isn't available, the closest quality will be used. If not
-                        specified, the best quality will be downloaded for each lecture
-  -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is 'en')
-  -cd CONCURRENT_DOWNLOADS, --concurrent-downloads CONCURRENT_DOWNLOADS
-                        The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-50)
+                        Download specific video quality. If the requested quality isn't available, the closest quality
+                        will be used. If not specified, the best quality will be downloaded for each lecture
+  -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is
+                        'en')
+  -cc CONCURRENT_CONNECTIONS, --concurrent-connections CONCURRENT_CONNECTIONS
+                        The number of maximum concurrent connections for segments (HLS and DASH, must be a number
+                        1-30)
   --skip-lectures       If specified, lectures won't be downloaded
   --download-assets     If specified, lecture assets will be downloaded
   --download-captions   If specified, captions will be downloaded
   --keep-vtt            If specified, .vtt files won't be removed
-  --skip-hls            If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p quality for non-drm
-                        lectures)
+  --skip-hls            If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p
+                        quality for non-drm lectures)
+  --use_mkv             If specified, MKV container will be used instead of MP4, subtitles will be muxed (if subtitles
+                        are requested)
   --info                If specified, only course information will be printed, nothing will be downloaded
 ```
 
