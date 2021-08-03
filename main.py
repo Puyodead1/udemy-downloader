@@ -1356,7 +1356,7 @@ if __name__ == "__main__":
         "--skip-hls",
         dest="skip_hls",
         action="store_true",
-        help="If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p quality for non-drm lectures)",
+        help="If specified, HLS streams will be skipped (faster fetching, HLS streams usually contain 1080p quality for non-DRM lectures)",
     )
     parser.add_argument(
         "--use_mkv",

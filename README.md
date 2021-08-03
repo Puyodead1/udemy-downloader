@@ -90,12 +90,18 @@ optional arguments:
   --download-assets     If specified, lecture assets will be downloaded
   --download-captions   If specified, captions will be downloaded
   --keep-vtt            If specified, .vtt files won't be removed
-  --skip-hls            If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p
-                        quality for non-drm lectures)
+  --skip-hls            If specified, HLS streams will be skipped (faster fetching, HLS streams usually contain 1080p
+                        quality for non-DRM lectures)
   --use_mkv             If specified, MKV container will be used instead of MP4, subtitles will be muxed (if subtitles
                         are requested)
   --info                If specified, only course information will be printed, nothing will be downloaded
 ```
+
+<br>
+
+### NOTE: Loading bearer token from a .env file or system environment is deprecated and may break in the future, pass the token as a command argument instead!
+
+## Command Examples:
 
 - Passing a Bearer Token and Course ID as an argument
   - `python main.py -c <Course URL> -b <Bearer Token>`
@@ -125,7 +131,7 @@ optional arguments:
 - Print course information only:
   - `python main.py -c <Course URL> --info`
 - Specify max number of concurrent downloads:
-  - `python main.py -c <Course URL> --concurrent-downloads 20`
+  - `python main.py -c <Course URL> --concurrent-connections 20`
   - `python main.py -c <Course URL> -cd 20`
 
 # Credits
