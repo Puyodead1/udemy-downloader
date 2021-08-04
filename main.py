@@ -1437,7 +1437,7 @@ if __name__ == "__main__":
             "> 'save_to_file' was specified, data will be saved to json files")
 
     if not os.path.isfile(keyfile_path):
-        print("> Keyfile not found! Did you rename the file correctly?")
+        print("❗ Keyfile not found! Did you rename the file correctly? ❗")
         sys.exit(1)
 
     # Read keys
