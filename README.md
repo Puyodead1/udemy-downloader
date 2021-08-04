@@ -10,7 +10,8 @@
 
 # NOTE
 
-This program is WIP, the code is provided as-is and I am not held resposible for any legal issues resulting from the use of this program.
+- **This tool will not work without decryption keys, and there currently no public way to get those keys. Do not bother installing unless you already have keys!**
+- This program is WIP, the code is provided as-is and I am not held resposible for any legal issues resulting from the use of this program.
 
 # Support
 
@@ -22,8 +23,8 @@ All code is licensed under the MIT license
 
 # Description
 
-Simple program to download a Udemy course, has support for DRM videos but requires the user to aquire the decryption key (for legal reasons).<br>
-Windows is the primary development OS, but I've made an effort to support linux also.
+Utility script to download Udemy courses, has support for DRM videos but requires the user to aquire the decryption key (for legal reasons).<br>
+Windows is the primary development OS, but I've made an effort to support Linux also.
 
 # Requirements
 
