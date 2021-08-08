@@ -6,23 +6,22 @@ import re
 import subprocess
 import sys
 import time
-from html.parser import HTMLParser as compat_HTMLParser
-
 import cloudscraper
 import m3u8
 import requests
 import yt_dlp
+import git
+from html.parser import HTMLParser as compat_HTMLParser
 from dotenv import load_dotenv
 from requests.exceptions import ConnectionError as conn_error
 from tqdm import tqdm
-
 from sanitize import sanitize, slugify, SLUG_OK
 from utils import extract_kid
 from vtt_to_srt import convert
+from _version import __version__
 
 home_dir = os.getcwd()
 download_dir = os.path.join(os.getcwd(), "out_dir")
-working_dir = os.path.join(os.getcwd(), "working_dir")
 keyfile_path = os.path.join(os.getcwd(), "keyfile.json")
 retry = 3
 downloader = None
@@ -777,9 +776,6 @@ class UdemyAuth(object):
             return None, None
 
 
-if not os.path.exists(working_dir):
-    os.makedirs(working_dir)
-
 if not os.path.exists(download_dir):
     os.makedirs(download_dir)
 
@@ -1081,7 +1077,7 @@ def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_to
                             f"{concurrent_connections}", "--downloader",
                             "aria2c", "-o", f"{temp_filepath}", f"{url}"
                         ]).wait()
-                        if retVal:
+                        if ret_code == 0:
                             os.rename(temp_filepath, lecture_path)
                             print("      > HLS Download success")
                     else:
@@ -1218,7 +1214,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                                         keep_vtt)
 
 
-def course_info(course_data):
+def _print_course_info(course_data):
     print("\n\n\n\n")
     course_title = course_data.get("title")
     chapter_count = course_data.get("total_chapters")
@@ -1285,6 +1281,16 @@ def course_info(course_data):
 
         if chapter_index != chapter_count:
             print("\n\n")
+
+
+def get_version_string():
+    repo = git.Repo(search_parent_directories=True)
+    if repo:
+        sha = repo.head.object.hexsha
+        branch = repo.active_branch.name
+        return sha + "-git-" + branch + " (" + __version__ + ")"
+    else:
+        return __version__
 
 
 if __name__ == "__main__":
@@ -1372,6 +1378,8 @@ if __name__ == "__main__":
         action="store_true",
         help=argparse.SUPPRESS,
     )
+    parser.add_argument("-v", "--version", action="version",
+                        version='You are running version {version}'.format(version=get_version_string()))
 
     dl_assets = False
     skip_lectures = False
@@ -1482,7 +1490,7 @@ if __name__ == "__main__":
         _udemy = json.loads(
             open(os.path.join(os.getcwd(), "saved", "_udemy.json")).read())
         if args.info:
-            course_info(_udemy)
+            _print_course_info(_udemy)
         else:
             parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                       caption_locale, keep_vtt, access_token,
@@ -1717,7 +1725,7 @@ if __name__ == "__main__":
             print("Saved parsed data to json")
 
         if args.info:
-            course_info(_udemy)
+            _print_course_info(_udemy)
         else:
             parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                       caption_locale, keep_vtt, access_token,
