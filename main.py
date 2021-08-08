@@ -1546,7 +1546,7 @@ if __name__ == "__main__":
                     if len(_udemy["chapters"]) == 0:
                         lectures = []
                         chapter_index = entry.get("object_index")
-                        chapter_title = "{0:02d} ".format(
+                        chapter_title = "{0:02d} - ".format(
                             chapter_index) + _clean(entry.get("title"))
                         if chapter_title not in _udemy["chapters"]:
                             _udemy["chapters"].append({
@@ -1703,7 +1703,7 @@ if __name__ == "__main__":
                     if len(_udemy["chapters"]) == 0:
                         lectures = []
                         chapter_index = entry.get("object_index")
-                        chapter_title = "{0:02d} ".format(
+                        chapter_title = "{0:02d} - ".format(
                             chapter_index) + _clean(entry.get("title"))
                         if chapter_title not in _udemy["chapters"]:
                             lecture_counter = 0
