@@ -37,6 +37,8 @@ course_name = None
 keep_vtt = False
 skip_hls = False
 use_mkv = False
+mkv_mux_args = []
+mkv_subtitles = []
 concurrent_connections = 10
 access_token = None
 
@@ -847,6 +849,12 @@ def mux_process(video_title, video_filepath, audio_filepath, output_path):
     os.system(command)
 
 
+def make_mkv_mux(video_title, output_path):
+    args = ["mkvmerge", "-q", "-o",
+            output_path.replace("mp4", "mkv"), "--title", video_title, output_path]
+    return args
+
+
 def decrypt(kid, in_filepath, out_filepath):
     """
     @author Jayapraveen
@@ -866,7 +874,7 @@ def decrypt(kid, in_filepath, out_filepath):
 
 
 def handle_segments(url, format_id, video_title,
-                    output_path, lecture_file_name, concurrent_connections, chapter_dir):
+                    output_path, lecture_file_name, chapter_dir):
     os.chdir(os.path.join(chapter_dir))
     file_name = lecture_file_name.replace("%", "").replace(".mp4", "")
     video_filepath_enc = file_name + ".encrypted.mp4"
@@ -995,10 +1003,12 @@ def download_aria(url, file_dir, filename):
 
 
 def process_caption(caption, lecture_title, lecture_dir, tries=0):
-    filename = f"%s_%s.%s" % (sanitize(lecture_title), caption.get("language"),
-                              caption.get("extension"))
+    caption_language = caption.get("language")
+    caption_ext = caption.get("extension")
+    filename = f"%s_%s.%s" % (sanitize(lecture_title), caption_language,
+                              caption_ext)
     filename_no_ext = f"%s_%s" % (sanitize(lecture_title),
-                                  caption.get("language"))
+                                  caption_language)
     filepath = os.path.join(lecture_dir, filename)
 
     if os.path.isfile(filepath):
@@ -1007,27 +1017,33 @@ def process_caption(caption, lecture_title, lecture_dir, tries=0):
         print(f"    >  Downloading caption: '%s'" % filename)
         try:
             download_aria(caption.get("download_url"), lecture_dir, filename)
+            return True
         except Exception as e:
             if tries >= 3:
                 print(
                     f"    > Error downloading caption: {e}. Exceeded retries, skipping."
                 )
-                return
+                return False
             else:
                 print(
                     f"    > Error downloading caption: {e}. Will retry {3-tries} more times."
                 )
                 process_caption(caption, lecture_title, lecture_dir, keep_vtt,
                                 tries + 1)
+
         if caption.get("extension") == "vtt":
             try:
                 print("    > Converting caption to SRT format...")
                 convert(lecture_dir, filename_no_ext)
                 print("    > Caption conversion complete.")
+
                 if not keep_vtt:
                     os.remove(filepath)
+
+                return True
             except Exception as e:
                 print(f"    > Error converting caption: {e}")
+                return False
 
 
 def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
@@ -1081,7 +1097,6 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                             "aria2c", "-o", f"{temp_filepath}", f"{url}"
                         ]).wait()
                         if ret_code == 0:
-                            # os.rename(temp_filepath, lecture_path)
                             print("      > HLS Download success")
                     else:
                         download_aria(url, chapter_dir, lecture_title + ".mp4")
@@ -1224,7 +1239,28 @@ def parse_new(_udemy):
                 for subtitle in subtitles:
                     lang = subtitle.get("language")
                     if lang == caption_locale or caption_locale == "all":
-                        process_caption(subtitle, lecture_title, chapter_dir)
+                        # ret_val should be True or False indicating download success
+                        ret_val = process_caption(subtitle, lecture_title, chapter_dir)
+
+                if use_mkv:
+                    print("> Muxing MKV and {} subtitles...".format(
+                        len(mkv_subtitles)))
+                    mkv_mux_args = ["mkvmerge", "-q", "-o", lecture_path.replace(
+                        ".mp4", ".mkv"), "--title", lecture_title, lecture_path]
+
+                    for i in range(2, len(mkv_subtitles)):
+                        caption = mkv_subtitles[i]
+                        lang = caption.get("language")
+                        mkv_mux_args.append("--language")
+                        mkv_mux_args.append(i + ":" + lang)
+                        mkv_mux_args.append(i.get("path"))
+
+                    ret_code = subprocess.Popen(mkv_mux_args).wait()
+                    if ret_code == 0:
+                        os.remove(lecture_path)
+
+                    for subtitle in mkv_subtitles:
+                        os.remove(subtitle)
 
 
 def _print_course_info(course_data):
@@ -1373,7 +1409,7 @@ if __name__ == "__main__":
         help="If specified, HLS streams will be skipped (faster fetching, HLS streams usually contain 1080p quality for non-DRM lectures)",
     )
     parser.add_argument(
-        "--use_mkv",
+        "--use-mkv",
         dest="use_mkv",
         action="store_true",
         help="If specified, MKV container will be used instead of MP4, subtitles will be muxed (if subtitles are requested)",
