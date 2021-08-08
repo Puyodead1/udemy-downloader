@@ -1073,7 +1073,7 @@ def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_to
                             "aria2c", "-o", f"{temp_filepath}", f"{url}"
                         ]).wait()
                         if ret_code == 0:
-                            os.rename(temp_filepath, lecture_path)
+                            # os.rename(temp_filepath, lecture_path)
                             print("      > HLS Download success")
                     else:
                         download_aria(url, chapter_dir, lecture_title + ".mp4")
