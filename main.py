@@ -23,8 +23,23 @@ from _version import __version__
 home_dir = os.getcwd()
 download_dir = os.path.join(os.getcwd(), "out_dir")
 keyfile_path = os.path.join(os.getcwd(), "keyfile.json")
+keys = None
 retry = 3
 downloader = None
+dl_assets = False
+skip_lectures = False
+dl_captions = False
+caption_locale = "en"
+quality = None
+bearer_token = None
+portal_name = None
+course_name = None
+keep_vtt = False
+skip_hls = False
+use_mkv = False
+concurrent_connections = 10
+access_token = None
+
 HEADERS = {
     "Origin": "www.udemy.com",
     "User-Agent":
@@ -779,11 +794,6 @@ class UdemyAuth(object):
 if not os.path.exists(download_dir):
     os.makedirs(download_dir)
 
-# Get the keys
-with open(keyfile_path, 'r') as keyfile:
-    keyfile = keyfile.read()
-keyfile = json.loads(keyfile)
-
 
 def durationtoseconds(period):
     """
@@ -843,7 +853,7 @@ def decrypt(kid, in_filepath, out_filepath):
     """
     print("> Decrypting, this might take a minute...")
     try:
-        key = keyfile[kid.lower()]
+        key = keys[kid.lower()]
         if (os.name == "nt"):
             os.system(f"mp4decrypt --key 1:%s \"%s\" \"%s\"" %
                       (key, in_filepath, out_filepath))
@@ -984,7 +994,7 @@ def download_aria(url, file_dir, filename):
     print("Return code: " + str(ret_code))
 
 
-def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
+def process_caption(caption, lecture_title, lecture_dir, tries=0):
     filename = f"%s_%s.%s" % (sanitize(lecture_title), caption.get("language"),
                               caption.get("extension"))
     filename_no_ext = f"%s_%s" % (sanitize(lecture_title),
@@ -1020,8 +1030,7 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
                 print(f"    > Error converting caption: {e}")
 
 
-def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_token,
-                    concurrent_connections, chapter_dir):
+def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
     lecture_title = lecture.get("lecture_title")
     is_encrypted = lecture.get("is_encrypted")
     lecture_sources = lecture.get("video_sources")
@@ -1037,8 +1046,7 @@ def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_to
                   lecture_title)
             handle_segments(source.get("download_url"),
                             source.get(
-                                "format_id"), lecture_title, lecture_path, lecture_file_name,
-                            concurrent_connections, chapter_dir)
+                "format_id"), lecture_title, lecture_path, lecture_file_name, chapter_dir)
         else:
             print(f"      > Lecture '%s' is missing media links" %
                   lecture_title)
@@ -1087,8 +1095,7 @@ def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_to
             print("      > Missing sources for lecture", lecture)
 
 
-def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
-              caption_locale, keep_vtt, access_token, concurrent_connections):
+def parse_new(_udemy):
     total_chapters = _udemy.get("total_chapters")
     total_lectures = _udemy.get("total_lectures")
     print(f"Chapter(s) ({total_chapters})")
@@ -1147,9 +1154,8 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                             print("    > Failed to write html file: ", e)
                             continue
                     else:
-                        process_lecture(lecture, lecture_path, lecture_file_name,
-                                        quality, access_token,
-                                        concurrent_connections, chapter_dir)
+                        process_lecture(lecture, lecture_path,
+                                        lecture_file_name, chapter_dir)
 
             if dl_assets:
                 assets = lecture.get("assets")
@@ -1218,8 +1224,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                 for subtitle in subtitles:
                     lang = subtitle.get("language")
                     if lang == caption_locale or caption_locale == "all":
-                        process_caption(subtitle, lecture_title, chapter_dir,
-                                        keep_vtt)
+                        process_caption(subtitle, lecture_title, chapter_dir)
 
 
 def _print_course_info(course_data):
@@ -1331,11 +1336,11 @@ if __name__ == "__main__":
         help="The language to download for captions, specify 'all' to download all captions (Default is 'en')",
     )
     parser.add_argument(
-        "-cd",
-        "--concurrent-downloads",
-        dest="concurrent_downloads",
+        "-cc",
+        "--concurrent-connections",
+        dest="concurrent_connections",
         type=int,
-        help="The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-30)",
+        help="The number of maximum concurrent connections for segments (HLS and DASH, must be a number 1-30)",
     )
     parser.add_argument(
         "--skip-lectures",
@@ -1365,7 +1370,13 @@ if __name__ == "__main__":
         "--skip-hls",
         dest="skip_hls",
         action="store_true",
-        help="If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p quality for non-drm lectures)",
+        help="If specified, HLS streams will be skipped (faster fetching, HLS streams usually contain 1080p quality for non-DRM lectures)",
+    )
+    parser.add_argument(
+        "--use_mkv",
+        dest="use_mkv",
+        action="store_true",
+        help="If specified, MKV container will be used instead of MP4, subtitles will be muxed (if subtitles are requested)",
     )
     parser.add_argument(
         "--info",
@@ -1389,18 +1400,6 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--version", action="version",
                         version='You are running version {version}'.format(version=get_version_string()))
 
-    dl_assets = False
-    skip_lectures = False
-    dl_captions = False
-    caption_locale = "en"
-    quality = None
-    bearer_token = None
-    portal_name = None
-    course_name = None
-    keep_vtt = False
-    skip_hls = False
-    concurrent_downloads = 10
-
     args = parser.parse_args()
     if args.download_assets:
         dl_assets = True
@@ -1416,15 +1415,17 @@ if __name__ == "__main__":
         keep_vtt = args.keep_vtt
     if args.skip_hls:
         skip_hls = args.skip_hls
-    if args.concurrent_downloads:
-        concurrent_downloads = args.concurrent_downloads
+    if args.use_mkv:
+        use_mkv = args.use_mkv
+    if args.concurrent_connections:
+        concurrent_connections = args.concurrent_connections
 
-        if concurrent_downloads <= 0:
+        if concurrent_connections <= 0:
             # if the user gave a number that is less than or equal to 0, set cc to default of 10
-            concurrent_downloads = 10
-        elif concurrent_downloads > 30:
+            concurrent_connections = 10
+        elif concurrent_connections > 30:
             # if the user gave a number thats greater than 30, set cc to the max of 30
-            concurrent_downloads = 30
+            concurrent_connections = 30
 
     aria_ret_val = check_for_aria()
     if not aria_ret_val:
@@ -1452,11 +1453,15 @@ if __name__ == "__main__":
             "> 'save_to_file' was specified, data will be saved to json files")
 
     if not os.path.isfile(keyfile_path):
-        print("> Keyfile not found! Did you rename the file correctly?")
+        print("❗ Keyfile not found! Did you rename the file correctly? ❗")
         sys.exit(1)
 
+    # Read keys
+    with open(keyfile_path, 'r') as keyfile:
+        keyfile = keyfile.read()
+    keyfile = json.loads(keyfile)
+
     load_dotenv()
-    access_token = None
     if args.bearer_token:
         access_token = args.bearer_token
     else:
@@ -1500,9 +1505,7 @@ if __name__ == "__main__":
         if args.info:
             _print_course_info(_udemy)
         else:
-            parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
-                      caption_locale, keep_vtt, access_token,
-                      concurrent_downloads)
+            parse_new(_udemy)
     else:
         _udemy = {}
         _udemy["access_token"] = access_token
@@ -1737,4 +1740,4 @@ if __name__ == "__main__":
         else:
             parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                       caption_locale, keep_vtt, access_token,
-                      concurrent_downloads)
+                      concurrent_connections)
