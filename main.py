@@ -1738,6 +1738,4 @@ if __name__ == "__main__":
         if args.info:
             _print_course_info(_udemy)
         else:
-            parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
-                      caption_locale, keep_vtt, access_token,
-                      concurrent_connections)
+            parse_new(_udemy)
