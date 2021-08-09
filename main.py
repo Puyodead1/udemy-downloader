@@ -866,7 +866,7 @@ def decrypt(kid, in_filepath, out_filepath):
 
 
 def handle_segments(url, format_id, video_title,
-                    output_path, lecture_file_name, concurrent_connections, chapter_dir):
+                    output_path, lecture_file_name, chapter_dir):
     os.chdir(os.path.join(chapter_dir))
     file_name = lecture_file_name.replace("%", "").replace(".mp4", "")
     video_filepath_enc = file_name + ".encrypted.mp4"
