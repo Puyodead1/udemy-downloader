@@ -1240,7 +1240,8 @@ def parse_new(_udemy):
                     lang = subtitle.get("language")
                     if lang == caption_locale or caption_locale == "all":
                         # ret_val should be True or False indicating download success
-                        ret_val = process_caption(subtitle, lecture_title, chapter_dir)
+                        ret_val = process_caption(
+                            subtitle, lecture_title, chapter_dir)
 
                 if use_mkv:
                     print("> Muxing MKV and {} subtitles...".format(
@@ -1774,6 +1775,4 @@ if __name__ == "__main__":
         if args.info:
             _print_course_info(_udemy)
         else:
-            parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
-                      caption_locale, keep_vtt, access_token,
-                      concurrent_connections)
+            parse_new(_udemy)
