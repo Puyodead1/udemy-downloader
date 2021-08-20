@@ -10,7 +10,6 @@ import cloudscraper
 import m3u8
 import requests
 import yt_dlp
-import git
 from html.parser import HTMLParser as compat_HTMLParser
 from dotenv import load_dotenv
 from requests.exceptions import ConnectionError as conn_error
@@ -1291,16 +1290,6 @@ def _print_course_info(course_data):
             print("\n\n")
 
 
-def get_version_string():
-    repo = git.Repo(search_parent_directories=True)
-    if repo:
-        sha = repo.head.object.hexsha
-        branch = repo.active_branch.name
-        return sha + "-git-" + branch + " (" + __version__ + ")"
-    else:
-        return __version__
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Udemy Downloader')
     parser.add_argument("-c",
@@ -1387,7 +1376,7 @@ if __name__ == "__main__":
         help=argparse.SUPPRESS,
     )
     parser.add_argument("-v", "--version", action="version",
-                        version='You are running version {version}'.format(version=get_version_string()))
+                        version='You are running version {version}'.format(version=__version__))
 
     dl_assets = False
     skip_lectures = False
