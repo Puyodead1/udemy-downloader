@@ -12,4 +12,3 @@ yt-dlp
 bitstring
 cloudscraper
 unidecode
-gitpython
