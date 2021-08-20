@@ -603,11 +603,14 @@ class Session(object):
             access_token)
 
     def _get(self, url):
-        session = self._session.get(url, headers=self._headers)
-        if session.ok or session.status_code in [502, 503]:
-            return session
-        if not session.ok:
-            raise Exception(f"{session.status_code} {session.reason}")
+        for i in range(10):
+            session = self._session.get(url, headers=self._headers)
+            if session.ok or session.status_code in [502, 503]:
+                return session
+            if not session.ok:
+                print('Failed request '+url)
+                print(f"{session.status_code} {session.reason}, retrying (attempt {i} )...")
+                time.sleep(0.8)
 
     def _post(self, url, data, redirect=True):
         session = self._session.post(url,
