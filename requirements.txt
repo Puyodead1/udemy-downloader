@@ -10,5 +10,4 @@ m3u8
 colorama
 yt-dlp
 bitstring
-cloudscraper
 unidecode
