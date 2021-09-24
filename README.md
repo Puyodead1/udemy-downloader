@@ -28,7 +28,7 @@ Windows is the primary development OS, but I've made an effort to support Linux 
 
 # Requirements
 
-1. You would need to download `ffmpeg`, `aria2c`, `mp4decrypt` (from Bento4 SDK) and ``yt-dlp`` (``pip install yt-dlp``). Ensure they are in the system path (typing their name in cmd should invoke them).
+1. You would need to download `ffmpeg`, `aria2c`, `mp4decrypt` (from Bento4 SDK) and `yt-dlp` (`pip install yt-dlp`). Ensure they are in the system path (typing their name in cmd should invoke them).
 
 # Usage
 
@@ -67,8 +67,9 @@ You can now run the program, see the examples below. The course will download to
 # Advanced Usage
 
 ```
-usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_DOWNLOADS] [--skip-lectures] [--download-assets]
-               [--download-captions] [--keep-vtt] [--skip-hls] [--info]
+usage: UdemyDownloader.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_CONNECTIONS]
+                          [--skip-lectures] [--download-assets] [--download-captions] [--keep-vtt] [--skip-hls]
+                          [--info] [--use-h265] [--h265-crf H265_CRF] [--h265-preset H265_PRESET] [-v]
 
 Udemy Downloader
 
@@ -79,50 +80,63 @@ optional arguments:
   -b BEARER_TOKEN, --bearer BEARER_TOKEN
                         The Bearer token to use
   -q QUALITY, --quality QUALITY
-                        Download specific video quality. If the requested quality isn't available, the closest quality will be used. If not
-                        specified, the best quality will be downloaded for each lecture
-  -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is 'en')
-  -cd CONCURRENT_DOWNLOADS, --concurrent-downloads CONCURRENT_DOWNLOADS
-                        The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-50)
+                        Download specific video quality. If the requested quality isn't available, the closest quality
+                        will be used. If not specified, the best quality will be downloaded for each lecture
+  -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is
+                        'en')
+  -cd CONCURRENT_CONNECTIONS, --concurrent-connections CONCURRENT_CONNECTIONS
+                        The number of maximum concurrent connections per download for segments (HLS and DASH, must be
+                        a number 1-30)
   --skip-lectures       If specified, lectures won't be downloaded
   --download-assets     If specified, lecture assets will be downloaded
   --download-captions   If specified, captions will be downloaded
   --keep-vtt            If specified, .vtt files won't be removed
-  --skip-hls            If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p quality for non-drm
-                        lectures)
+  --skip-hls            If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p
+                        quality for non-drm lectures)
   --info                If specified, only course information will be printed, nothing will be downloaded
+  --use-h265            If specified, videos will be encoded with the H.265 codec
+  --h265-crf H265_CRF   Set a custom CRF value for H.265 encoding. FFMPEG default is 28
+  --h265-preset H265_PRESET
+                        Set a custom preset value for H.265 encoding. FFMPEG default is medium
+  -v, --version         show program's version number and exit
 ```
 
 - Passing a Bearer Token and Course ID as an argument
-  - `python main.py -c <Course URL> -b <Bearer Token>`
-  - `python main.py -c https://www.udemy.com/courses/myawesomecourse -b <Bearer Token>`
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> -b <Bearer Token>`
+  - `python udemy_downloader\UdemyDownloader.py -c https://www.udemy.com/courses/myawesomecourse -b <Bearer Token>`
 - Download a specific quality
-  - `python main.py -c <Course URL> -q 720`
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> -q 720`
 - Download assets along with lectures
-  - `python main.py -c <Course URL> --download-assets`
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-assets`
 - Download assets and specify a quality
-  - `python main.py -c <Course URL> -q 360 --download-assets`
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> -q 360 --download-assets`
 - Download captions (Defaults to English)
-  - `python main.py -c <Course URL> --download-captions`
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-captions`
 - Download captions with specific language
-  - `python main.py -c <Course URL> --download-captions -l en` - English subtitles
-  - `python main.py -c <Course URL> --download-captions -l es` - Spanish subtitles
-  - `python main.py -c <Course URL> --download-captions -l it` - Italian subtitles
-  - `python main.py -c <Course URL> --download-captions -l pl` - Polish Subtitles
-  - `python main.py -c <Course URL> --download-captions -l all` - Downloads all subtitles
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-captions -l en` - English subtitles
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-captions -l es` - Spanish subtitles
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-captions -l it` - Italian subtitles
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-captions -l pl` - Polish Subtitles
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-captions -l all` - Downloads all subtitles
   - etc
 - Skip downloading lecture videos
-  - `python main.py -c <Course URL> --skip-lectures --download-captions` - Downloads only captions
-  - `python main.py -c <Course URL> --skip-lectures --download-assets` - Downloads only assets
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --skip-lectures --download-captions` - Downloads only captions
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --skip-lectures --download-assets` - Downloads only assets
 - Keep .VTT caption files:
-  - `python main.py -c <Course URL> --download-captions --keep-vtt`
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-captions --keep-vtt`
 - Skip parsing HLS Streams (HLS streams usually contain 1080p quality for Non-DRM lectures):
-  - `python main.py -c <Course URL> --skip-hls`
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --skip-hls`
 - Print course information only:
-  - `python main.py -c <Course URL> --info`
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --info`
 - Specify max number of concurrent downloads:
-  - `python main.py -c <Course URL> --concurrent-downloads 20`
-  - `python main.py -c <Course URL> -cd 20`
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --concurrent-downloads 20`
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> -cd 20`
+- Encode in H.265:
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --use-h265`
+- Encode in H.265 with custom CRF:
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --use-h265 -h265-crf 20`
+- Encode in H.265 with custom preset:
+  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --use-h265 --h265-preset faster`
 
 # Credits
 
