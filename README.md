@@ -23,7 +23,7 @@ All code is licensed under the MIT license
 
 # Description
 
-Utility script to download Udemy courses, has support for DRM videos but requires the user to aquire the decryption key (for legal reasons).<br>
+Utility script to download Udemy courses, has support for DRM videos but requires the user to acquire the decryption key (for legal reasons).<br>
 Windows is the primary development OS, but I've made an effort to support Linux also.
 
 # Requirements
@@ -43,10 +43,12 @@ You will need to get a few things before you can use this program:
 
 ### Setting up
 
+- install python 3.6+
+- install requirements: `pip install -r requirements.txt`
 - rename `.env.sample` to `.env` _(you only need to do this if you plan to use the .env file to store your bearer token)_
-- rename `keyfile.example.json` to `keyfile.json`
+- rename `keyfile.example.json` to `keyfile.json` _(this is only required if you plan to download DRM encrypted lectures)_
 
-### Aquire Bearer Token
+### Acquire Bearer Token
 
 - Firefox: [Udemy-DL Guide](https://github.com/r0oth3x49/udemy-dl/issues/389#issuecomment-491903900)
 - Chrome: [Udemy-DL Guide](https://github.com/r0oth3x49/udemy-dl/issues/389#issuecomment-492569372)
@@ -54,7 +56,7 @@ You will need to get a few things before you can use this program:
 
 ### Key ID and Key
 
-It is up to you to aquire the key and key ID. Please don't ask me for help acquiring these, decrypting DRM protected content can be considered piracy.
+I would rather not instruct you how to get these as its a grey area in terms of legality. I would prefer if you don't ask me for help getting these.
 
 - Enter the key and key id in the `keyfile.json`
 - ![keyfile example](https://i.imgur.com/e5aU0ng.png)
