@@ -28,7 +28,7 @@ Windows is the primary development OS, but I've made an effort to support Linux 
 
 # Requirements
 
-1. You would need to download `ffmpeg`, `aria2c`, `mp4decrypt` (from Bento4 SDK) and `yt-dlp` (`pip install yt-dlp`). Ensure they are in the system path (typing their name in cmd should invoke them).
+1. You would need to download `ffmpeg`, `aria2c`, `mp4decrypt` (from Bento4 SDK) and `yt-dlp` (this is installed with the other requirements). Ensure they are in the system path (typing their name in cmd should invoke them).
 
 # Usage
 
