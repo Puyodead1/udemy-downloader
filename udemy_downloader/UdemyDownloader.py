@@ -51,6 +51,7 @@ _udemy_path = os.path.join(saved_dir, "_udemy.json")
 
 udemy = None
 parser = None
+iknowwhatimdoing = False
 retry = 3
 _udemy = {}
 course_url = None
@@ -82,6 +83,7 @@ use_h265 = False
 h265_crf = 28
 h265_preset = "medium"
 
+
 def download_segments(url, format_id, video_title, output_path, lecture_file_name, chapter_dir):
     os.chdir(os.path.join(chapter_dir))
     file_name = lecture_file_name.replace("%", "").replace(".mp4", "")
@@ -103,7 +105,6 @@ def download_segments(url, format_id, video_title, output_path, lecture_file_nam
         print("Return code from the downloader was non-0 (error), skipping!")
         return
 
-
     # tries to decrypt audio and video, and then merge them
     try:
         # tries to decrypt audio
@@ -113,9 +114,11 @@ def download_segments(url, format_id, video_title, output_path, lecture_file_nam
             audio_key = keys[audio_kid.lower()]
 
             print("> Decrypting audio...")
-            ret_code = decrypt(audio_key, audio_filepath_enc, audio_filepath_dec)
+            ret_code = decrypt(
+                audio_key, audio_filepath_enc, audio_filepath_dec)
             if(ret_code != 0):
-                print("WARN: Decrypting returned a non-0 result code which usually indicated an error!")
+                print(
+                    "WARN: Decrypting returned a non-0 result code which usually indicated an error!")
             else:
                 print("Decryption complete")
         except KeyError:
@@ -129,32 +132,35 @@ def download_segments(url, format_id, video_title, output_path, lecture_file_nam
             video_key = keys[video_kid.lower()]
 
             print("> Decrypting video...")
-            ret_code2 = decrypt(video_key, video_filepath_enc, video_filepath_dec)
+            ret_code2 = decrypt(
+                video_key, video_filepath_enc, video_filepath_dec)
             if(ret_code2 != 0):
-                print("WARN: Decrypting returned a non-0 result code which usually indicated an error!")
+                print(
+                    "WARN: Decrypting returned a non-0 result code which usually indicated an error!")
             else:
                 print("Decryption complete")
         except KeyError:
             print("Video key not found!")
             raise RuntimeError("No video key")
 
-
         # tries to merge audio and video
         # this should run only if both audio and video decryption returned 0 codes
         print("> Merging audio and video files...")
-        ret_code3 = merge(video_title=video_title, video_filepath=video_filepath_dec, audio_filepath=audio_filepath_dec, output_path=output_path, use_h265=use_h265, h265_crf=h265_crf, h265_preset=h265_preset)
+        ret_code3 = merge(video_title=video_title, video_filepath=video_filepath_dec, audio_filepath=audio_filepath_dec,
+                          output_path=output_path, use_h265=use_h265, h265_crf=h265_crf, h265_preset=h265_preset)
         if(ret_code3 != 0):
-            print("WARN: Merging returned a non-0 result code which usually indicated an error!")
-
+            print(
+                "WARN: Merging returned a non-0 result code which usually indicated an error!")
 
         if(ret_code == 0 and ret_code2 == 0 and ret_code3 == 0):
             print("> Cleaning up...")
             # remove all the temporary files left over after decryption and merging if there were no errors
-            remove_files((video_filepath_enc, video_filepath_dec, audio_filepath_enc, audio_filepath_dec))
+            remove_files((video_filepath_enc, video_filepath_dec,
+                         audio_filepath_enc, audio_filepath_dec))
             print("> Cleanup complete")
     except Exception as e:
         print(e)
-        
+
     os.chdir(home_dir)
 
 
@@ -200,7 +206,7 @@ def download_aria(url, file_dir, filename):
     print("Return code: " + str(ret_code))
 
 
-def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
+def process_caption(caption, lecture_title, lecture_dir, tries=0):
     filename = f"%s_%s.%s" % (sanitize(lecture_title), caption.get("language"),
                               caption.get("extension"))
     filename_no_ext = f"%s_%s" % (sanitize(lecture_title),
@@ -241,6 +247,78 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
     is_encrypted = lecture.get("is_encrypted")
     lecture_sources = lecture.get("video_sources")
 
+    if dl_assets:
+        assets = lecture.get("assets")
+        print("    > Processing {} asset(s) for lecture...".format(
+            len(assets)))
+
+        for asset in assets:
+            asset_type = asset.get("type")
+            filename = asset.get("filename")
+            download_url = asset.get("download_url")
+            asset_id = asset.get("id")
+
+            if asset_type == "article":
+                print(
+                    "If you're seeing this message, that means that you reached a secret area that I haven't finished! jk I haven't implemented handling for this asset type, please report this at https://github.com/Puyodead1/udemy-downloader/issues so I can add it. When reporting, please provide the following information: "
+                )
+                print("AssetType: Article; AssetData: ", asset)
+                # html_content = lecture.get("html_content")
+                # lecture_path = os.path.join(
+                #     chapter_dir, "{}.html".format(sanitize(lecture_title)))
+                # try:
+                #     with open(lecture_path, 'w') as f:
+                #         f.write(html_content)
+                #         f.close()
+                # except Exception as e:
+                #     print("Failed to write html file: ", e)
+                #     continue
+            elif asset_type == "video":
+                print(
+                    "If you're seeing this message, that means that you reached a secret area that I haven't finished! jk I haven't implemented handling for this asset type, please report this at https://github.com/Puyodead1/udemy-downloader/issues so I can add it. When reporting, please provide the following information: "
+                )
+                print("AssetType: Video; AssetData: ", asset)
+            elif asset_type == "audio" or asset_type == "e-book" or asset_type == "file" or asset_type == "presentation":
+                try:
+                    download_aria(download_url, chapter_dir,
+                                  f"{asset_id}-{filename}")
+                except Exception as e:
+                    print("> Error downloading asset: ", e)
+                    continue
+            elif asset_type == "external_link":
+                filepath = os.path.join(chapter_dir, filename)
+                savedirs, name = os.path.split(filepath)
+                filename = u"external-assets-links.txt"
+                filename = os.path.join(savedirs, filename)
+                file_data = []
+                if os.path.isfile(filename):
+                    file_data = [
+                        i.strip().lower()
+                        for i in open(filename,
+                                      encoding="utf-8",
+                                      errors="ignore") if i
+                    ]
+
+                content = u"\n{}\n{}\n".format(name, download_url)
+                if name.lower() not in file_data:
+                    with open(filename,
+                              'a',
+                              encoding="utf-8",
+                              errors="ignore") as f:
+                        f.write(content)
+                        f.close()
+
+    subtitles = lecture.get("subtitles")
+    if dl_captions and subtitles:
+        selected_subtitles = []
+        print("Processing {} caption(s)...".format(len(subtitles)))
+        for subtitle in subtitles:
+            lang = subtitle.get("language")
+            if lang == caption_locale or caption_locale == "all":
+                selected_subtitles.append(subtitle)
+                process_caption(subtitle, lecture_title, chapter_dir)
+        print("Selected {} captions".format(len(selected_subtitles)))
+
     if is_encrypted:
         if len(lecture_sources) > 0:
             source = lecture_sources[-1]  # last index is the best quality
@@ -251,8 +329,8 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
             print(f"      > Lecture '%s' has DRM, attempting to download" %
                   lecture_title)
             download_segments(source.get("download_url"),
-                            source.get(
-                                "format_id"), lecture_title, lecture_path, lecture_file_name, chapter_dir)
+                              source.get(
+                "format_id"), lecture_title, lecture_path, lecture_file_name, chapter_dir)
         else:
             print(f"      > Lecture '%s' is missing media links" %
                   lecture_title)
@@ -287,7 +365,6 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                             "aria2c", "-o", f"{temp_filepath}", f"{url}"
                         ]).wait()
                         if ret_code == 0:
-                            # os.rename(temp_filepath, lecture_path)
                             print("      > HLS Download success")
                     else:
                         download_aria(url, chapter_dir, lecture_title + ".mp4")
@@ -338,7 +415,6 @@ def parse():
             print(
                 f"  > Processing lecture {lecture_index} of {total_lectures}")
             if not skip_lectures:
-                print(lecture_file_name)
                 # Check if the lecture is already downloaded
                 if os.path.isfile(lecture_path):
                     print(
@@ -360,76 +436,8 @@ def parse():
                             print("    > Failed to write html file: ", e)
                             continue
                     else:
-                        process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir)
-
-            if dl_assets:
-                assets = lecture.get("assets")
-                print("    > Processing {} asset(s) for lecture...".format(
-                    len(assets)))
-
-                for asset in assets:
-                    asset_type = asset.get("type")
-                    filename = asset.get("filename")
-                    download_url = asset.get("download_url")
-                    asset_id = asset.get("id")
-
-                    if asset_type == "article":
-                        print(
-                            "If you're seeing this message, that means that you reached a secret area that I haven't finished! jk I haven't implemented handling for this asset type, please report this at https://github.com/Puyodead1/udemy-downloader/issues so I can add it. When reporting, please provide the following information: "
-                        )
-                        print("AssetType: Article; AssetData: ", asset)
-                        # html_content = lecture.get("html_content")
-                        # lecture_path = os.path.join(
-                        #     chapter_dir, "{}.html".format(sanitize(lecture_title)))
-                        # try:
-                        #     with open(lecture_path, 'w') as f:
-                        #         f.write(html_content)
-                        #         f.close()
-                        # except Exception as e:
-                        #     print("Failed to write html file: ", e)
-                        #     continue
-                    elif asset_type == "video":
-                        print(
-                            "If you're seeing this message, that means that you reached a secret area that I haven't finished! jk I haven't implemented handling for this asset type, please report this at https://github.com/Puyodead1/udemy-downloader/issues so I can add it. When reporting, please provide the following information: "
-                        )
-                        print("AssetType: Video; AssetData: ", asset)
-                    elif asset_type == "audio" or asset_type == "e-book" or asset_type == "file" or asset_type == "presentation":
-                        try:
-                            download_aria(download_url, chapter_dir,
-                                          f"{asset_id}-{filename}")
-                        except Exception as e:
-                            print("> Error downloading asset: ", e)
-                            continue
-                    elif asset_type == "external_link":
-                        filepath = os.path.join(chapter_dir, filename)
-                        savedirs, name = os.path.split(filepath)
-                        filename = u"external-assets-links.txt"
-                        filename = os.path.join(savedirs, filename)
-                        file_data = []
-                        if os.path.isfile(filename):
-                            file_data = [
-                                i.strip().lower()
-                                for i in open(filename,
-                                              encoding="utf-8",
-                                              errors="ignore") if i
-                            ]
-
-                        content = u"\n{}\n{}\n".format(name, download_url)
-                        if name.lower() not in file_data:
-                            with open(filename,
-                                      'a',
-                                      encoding="utf-8",
-                                      errors="ignore") as f:
-                                f.write(content)
-                                f.close()
-
-            subtitles = lecture.get("subtitles")
-            if dl_captions and subtitles:
-                print("Processing {} caption(s)...".format(len(subtitles)))
-                for subtitle in subtitles:
-                    lang = subtitle.get("language")
-                    if lang == caption_locale or caption_locale == "all":
-                        process_caption(subtitle, lecture_title, chapter_dir)
+                        process_lecture(lecture, lecture_path,
+                                        lecture_file_name, chapter_dir)
 
 
 def process_course():
@@ -481,15 +489,15 @@ def process_course():
 
                 if isinstance(asset, dict):
                     asset_type = (asset.get("asset_type").lower()
-                                    or asset.get("assetType").lower)
+                                  or asset.get("assetType").lower)
                     if asset_type == "article":
                         if isinstance(supp_assets,
-                                        list) and len(supp_assets) > 0:
+                                      list) and len(supp_assets) > 0:
                             retVal = udemy._extract_supplementary_assets(
                                 supp_assets)
                     elif asset_type == "video":
                         if isinstance(supp_assets,
-                                        list) and len(supp_assets) > 0:
+                                      list) and len(supp_assets) > 0:
                             retVal = udemy._extract_supplementary_assets(
                                 supp_assets)
                     elif asset_type == "e-book":
@@ -641,6 +649,7 @@ def process_course():
         if entry
     ])
 
+
 def get_course_information():
     global course_info, course_id, title, course_title, portal_name
     if(load_from_file):
@@ -658,6 +667,7 @@ def get_course_information():
     course_title = course_info.get("published_title")
     portal_name = course_info.get("portal_name")
 
+
 def get_course_content():
     global course_content
     if load_from_file:
@@ -666,17 +676,21 @@ def get_course_content():
             course_content = json.loads(f.read())
         else:
             print("course_content.json not found, falling back to fetching")
-            course_content = udemy._extract_course_json(course_url, course_id, portal_name)
+            course_content = udemy._extract_course_json(
+                course_url, course_id, portal_name)
     else:
-        course_content = udemy._extract_course_json(course_url, course_id, portal_name)
+        course_content = udemy._extract_course_json(
+            course_url, course_id, portal_name)
+
 
 def parse_data():
     global _udemy
-    if load_from_file:
+    if load_from_file and os.path.exists(_udemy_path):
         f = open(_udemy_path, 'r')
         _udemy = json.loads(f.read())
     else:
         process_course()
+
 
 def _print_course_info(course_data):
     print("\n\n\n\n")
@@ -745,6 +759,7 @@ def _print_course_info(course_data):
 
         if chapter_index != chapter_count:
             print("\n\n")
+
 
 def setup_parser():
     global parser
@@ -840,6 +855,12 @@ def setup_parser():
         help="Set a custom preset value for H.265 encoding. FFMPEG default is medium",
     )
     parser.add_argument(
+        "--iknowwhatimdoing",
+        dest="iknowwhatimdoing",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         "--save-to-file",
         dest="save_to_file",
         action="store_true",
@@ -854,10 +875,10 @@ def setup_parser():
     parser.add_argument("-v", "--version", action="version",
                         version='You are running version {version}'.format(version=__version__))
 
- 
+
 def process_args(args):
-    global course_url, bearer_token, dl_assets, caption_locale, skip_lectures, quality, keep_vtt, skip_hls, print_info, load_from_file, save_to_file, concurrent_connections, use_h265, h265_crf, h265_preset
-    
+    global course_url, bearer_token, dl_assets, dl_captions, caption_locale, skip_lectures, quality, keep_vtt, skip_hls, print_info, load_from_file, save_to_file, concurrent_connections, use_h265, h265_crf, h265_preset, iknowwhatimdoing
+
     course_url = args.course_url
     if args.download_assets:
         dl_assets = True
@@ -893,6 +914,8 @@ def process_args(args):
         h265_crf = args.h265_crf
     if args.h265_preset:
         h265_preset = args.h265_preset
+    if args.iknowwhatimdoing:
+        iknowwhatimdoing = args.iknowwhatimdoing
 
     if args.load_from_file:
         print(
@@ -906,6 +929,7 @@ def process_args(args):
         bearer_token = args.bearer_token
     else:
         bearer_token = os.getenv("UDEMY_BEARER")
+
 
 def ensure_dependencies_installed():
     aria_ret_val = check_for_aria()
@@ -925,6 +949,7 @@ def ensure_dependencies_installed():
         )
         sys.exit(1)
 
+
 def check_dirs():
     if not os.path.exists(saved_dir):
         os.makedirs(saved_dir)
@@ -932,28 +957,16 @@ def check_dirs():
     if not os.path.exists(download_dir):
         os.makedirs(download_dir)
 
-def load_keys():
+
+def try_load_keys():
     global keys
     f = open(keyfile_path, 'r')
     keys = json.loads(f.read())
 
+
 def UdemyDownloader():
     global udemy, course, resource
     check_dirs()
-
-     # warn that the keyfile is not found
-    if not os.path.isfile(keyfile_path):
-        print("!!! Keyfile not found! This means you probably didn't rename the keyfile correctly, DRM lecture decryption will fail! If you aren't downloading DRM encrypted courses, you can ignore this message. !!!")
-        print("Waiting for 10 seconds...")
-        time.sleep(10)
-
-    load_keys()
-
-    # ensure 3rd party binaries are installed
-    ensure_dependencies_installed();
-
-    # loads the .env file
-    load_dotenv()
 
     # Creates a new parser and sets up the arguments
     setup_parser()
@@ -961,6 +974,22 @@ def UdemyDownloader():
     # parses the arguments and sets all the variables
     args = parser.parse_args()
     process_args(args=args)
+
+    # warn that the keyfile is not found
+    if not os.path.exists(keyfile_path):
+        print("!!! Keyfile not found! This means you probably didn't rename the keyfile correctly, DRM lecture decryption will fail! If you aren't downloading DRM encrypted courses, you can ignore this message. !!!")
+        if not iknowwhatimdoing:
+            print("Waiting for 10 seconds...")
+            time.sleep(10)
+
+    else:
+        try_load_keys()
+
+    # ensure 3rd party binaries are installed
+    ensure_dependencies_installed()
+
+    # loads the .env file
+    load_dotenv()
 
     udemy = Udemy(access_token=bearer_token)
 
@@ -989,7 +1018,7 @@ def UdemyDownloader():
                   'w') as f:
             f.write(json.dumps(course_content))
             print("Saved course content to file")
-    
+
     course = course_content.get("results")
     resource = course_content.get("detail")
 
@@ -1010,7 +1039,7 @@ def UdemyDownloader():
 
     if save_to_file:
         with open(_udemy_path,
-                    'w') as f:
+                  'w') as f:
             f.write(json.dumps(_udemy))
             print("Saved parsed data to file")
 

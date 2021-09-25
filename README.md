@@ -104,41 +104,41 @@ optional arguments:
 ```
 
 - Passing a Bearer Token and Course ID as an argument
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> -b <Bearer Token>`
-  - `python udemy_downloader\UdemyDownloader.py -c https://www.udemy.com/courses/myawesomecourse -b <Bearer Token>`
+  - `python udemy_downloader -c <Course URL> -b <Bearer Token>`
+  - `python udemy_downloader -c https://www.udemy.com/courses/myawesomecourse -b <Bearer Token>`
 - Download a specific quality
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> -q 720`
+  - `python udemy_downloader -c <Course URL> -q 720`
 - Download assets along with lectures
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-assets`
+  - `python udemy_downloader -c <Course URL> --download-assets`
 - Download assets and specify a quality
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> -q 360 --download-assets`
+  - `python udemy_downloader -c <Course URL> -q 360 --download-assets`
 - Download captions (Defaults to English)
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-captions`
+  - `python udemy_downloader -c <Course URL> --download-captions`
 - Download captions with specific language
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-captions -l en` - English subtitles
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-captions -l es` - Spanish subtitles
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-captions -l it` - Italian subtitles
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-captions -l pl` - Polish Subtitles
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-captions -l all` - Downloads all subtitles
+  - `python udemy_downloader -c <Course URL> --download-captions -l en` - English subtitles
+  - `python udemy_downloader -c <Course URL> --download-captions -l es` - Spanish subtitles
+  - `python udemy_downloader -c <Course URL> --download-captions -l it` - Italian subtitles
+  - `python udemy_downloader -c <Course URL> --download-captions -l pl` - Polish Subtitles
+  - `python udemy_downloader -c <Course URL> --download-captions -l all` - Downloads all subtitles
   - etc
 - Skip downloading lecture videos
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --skip-lectures --download-captions` - Downloads only captions
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --skip-lectures --download-assets` - Downloads only assets
+  - `python udemy_downloader -c <Course URL> --skip-lectures --download-captions` - Downloads only captions
+  - `python udemy_downloader -c <Course URL> --skip-lectures --download-assets` - Downloads only assets
 - Keep .VTT caption files:
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --download-captions --keep-vtt`
+  - `python udemy_downloader -c <Course URL> --download-captions --keep-vtt`
 - Skip parsing HLS Streams (HLS streams usually contain 1080p quality for Non-DRM lectures):
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --skip-hls`
+  - `python udemy_downloader -c <Course URL> --skip-hls`
 - Print course information only:
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --info`
+  - `python udemy_downloader -c <Course URL> --info`
 - Specify max number of concurrent downloads:
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --concurrent-downloads 20`
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> -cd 20`
+  - `python udemy_downloader -c <Course URL> --concurrent-downloads 20`
+  - `python udemy_downloader -c <Course URL> -cd 20`
 - Encode in H.265:
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --use-h265`
+  - `python udemy_downloader -c <Course URL> --use-h265`
 - Encode in H.265 with custom CRF:
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --use-h265 -h265-crf 20`
+  - `python udemy_downloader -c <Course URL> --use-h265 -h265-crf 20`
 - Encode in H.265 with custom preset:
-  - `python udemy_downloader\UdemyDownloader.py -c <Course URL> --use-h265 --h265-preset faster`
+  - `python udemy_downloader -c <Course URL> --use-h265 --h265-preset faster`
 
 # Credits
 

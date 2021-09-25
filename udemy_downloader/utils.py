@@ -9,6 +9,7 @@ from mp4parse import F4VParser
 from widevine_pssh_pb2 import WidevinePsshData
 from sanitize import sanitize, slugify, SLUG_OK
 
+
 def extract_kid(mp4_file):
     """
     Parameters
@@ -26,7 +27,8 @@ def extract_kid(mp4_file):
     boxes = F4VParser.parse(filename=mp4_file)
     for box in boxes:
         if box.header.box_type == 'moov':
-            pssh_box = next(x for x in box.pssh if x.system_id == "edef8ba979d64acea3c827dcd51d21ed")
+            pssh_box = next(x for x in box.pssh if x.system_id ==
+                            "edef8ba979d64acea3c827dcd51d21ed")
             hex = codecs.decode(pssh_box.payload, "hex")
 
             pssh = WidevinePsshData()
@@ -36,6 +38,7 @@ def extract_kid(mp4_file):
 
     # No Moof or PSSH header found
     return None
+
 
 def _clean(text):
     ok = re.compile(r'[^\\/:*?!"<>|]')
@@ -48,6 +51,7 @@ def _sanitize(self, unsafetext):
     text = _clean(sanitize(
         slugify(unsafetext, lower=False, spaces=True, ok=SLUG_OK + "().[]")))
     return text
+
 
 def durationtoseconds(period):
     """
@@ -74,6 +78,7 @@ def durationtoseconds(period):
         print("Duration Format Error")
         return None
 
+
 def cleanup(path):
     """
     @author Jayapraveen
@@ -86,9 +91,11 @@ def cleanup(path):
             print(f"Error deleting file: {file_list}")
     os.removedirs(path)
 
+
 def remove_files(files):
     for file in files:
         os.remove(file)
+
 
 def merge(video_title, video_filepath, audio_filepath, output_path, use_h265, h265_crf, h265_preset):
     """
@@ -96,15 +103,20 @@ def merge(video_title, video_filepath, audio_filepath, output_path, use_h265, h2
     """
     if os.name == "nt":
         if use_h265:
-            command = "ffmpeg -y -i \"{}\" -i \"{}\" -c:v libx265 -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(video_filepath, audio_filepath, h265_crf, h265_preset, video_title, output_path)
+            command = "ffmpeg -y -i \"{}\" -i \"{}\" -c:v libx265 -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
+                video_filepath, audio_filepath, h265_crf, h265_preset, video_title, output_path)
         else:
-            command = "ffmpeg -y -i \"{}\" -i \"{}\" -c:v copy -vtag hvc1 -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(video_filepath, audio_filepath, video_title, output_path)
+            command = "ffmpeg -y -i \"{}\" -i \"{}\" -c:v copy -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
+                video_filepath, audio_filepath, video_title, output_path)
     else:
         if use_h265:
-            command = "nide -n 7 ffmpeg -y -i \"{}\" -i \"{}\" -c:v libx265 -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(video_filepath, audio_filepath, h265_crf, h265_preset, video_title, output_path)
+            command = "nide -n 7 ffmpeg -y -i \"{}\" -i \"{}\" -c:v libx265 -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
+                video_filepath, audio_filepath, h265_crf, h265_preset, video_title, output_path)
         else:
-            command = "nide -n 7 ffmpeg -y -i \"{}\" -i \"{}\" -c:v copy -vtag hvc1 -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(video_filepath, audio_filepath, video_title, output_path)
+            command = "nide -n 7 ffmpeg -y -i \"{}\" -i \"{}\" -c:v copy -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
+                video_filepath, audio_filepath, video_title, output_path)
     return os.system(command)
+
 
 def decrypt(key, in_filepath, out_filepath):
     """
@@ -112,12 +124,13 @@ def decrypt(key, in_filepath, out_filepath):
     """
     if (os.name == "nt"):
         ret_code = os.system(f"mp4decrypt --key 1:%s \"%s\" \"%s\"" %
-                    (key, in_filepath, out_filepath))
+                             (key, in_filepath, out_filepath))
     else:
         ret_code = os.system(f"nice -n 7 mp4decrypt --key 1:%s \"%s\" \"%s\"" %
-                    (key, in_filepath, out_filepath))
+                             (key, in_filepath, out_filepath))
 
     return ret_code
+
 
 def check_for_aria():
     try:
