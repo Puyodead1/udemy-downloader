@@ -978,6 +978,10 @@ def try_load_keys():
 
 def UdemyDownloader():
     global udemy, course, resource
+
+    # loads the .env file
+    load_dotenv()
+
     check_dirs()
 
     # Creates a new parser and sets up the arguments
@@ -999,9 +1003,6 @@ def UdemyDownloader():
 
     # ensure 3rd party binaries are installed
     ensure_dependencies_installed()
-
-    # loads the .env file
-    load_dotenv()
 
     udemy = Udemy(access_token=bearer_token)
 
