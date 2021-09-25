@@ -358,14 +358,26 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                     if source_type == "hls":
                         temp_filepath = lecture_path.replace(
                             ".mp4", ".%(ext)s")
-                        ret_code = subprocess.Popen([
+                        command = [
                             "yt-dlp", "--force-generic-extractor",
                             "--concurrent-fragments",
                             f"{concurrent_connections}", "--downloader",
                             "aria2c", "-o", f"{temp_filepath}", f"{url}"
-                        ]).wait()
+                        ]
+                        ret_code = subprocess.Popen(command).wait()
                         if ret_code == 0:
                             print("      > HLS Download success")
+
+                            ffmpeg_command = ["ffmpeg", "-i", lecture_path, "-c:v",
+                                              "libx265", "-c:a", "copy", lecture_path + ".mp4"]
+                            ret_code = subprocess.Popen(ffmpeg_command).wait()
+                            if ret_code == 0:
+                                os.remove(lecture_path)
+                                os.rename(lecture_path + ".mp4", lecture_path)
+                                print("Encoding done")
+                            else:
+                                print("Encoding returned a non-0 code")
+
                     else:
                         download_aria(url, chapter_dir, lecture_title + ".mp4")
                 except EnvironmentError as e:
