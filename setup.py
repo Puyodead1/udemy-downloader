@@ -22,7 +22,7 @@ setup(
         "Topic :: Multimedia",
         "Topic :: Utilities"
     ],
-    install_requires=["mpegdash", "sanitize_filename", "tqdm", "requests", "python-dotenv", "protobuf", "webvtt-py", "pysrt", "m3u8", "colorama", "yt-dlp", "bitstring", "unidecode"],
+    install_requires=["mpegdash", "sanitize_filename", "tqdm", "requests", "python-dotenv", "protobuf", "webvtt-py", "pysrt", "m3u8", "colorama", "yt-dlp", "bitstring", "unidecode", "six"],
     packages=packages,
     python_requires=">=3.6",
     entry_points={

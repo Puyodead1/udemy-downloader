@@ -11,3 +11,4 @@ colorama
 yt-dlp
 bitstring
 unidecode
+six
