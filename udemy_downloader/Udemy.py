@@ -22,9 +22,9 @@ import m3u8
 import yt_dlp
 import re
 from requests.exceptions import ConnectionError as conn_error
-from udemy_downloader.UdemyAuth import UdemyAuth
-from udemy_downloader.utils import _clean
-from udemy_downloader.constants import COURSE_SEARCH, COURSE_URL, MY_COURSES_URL, COLLECTION_URL
+from UdemyAuth import UdemyAuth
+from utils import _clean
+from constants import COURSE_SEARCH, COURSE_URL, MY_COURSES_URL, COLLECTION_URL
 
 class Udemy:
     def __init__(self, access_token):

@@ -35,11 +35,11 @@ from dotenv import load_dotenv
 from requests.exceptions import ConnectionError as conn_error
 from tqdm import tqdm
 from html.parser import HTMLParser as compat_HTMLParser
-from udemy_downloader.sanitize import sanitize, slugify, SLUG_OK
-from udemy_downloader.utils import extract_kid, decrypt, merge, remove_files, _clean, check_for_aria, check_for_ffmpeg, check_for_mp4decrypt
-from udemy_downloader.vtt_to_srt import convert
-from udemy_downloader.Udemy import Udemy
-from udemy_downloader.version import __version__
+from sanitize import sanitize, slugify, SLUG_OK
+from utils import extract_kid, decrypt, merge, remove_files, _clean, check_for_aria, check_for_ffmpeg, check_for_mp4decrypt
+from vtt_to_srt import convert
+from Udemy import Udemy
+from version import __version__
 
 home_dir = os.getcwd()
 download_dir = os.path.join(os.getcwd(), "out_dir")

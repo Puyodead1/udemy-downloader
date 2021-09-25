@@ -5,9 +5,9 @@ import os
 import glob
 import subprocess
 import sys
-from udemy_downloader.mp4parse import F4VParser
-from udemy_downloader.widevine_pssh_pb2 import WidevinePsshData
-from udemy_downloader.sanitize import sanitize, slugify, SLUG_OK
+from mp4parse import F4VParser
+from widevine_pssh_pb2 import WidevinePsshData
+from sanitize import sanitize, slugify, SLUG_OK
 
 def extract_kid(mp4_file):
     """

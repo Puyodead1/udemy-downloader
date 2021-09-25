@@ -19,7 +19,7 @@ THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import time
 import requests
-from udemy_downloader.constants import HEADERS
+from constants import HEADERS
 
 class Session(object):
     def __init__(self):

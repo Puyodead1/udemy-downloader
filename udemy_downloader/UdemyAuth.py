@@ -16,7 +16,7 @@ ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
-from udemy_downloader.Session import Session
+from Session import Session
 import sys
 
 class UdemyAuth(object):

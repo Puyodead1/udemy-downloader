@@ -1,1 +1,1 @@
-from udemy_downloader.UdemyDownloader import UdemyDownloader
+from UdemyDownloader import UdemyDownloader
