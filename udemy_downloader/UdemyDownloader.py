@@ -275,13 +275,13 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                 #     continue
             elif asset_type == "video":
                 print(
-                    "If you're seeing this message, that means that you reached a secret area that I haven't finished! jk I haven't implemented handling for this asset type, please report this at https://github.com/Puyodead1/udemy-downloader/issues so I can add it. When reporting, please provide the following information: "
+                    "If you're seeing this message, that means that you reached an asset type that I haven't implemented handling for, please report this at https://github.com/Puyodead1/udemy-downloader/issues so I can add it. When reporting, please provide the following information: "
                 )
                 print("AssetType: Video; AssetData: ", asset)
             elif asset_type == "audio" or asset_type == "e-book" or asset_type == "file" or asset_type == "presentation":
                 try:
                     download_aria(download_url, chapter_dir,
-                                  f"{asset_id}-{filename}")
+                                  filename)
                 except Exception as e:
                     print("> Error downloading asset: ", e)
                     continue
