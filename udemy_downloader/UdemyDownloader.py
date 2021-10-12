@@ -704,18 +704,18 @@ def parse_data():
         process_course()
 
 
-def _print_course_info(course_data):
+def _print_course_info():
     print("\n\n\n\n")
-    course_title = course_data.get("title")
-    chapter_count = course_data.get("total_chapters")
-    lecture_count = course_data.get("total_lectures")
+    course_title = _udemy.get("title")
+    chapter_count = _udemy.get("total_chapters")
+    lecture_count = _udemy.get("total_lectures")
 
     print("> Course: {}".format(course_title))
     print("> Total Chapters: {}".format(chapter_count))
     print("> Total Lectures: {}".format(lecture_count))
     print("\n")
 
-    chapters = course_data.get("chapters")
+    chapters = _udemy.get("chapters")
     for chapter in chapters:
         chapter_title = chapter.get("chapter_title")
         chapter_index = chapter.get("chapter_index")
