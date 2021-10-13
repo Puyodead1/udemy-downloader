@@ -608,7 +608,8 @@ class Session(object):
                 return session
             if not session.ok:
                 print('Failed request '+url)
-                print(f"{session.status_code} {session.reason}, retrying (attempt {i} )...")
+                print(
+                    f"{session.status_code} {session.reason}, retrying (attempt {i} )...")
                 time.sleep(0.8)
 
     def _post(self, url, data, redirect=True):
@@ -1080,7 +1081,8 @@ def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_to
                     else:
                         download_aria(url, chapter_dir, lecture_title + ".mp4")
                 except EnvironmentError as e:
-                    print(f"      > Error downloading lecture: ", e)
+                    print(">        Error downloading lecture")
+                    raise e
             else:
                 print(
                     "      > Lecture '%s' is already downloaded, skipping..." %
