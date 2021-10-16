@@ -9,6 +9,7 @@ import time
 import cloudscraper
 import m3u8
 import requests
+from pathlib import Path
 import yt_dlp
 from html.parser import HTMLParser as compat_HTMLParser
 from dotenv import load_dotenv
@@ -21,13 +22,14 @@ from _version import __version__
 
 home_dir = os.getcwd()
 download_dir = os.path.join(os.getcwd(), "out_dir")
+saved_dir = os.path.join(os.getcwd(), "saved")
 keyfile_path = os.path.join(os.getcwd(), "keyfile.json")
 retry = 3
 downloader = None
 HEADERS = {
     "Origin": "www.udemy.com",
-    "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0",
+    # "User-Agent":
+    # "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0",
     "Accept": "*/*",
     "Accept-Encoding": None,
 }
@@ -38,6 +40,9 @@ COURSE_SEARCH = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-cou
 SUBSCRIBED_COURSES = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses/?ordering=-last_accessed&fields[course]=id,title,url&page=1&page_size=12"
 MY_COURSES_URL = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,title,published_title&ordering=-last_accessed,-access_time&page=1&page_size=10000"
 COLLECTION_URL = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses-collections/?collection_has_courses=True&course_limit=20&fields[course]=last_accessed_time,title,published_title&fields[user_has_subscribed_courses_collection]=@all&page=1&page_size=1000"
+
+Path(download_dir).mkdir(parents=True, exist_ok=True)
+Path(saved_dir).mkdir(parents=True, exist_ok=True)
 
 
 def _clean(text):
