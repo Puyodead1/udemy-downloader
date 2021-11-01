@@ -80,8 +80,10 @@ save_to_file = False
 concurrent_connections = 10
 access_token = None
 use_h265 = False
-h265_crf = 28
-h265_preset = "medium"
+h265_crf = "28"
+ffmpeg_preset = "medium"
+h265_encoder = "libx265"
+ffmpeg_framerate = "30"
 
 
 def download_segments(url, format_id, video_title, output_path, lecture_file_name, chapter_dir):
@@ -147,7 +149,7 @@ def download_segments(url, format_id, video_title, output_path, lecture_file_nam
         # this should run only if both audio and video decryption returned 0 codes
         print("> Merging audio and video files...")
         ret_code3 = merge(video_title=video_title, video_filepath=video_filepath_dec, audio_filepath=audio_filepath_dec,
-                          output_path=output_path, use_h265=use_h265, h265_crf=h265_crf, h265_preset=h265_preset)
+                          output_path=output_path, use_h265=use_h265, h265_crf=h265_crf, ffmpeg_preset=ffmpeg_preset, h265_encoder=h265_encoder, ffmpeg_framerate=ffmpeg_framerate)
         if(ret_code3 != 0):
             print(
                 "WARN: Merging returned a non-0 result code which usually indicated an error!")
@@ -369,7 +371,7 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                             print("      > HLS Download success")
 
                             ffmpeg_command = ["ffmpeg", "-i", lecture_path, "-c:v",
-                                              "libx265", "-c:a", "copy", lecture_path + ".mp4"]
+                                              h265_encoder, "-c:a", "copy", "-filter:v", "fps=" + ffmpeg_framerate, lecture_path + ".mp4"]
                             ret_code = subprocess.Popen(ffmpeg_command).wait()
                             if ret_code == 0:
                                 os.remove(lecture_path)
@@ -855,16 +857,30 @@ def setup_parser():
     parser.add_argument(
         "--h265-crf",
         dest="h265_crf",
-        type=int,
-        default=28,
+        type=str,
+        default="28",
         help="Set a custom CRF value for H.265 encoding. FFMPEG default is 28",
     )
     parser.add_argument(
-        "--h265-preset",
-        dest="h265_preset",
+        "--ffmpeg-preset",
+        dest="ffmpeg_preset",
         type=str,
         default="medium",
-        help="Set a custom preset value for H.265 encoding. FFMPEG default is medium",
+        help="Set a custom preset value for encoding. This can vary depending on the encoder",
+    )
+    parser.add_argument(
+        "--ffmpeg-framerate",
+        dest="ffmpeg_framerate",
+        type=str,
+        default="30",
+        help="Changes the FPS used for encoding. FFMPEG default is 30",
+    )
+    parser.add_argument(
+        "--h265-encoder",
+        dest="h265_encoder",
+        type=str,
+        default="libx265",
+        help="Changes the HEVC encder that is used. Default is libx265",
     )
     parser.add_argument(
         "--iknowwhatimdoing",
@@ -889,7 +905,7 @@ def setup_parser():
 
 
 def process_args(args):
-    global course_url, bearer_token, dl_assets, dl_captions, caption_locale, skip_lectures, quality, keep_vtt, skip_hls, print_info, load_from_file, save_to_file, concurrent_connections, use_h265, h265_crf, h265_preset, iknowwhatimdoing
+    global course_url, bearer_token, dl_assets, dl_captions, caption_locale, skip_lectures, quality, keep_vtt, skip_hls, print_info, load_from_file, save_to_file, concurrent_connections, use_h265, h265_crf, ffmpeg_preset, iknowwhatimdoing, h265_encoder, ffmpeg_framerate
 
     course_url = args.course_url
     if args.download_assets:
@@ -924,11 +940,21 @@ def process_args(args):
         use_h265 = True
     if args.h265_crf:
         h265_crf = args.h265_crf
-    if args.h265_preset:
-        h265_preset = args.h265_preset
+        print("> Selected CRF: " + h265_crf)
     if args.iknowwhatimdoing:
         iknowwhatimdoing = args.iknowwhatimdoing
-
+    if args.ffmpeg_framerate:
+        ffmpeg_framerate = args.ffmpeg_framerate
+        print("> Selected Framerate: " + ffmpeg_framerate)
+    if args.h265_encoder:
+        h265_encoder = args.h265_encoder
+        print("> Selected HEVC Encoder: " + h265_encoder)
+        if h265_encoder == "hevc_nvenc":
+            ffmpeg_preset = "p4"
+            print("  > Default preset for hevc_nvenc is p4")
+    if args.ffmpeg_preset:
+        ffmpeg_preset = args.ffmpeg_preset
+        print("> Selected HEVC Encoder Preset: " + ffmpeg_preset)
     if args.load_from_file:
         print(
             "> 'load_from_file' was specified, data will be loaded from json files instead of fetched"

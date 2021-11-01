@@ -97,24 +97,24 @@ def remove_files(files):
         os.remove(file)
 
 
-def merge(video_title, video_filepath, audio_filepath, output_path, use_h265, h265_crf, h265_preset):
+def merge(video_title, video_filepath, audio_filepath, output_path, use_h265, h265_crf, ffmpeg_preset, h265_encoder, ffmpeg_framerate):
     """
     @author Jayapraveen
     """
     if os.name == "nt":
         if use_h265:
-            command = "ffmpeg -y -i \"{}\" -i \"{}\" -c:v libx265 -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
-                video_filepath, audio_filepath, h265_crf, h265_preset, video_title, output_path)
+            command = "ffmpeg -y -i \"{}\" -i \"{}\" -c:v {} -filter:v fps={} -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
+                video_filepath, audio_filepath, h265_encoder, ffmpeg_framerate, h265_crf, ffmpeg_preset, video_title, output_path)
         else:
-            command = "ffmpeg -y -i \"{}\" -i \"{}\" -c:v copy -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
-                video_filepath, audio_filepath, video_title, output_path)
+            command = "ffmpeg -y -i \"{}\" -i \"{}\" -c:v copy -filter:v fps={} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
+                video_filepath, audio_filepath, ffmpeg_framerate, ffmpeg_preset, video_title, output_path)
     else:
         if use_h265:
-            command = "nide -n 7 ffmpeg -y -i \"{}\" -i \"{}\" -c:v libx265 -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
-                video_filepath, audio_filepath, h265_crf, h265_preset, video_title, output_path)
+            command = "nide -n 7 ffmpeg -y -i \"{}\" -i \"{}\" -c:v {} -filter:v fps={} -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
+                video_filepath, audio_filepath, h265_encoder, ffmpeg_framerate, h265_crf, ffmpeg_preset, video_title, output_path)
         else:
-            command = "nide -n 7 ffmpeg -y -i \"{}\" -i \"{}\" -c:v copy -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
-                video_filepath, audio_filepath, video_title, output_path)
+            command = "nide -n 7 ffmpeg -y -i \"{}\" -i \"{}\" -c:v copy -filter:v fps={} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
+                video_filepath, audio_filepath, ffmpeg_framerate, ffmpeg_preset, video_title, output_path)
     return os.system(command)
 
 

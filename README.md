@@ -69,9 +69,8 @@ You can now run the program, see the examples below. The course will download to
 # Advanced Usage
 
 ```
-usage: UdemyDownloader.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_CONNECTIONS]
-                          [--skip-lectures] [--download-assets] [--download-captions] [--keep-vtt] [--skip-hls]
-                          [--info] [--use-h265] [--h265-crf H265_CRF] [--h265-preset H265_PRESET] [-v]
+usage: udemy_downloader [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_CONNECTIONS] [--skip-lectures] [--download-assets] [--download-captions] [--keep-vtt] [--skip-hls] [--info]
+                        [--use-h265] [--h265-crf H265_CRF] [--ffmpeg-preset FFMPEG_PRESET] [--ffmpeg-framerate FFMPEG_FRAMERATE] [--h265-encoder H265_ENCODER] [-v]
 
 Udemy Downloader
 
@@ -82,24 +81,24 @@ optional arguments:
   -b BEARER_TOKEN, --bearer BEARER_TOKEN
                         The Bearer token to use
   -q QUALITY, --quality QUALITY
-                        Download specific video quality. If the requested quality isn't available, the closest quality
-                        will be used. If not specified, the best quality will be downloaded for each lecture
-  -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is
-                        'en')
+                        Download specific video quality. If the requested quality isn't available, the closest quality will be used. If not specified, the best quality will be downloaded for each lecture
+  -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is 'en')
   -cd CONCURRENT_CONNECTIONS, --concurrent-connections CONCURRENT_CONNECTIONS
-                        The number of maximum concurrent connections per download for segments (HLS and DASH, must be
-                        a number 1-30)
+                        The number of maximum concurrent connections per download for segments (HLS and DASH, must be a number 1-30)
   --skip-lectures       If specified, lectures won't be downloaded
   --download-assets     If specified, lecture assets will be downloaded
   --download-captions   If specified, captions will be downloaded
   --keep-vtt            If specified, .vtt files won't be removed
-  --skip-hls            If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p
-                        quality for non-drm lectures)
+  --skip-hls            If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p quality for non-drm lectures)
   --info                If specified, only course information will be printed, nothing will be downloaded
   --use-h265            If specified, videos will be encoded with the H.265 codec
   --h265-crf H265_CRF   Set a custom CRF value for H.265 encoding. FFMPEG default is 28
-  --h265-preset H265_PRESET
-                        Set a custom preset value for H.265 encoding. FFMPEG default is medium
+  --ffmpeg-preset FFMPEG_PRESET
+                        Set a custom preset value for encoding. This can vary depending on the encoder
+  --ffmpeg-framerate FFMPEG_FRAMERATE
+                        Changes the FPS used for encoding. FFMPEG default is 30
+  --h265-encoder H265_ENCODER
+                        Changes the HEVC encder that is used. Default is libx265
   -v, --version         show program's version number and exit
 ```
 
@@ -137,8 +136,13 @@ optional arguments:
   - `python udemy_downloader -c <Course URL> --use-h265`
 - Encode in H.265 with custom CRF:
   - `python udemy_downloader -c <Course URL> --use-h265 -h265-crf 20`
-- Encode in H.265 with custom preset:
+- Encode in H.265 with custom preset using the default encoder (libx265):
   - `python udemy_downloader -c <Course URL> --use-h265 --h265-preset faster`
+- Encode in H.265 with custom preset using a custom encoder:
+  - **Note**: _The presets may be different depending on the encoder! For example: hevc_nvenc default is p7. You can view encoder help with `ffmpeg -h encoder=<encoder name>`, ex: `ffmpeg -h encoder=hevc_nvenc`_
+  - `python udemy_downloader -c <Course URL> --use-h265 --h265-encoder hevc_nvenc --h265-preset p7`
+- Encode in H.265 with a custom framerate:
+  - `python udemy_downloader -c <Course URL> --use-h265 --ffmpeg-framerate 24`
 
 # Credits
 
