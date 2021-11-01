@@ -139,7 +139,8 @@ optional arguments:
 - Encode in H.265 with custom preset using the default encoder (libx265):
   - `python udemy_downloader -c <Course URL> --use-h265 --h265-preset faster`
 - Encode in H.265 with custom preset using a custom encoder:
-  - **Note**: _The presets may be different depending on the encoder! For example: hevc_nvenc default is p7. You can view encoder help with `ffmpeg -h encoder=<encoder name>`, ex: `ffmpeg -h encoder=hevc_nvenc`_
+  - **Note**: _The presets may be different depending on the encoder! For example: `hevc_nvenc` default is `p4` and `libx265` is `medium`_
+  - _You can view encoder help with `ffmpeg -h encoder=<encoder name>`, ex: `ffmpeg -h encoder=hevc_nvenc`_
   - `python udemy_downloader -c <Course URL> --use-h265 --h265-encoder hevc_nvenc --h265-preset p7`
 - Encode in H.265 with a custom framerate:
   - `python udemy_downloader -c <Course URL> --use-h265 --ffmpeg-framerate 24`
