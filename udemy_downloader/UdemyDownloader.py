@@ -25,17 +25,15 @@ SOFTWARE.
 import argparse
 import json
 import os
-import re
 import subprocess
 import sys
 import time
 import requests
-import yt_dlp
 from dotenv import load_dotenv
 from requests.exceptions import ConnectionError as conn_error
 from tqdm import tqdm
 from html.parser import HTMLParser as compat_HTMLParser
-from sanitize import sanitize, slugify, SLUG_OK
+from sanitize import sanitize
 from utils import extract_kid, decrypt, merge, remove_files, _clean, check_for_aria, check_for_ffmpeg, check_for_mp4decrypt
 from vtt_to_srt import convert
 from Udemy import Udemy
@@ -45,6 +43,7 @@ home_dir = os.getcwd()
 download_dir = os.path.join(os.getcwd(), "out_dir")
 saved_dir = os.path.join(os.getcwd(), "saved")
 keyfile_path = os.path.join(os.getcwd(), "keyfile.json")
+cookiefile_path = os.path.join(os.getcwd(), "cookies.txt")
 course_info_path = os.path.join(saved_dir, "course_info.json")
 course_content_path = os.path.join(saved_dir, "course_content.json")
 _udemy_path = os.path.join(saved_dir, "_udemy.json")
@@ -82,8 +81,9 @@ access_token = None
 use_h265 = False
 h265_crf = "28"
 ffmpeg_preset = "medium"
-h265_encoder = "libx265"
+h265_encoder = "copy"
 ffmpeg_framerate = "30"
+cookies = ""
 
 
 def download_segments(url, format_id, video_title, output_path, lecture_file_name, chapter_dir):
@@ -398,7 +398,7 @@ def parse():
     print(f"Chapter(s) ({total_chapters})")
     print(f"Lecture(s) ({total_lectures})")
 
-    course_name = _udemy.get("course_title")
+    course_name = str(_udemy.get("course_id"))
     course_dir = os.path.join(download_dir, course_name)
     if not os.path.exists(course_dir):
         os.mkdir(course_dir)
@@ -880,7 +880,7 @@ def setup_parser():
         dest="h265_encoder",
         type=str,
         default="libx265",
-        help="Changes the HEVC encder that is used. Default is libx265",
+        help="Changes the HEVC encder that is used. Default is copy when not using h265, otherwise the default is libx265",
     )
     parser.add_argument(
         "--iknowwhatimdoing",
@@ -938,6 +938,7 @@ def process_args(args):
             concurrent_connections = 30
     if args.use_h265:
         use_h265 = True
+        h265_encoder = "libx265"
     if args.h265_crf:
         h265_crf = args.h265_crf
         print("> Selected CRF: " + h265_crf)
@@ -1002,6 +1003,12 @@ def try_load_keys():
     keys = json.loads(f.read())
 
 
+def try_load_cookies():
+    global cookies
+    f = open(cookiefile_path, 'r')
+    cookies = f.read()
+
+
 def UdemyDownloader():
     global udemy, course, resource
 
@@ -1017,6 +1024,11 @@ def UdemyDownloader():
     args = parser.parse_args()
     process_args(args=args)
 
+    if not os.path.exists(cookiefile_path):
+        print("No cookies.txt file was found, you won't be able to download subscription courses! You can ignore ignore this if you don't plan to download a course included in a subscription plan.")
+    else:
+        try_load_cookies()
+
     # warn that the keyfile is not found
     if not os.path.exists(keyfile_path):
         print("!!! Keyfile not found! This means you probably didn't rename the keyfile correctly, DRM lecture decryption will fail! If you aren't downloading DRM encrypted courses, you can ignore this message. !!!")
@@ -1030,7 +1042,7 @@ def UdemyDownloader():
     # ensure 3rd party binaries are installed
     ensure_dependencies_installed()
 
-    udemy = Udemy(access_token=bearer_token)
+    udemy = Udemy(access_token=bearer_token, cookies=cookies)
 
     print("> Fetching course information, this may take a minute...")
     get_course_information()

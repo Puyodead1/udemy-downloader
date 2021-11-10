@@ -21,19 +21,22 @@ import sys
 import m3u8
 import yt_dlp
 import re
+import json
 from requests.exceptions import ConnectionError as conn_error
 from UdemyAuth import UdemyAuth
 from utils import _clean
-from constants import COURSE_SEARCH, COURSE_URL, MY_COURSES_URL, COLLECTION_URL
+from constants import COURSE_SEARCH, COURSE_URL, COURSE_INFO_URL, MY_COURSES_URL, COLLECTION_URL
+from bs4 import BeautifulSoup
+
 
 class Udemy:
-    def __init__(self, access_token):
+    def __init__(self, access_token, cookies):
         self.session = None
         self.access_token = None
         self.auth = UdemyAuth(cache_session=False)
         if not self.session:
             self.session, self.access_token = self.auth.authenticate(
-                access_token=access_token)
+                access_token=access_token, cookies=cookies)
 
         if self.session and self.access_token:
             self.session._headers.update(
@@ -331,6 +334,11 @@ class Udemy:
         if obj:
             return obj.group("portal_name"), obj.group("name_or_id")
 
+    def extract_portal_name(self, url):
+        obj = re.search(r"(?i)(?://(?P<portal_name>.+?).udemy.com)", url)
+        if obj:
+            return obj.group("portal_name")
+
     def _subscribed_courses(self, portal_name, course_name):
         results = []
         self.session._headers.update({
@@ -355,6 +363,19 @@ class Udemy:
         else:
             results = webpage.get("results", [])
         return results
+
+    def _extract_course_info_json(self, url, course_id, portal_name):
+        self.session._headers.update({"Referer": url})
+        url = COURSE_INFO_URL.format(
+            portal_name=portal_name, course_id=course_id)
+        try:
+            resp = self.session._get(url).json()
+        except conn_error as error:
+            print(f"Udemy Says: Connection error, {error}")
+            time.sleep(0.8)
+            sys.exit(0)
+        else:
+            return resp
 
     def _extract_course_json(self, url, course_id, portal_name):
         self.session._headers.update({"Referer": url})
@@ -404,7 +425,7 @@ class Udemy:
                             data["results"].append(d)
             return data
 
-    def __extract_course(self, response, course_name):
+    def _extract_course(self, response, course_name):
         _temp = {}
         if response:
             for entry in response:
@@ -534,21 +555,32 @@ class Udemy:
         course = {}
         results = self._subscribed_courses(portal_name=portal_name,
                                            course_name=course_name)
-        course = self.__extract_course(response=results,
-                                       course_name=course_name)
+        course = self._extract_course(response=results,
+                                      course_name=course_name)
         if not course:
             results = self._my_courses(portal_name=portal_name)
-            course = self.__extract_course(response=results,
-                                           course_name=course_name)
+            course = self._extract_course(response=results,
+                                          course_name=course_name)
         if not course:
             results = self._subscribed_collection_courses(
                 portal_name=portal_name)
-            course = self.__extract_course(response=results,
-                                           course_name=course_name)
+            course = self._extract_course(response=results,
+                                          course_name=course_name)
         if not course:
             results = self._archived_courses(portal_name=portal_name)
-            course = self.__extract_course(response=results,
-                                           course_name=course_name)
+            course = self._extract_course(response=results,
+                                          course_name=course_name)
+
+        if not course:
+            course_html = self.session._get(url).text
+            soup = BeautifulSoup(course_html, "lxml")
+            data_args = soup.find(
+                "div", {"class": "ud-component--course-taking--app"}).attrs["data-module-args"]
+            data_json = json.loads(data_args)
+            course_id = data_json.get("courseId", None)
+            portal_name = self.extract_portal_name(url)
+            course = self._extract_course_info_json(
+                url, course_id, portal_name)
 
         if course:
             course.update({"portal_name": portal_name})

@@ -19,6 +19,7 @@ THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 from Session import Session
 import sys
 
+
 class UdemyAuth(object):
     def __init__(self, username="", password="", cache_session=False):
         self.username = username
@@ -26,12 +27,12 @@ class UdemyAuth(object):
         self._cache = cache_session
         self._session = Session()
 
-    def authenticate(self, access_token):
+    def authenticate(self, access_token, cookies):
         if access_token:
-            self._session._set_auth_headers(access_token=access_token)
+            self._session._set_auth_headers(
+                access_token=access_token, cookies=cookies)
             self._session._session.cookies.update(
                 {"access_token": access_token})
             return self._session, access_token
         else:
             raise RuntimeError("No access token is present")
-            sys.exit(1)

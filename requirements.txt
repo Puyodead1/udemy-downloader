@@ -12,3 +12,5 @@ yt-dlp
 bitstring
 unidecode
 six
+beautifulsoup4
+lxml

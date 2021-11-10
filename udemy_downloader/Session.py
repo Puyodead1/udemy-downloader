@@ -21,15 +21,17 @@ import time
 import requests
 from constants import HEADERS
 
+
 class Session(object):
     def __init__(self):
         self._headers = HEADERS
         self._session = requests.sessions.Session()
 
-    def _set_auth_headers(self, access_token="", client_id=""):
+    def _set_auth_headers(self, access_token="", cookies={}):
         self._headers["Authorization"] = "Bearer {}".format(access_token)
         self._headers["X-Udemy-Authorization"] = "Bearer {}".format(
             access_token)
+        self._headers["Cookie"] = cookies
 
     def _get(self, url):
         for i in range(10):
@@ -38,7 +40,8 @@ class Session(object):
                 return session
             if not session.ok:
                 print('Failed request '+url)
-                print(f"{session.status_code} {session.reason}, retrying (attempt {i} )...")
+                print(
+                    f"{session.status_code} {session.reason}, retrying (attempt {i} )...")
                 time.sleep(0.8)
 
     def _post(self, url, data, redirect=True):

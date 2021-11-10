@@ -66,6 +66,24 @@ I would rather not instruct you how to get these as its a grey area in terms of 
 
 You can now run the program, see the examples below. The course will download to `out_dir`.
 
+# Udemy Subscription Plans
+
+To download a course included in a subscription plan that you did not purchase individually, you will need to follow a few more steps to get setup.
+
+## Getting your cookies
+
+- Go to the page of the course you want to download
+- press `control` + `shift` + `i` (this may be different depending on your OS, just google how to open developer tools)
+- click the `Console` tab
+- copy and paste `document.cookie` and press enter
+- copy the text between the quotes
+
+## Setup token file
+
+- Create a file called `cookies.txt`
+- Paste the cookie into the file
+- save and close the file
+
 # Advanced Usage
 
 ```
@@ -98,7 +116,7 @@ optional arguments:
   --ffmpeg-framerate FFMPEG_FRAMERATE
                         Changes the FPS used for encoding. FFMPEG default is 30
   --h265-encoder H265_ENCODER
-                        Changes the HEVC encder that is used. Default is libx265
+                        Changes the HEVC encder that is used. Default is copy when not using h265, otherwise the default is libx265
   -v, --version         show program's version number and exit
 ```
 
