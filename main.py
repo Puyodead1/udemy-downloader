@@ -19,12 +19,15 @@ from sanitize import sanitize, slugify, SLUG_OK
 from utils import extract_kid
 from vtt_to_srt import convert
 from _version import __version__
+from bs4 import BeautifulSoup
 
 home_dir = os.getcwd()
 download_dir = os.path.join(os.getcwd(), "out_dir")
 saved_dir = os.path.join(os.getcwd(), "saved")
 keyfile_path = os.path.join(os.getcwd(), "keyfile.json")
+cookiefile_path = os.path.join(os.getcwd(), "cookies.txt")
 retry = 3
+cookies = {}
 downloader = None
 HEADERS = {
     "Origin": "www.udemy.com",
@@ -36,6 +39,7 @@ HEADERS = {
 LOGIN_URL = "https://www.udemy.com/join/login-popup/?ref=&display_type=popup&loc"
 LOGOUT_URL = "https://www.udemy.com/user/logout"
 COURSE_URL = "https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,title,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,media_license_token,course_is_drmed,media_sources,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000"
+COURSE_INFO_URL = "https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/"
 COURSE_SEARCH = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,title,published_title&page=1&page_size=500&search={course_name}"
 SUBSCRIBED_COURSES = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses/?ordering=-last_accessed&fields[course]=id,title,url&page=1&page_size=12"
 MY_COURSES_URL = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,title,published_title&ordering=-last_accessed,-access_time&page=1&page_size=10000"
@@ -43,6 +47,18 @@ COLLECTION_URL = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-co
 
 Path(download_dir).mkdir(parents=True, exist_ok=True)
 Path(saved_dir).mkdir(parents=True, exist_ok=True)
+
+# Get the keys
+with open(keyfile_path, 'r') as keyfile:
+    keyfile = keyfile.read()
+keyfile = json.loads(keyfile)
+
+# Read cookies from file
+if os.path.exists(cookiefile_path):
+    with open(cookiefile_path, 'r') as cookiefile:
+        cookies = cookiefile.read()
+else:
+    print("No cookies.txt file was found, you won't be able to download subscription courses! You can ignore ignore this if you don't plan to download a course included in a subscription plan.")
 
 
 def _clean(text):
@@ -363,6 +379,11 @@ class Udemy:
         if obj:
             return obj.group("portal_name"), obj.group("name_or_id")
 
+    def extract_portal_name(self, url):
+        obj = re.search(r"(?i)(?://(?P<portal_name>.+?).udemy.com)", url)
+        if obj:
+            return obj.group("portal_name")
+
     def _subscribed_courses(self, portal_name, course_name):
         results = []
         self.session._headers.update({
@@ -387,6 +408,19 @@ class Udemy:
         else:
             results = webpage.get("results", [])
         return results
+
+    def _extract_course_info_json(self, url, course_id, portal_name):
+        self.session._headers.update({"Referer": url})
+        url = COURSE_INFO_URL.format(
+            portal_name=portal_name, course_id=course_id)
+        try:
+            resp = self.session._get(url).json()
+        except conn_error as error:
+            print(f"Udemy Says: Connection error, {error}")
+            time.sleep(0.8)
+            sys.exit(0)
+        else:
+            return resp
 
     def _extract_course_json(self, url, course_id, portal_name):
         self.session._headers.update({"Referer": url})
@@ -436,7 +470,7 @@ class Udemy:
                             data["results"].append(d)
             return data
 
-    def __extract_course(self, response, course_name):
+    def _extract_course(self, response, course_name):
         _temp = {}
         if response:
             for entry in response:
@@ -566,21 +600,32 @@ class Udemy:
         course = {}
         results = self._subscribed_courses(portal_name=portal_name,
                                            course_name=course_name)
-        course = self.__extract_course(response=results,
-                                       course_name=course_name)
+        course = self._extract_course(response=results,
+                                      course_name=course_name)
         if not course:
             results = self._my_courses(portal_name=portal_name)
-            course = self.__extract_course(response=results,
-                                           course_name=course_name)
+            course = self._extract_course(response=results,
+                                          course_name=course_name)
         if not course:
             results = self._subscribed_collection_courses(
                 portal_name=portal_name)
-            course = self.__extract_course(response=results,
-                                           course_name=course_name)
+            course = self._extract_course(response=results,
+                                          course_name=course_name)
         if not course:
             results = self._archived_courses(portal_name=portal_name)
-            course = self.__extract_course(response=results,
-                                           course_name=course_name)
+            course = self._extract_course(response=results,
+                                          course_name=course_name)
+
+        if not course:
+            course_html = self.session._get(url).text
+            soup = BeautifulSoup(course_html, "lxml")
+            data_args = soup.find(
+                "div", {"class": "ud-component--course-taking--app"}).attrs["data-module-args"]
+            data_json = json.loads(data_args)
+            course_id = data_json.get("courseId", None)
+            portal_name = self.extract_portal_name(url)
+            course = self._extract_course_info_json(
+                url, course_id, portal_name)
 
         if course:
             course.update({"portal_name": portal_name})
@@ -601,10 +646,12 @@ class Session(object):
         self._headers = HEADERS
         self._session = requests.sessions.Session()
 
-    def _set_auth_headers(self, access_token="", client_id=""):
+    def _set_auth_headers(self, access_token=""):
         self._headers["Authorization"] = "Bearer {}".format(access_token)
         self._headers["X-Udemy-Authorization"] = "Bearer {}".format(
             access_token)
+        self._headers[
+            "Cookie"] = cookies
 
     def _get(self, url):
         for i in range(10):
@@ -754,28 +801,9 @@ class UdemyAuth(object):
             })
             return login_form
 
-    def authenticate(self, access_token="", client_id=""):
-        if not access_token and not client_id:
-            data = self._form_hidden_input(form_id="login-form")
-            self._cloudsc.headers.update({"Referer": LOGIN_URL})
-            auth_response = self._cloudsc.post(LOGIN_URL,
-                                               data=data,
-                                               allow_redirects=False)
-            auth_cookies = auth_response.cookies
-
-            access_token = auth_cookies.get("access_token", "")
-            client_id = auth_cookies.get("client_id", "")
-
+    def authenticate(self, access_token=""):
         if access_token:
-            # dump cookies to configs
-            # if self._cache:
-            #     _ = to_configs(
-            #         username=self.username,
-            #         password=self.password,
-            #         cookies=f"access_token={access_token}",
-            #     )
-            self._session._set_auth_headers(access_token=access_token,
-                                            client_id=client_id)
+            self._session._set_auth_headers(access_token=access_token)
             self._session._session.cookies.update(
                 {"access_token": access_token})
             return self._session, access_token
@@ -786,11 +814,6 @@ class UdemyAuth(object):
 
 if not os.path.exists(download_dir):
     os.makedirs(download_dir)
-
-# Get the keys
-with open(keyfile_path, 'r') as keyfile:
-    keyfile = keyfile.read()
-keyfile = json.loads(keyfile)
 
 
 def durationtoseconds(period):

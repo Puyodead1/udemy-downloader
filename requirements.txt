@@ -12,3 +12,5 @@ yt-dlp
 bitstring
 cloudscraper
 unidecode
+beautifulsoup4
+lxml

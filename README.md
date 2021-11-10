@@ -28,7 +28,7 @@ Windows is the primary development OS, but I've made an effort to support Linux 
 
 # Requirements
 
-1. You will need to download `ffmpeg`, `aria2c`, `mp4decrypt` (from Bento4 SDK) and ``yt-dlp`` (``pip install yt-dlp``). Ensure they are in the system path (typing their name in cmd should invoke them).
+1. You will need to download `ffmpeg`, `aria2c`, `mp4decrypt` (from Bento4 SDK) and `yt-dlp` (`pip install yt-dlp`). Ensure they are in the system path (typing their name in cmd should invoke them).
 
 # Usage
 
@@ -54,7 +54,7 @@ You will need to get a few things before you can use this program:
 
 ### Key ID and Key
 
-It is up to you to aquire the key and key ID. Please don't ask me for help acquiring these, decrypting DRM protected content can be considered piracy.
+It is up to you to aquire the key and key ID. Please **DO NOT** ask me for help acquiring these, decrypting DRM protected content can be considered piracy.
 
 - Enter the key and key id in the `keyfile.json`
 - ![keyfile example](https://i.imgur.com/e5aU0ng.png)
@@ -63,6 +63,24 @@ It is up to you to aquire the key and key ID. Please don't ask me for help acqui
 ### Start Downloading
 
 You can now run the program, see the examples below. The course will download to `out_dir`.
+
+# Udemy Subscription Plans
+
+To download a course included in a subscription plan that you did not purchase individually, you will need to follow a few more steps to get setup.
+
+## Getting your cookies
+
+- Go to the page of the course you want to download
+- press `control` + `shift` + `i` (this may be different depending on your OS, just google how to open developer tools)
+- click the `Console` tab
+- copy and paste `document.cookie` and press enter
+- copy the text between the quotes
+
+## Setup token file
+
+- Create a file called `cookies.txt` in the same folder as `main.py`
+- Paste the cookie into the file
+- save and close the file
 
 # Advanced Usage
 
