@@ -27,7 +27,7 @@ saved_dir = os.path.join(os.getcwd(), "saved")
 keyfile_path = os.path.join(os.getcwd(), "keyfile.json")
 cookiefile_path = os.path.join(os.getcwd(), "cookies.txt")
 retry = 3
-cookies = {}
+cookies = ""
 downloader = None
 HEADERS = {
     "Origin": "www.udemy.com",
