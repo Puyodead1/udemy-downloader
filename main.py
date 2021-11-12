@@ -92,7 +92,7 @@ class Udemy:
             })
             print("Login Success")
         else:
-            print("Login Failure!")
+            print("Login Failure! You are probably missing an access token!")
             sys.exit(1)
 
     def _extract_supplementary_assets(self, supp_assets):
@@ -400,11 +400,11 @@ class Udemy:
         except conn_error as error:
             print(f"Udemy Says: Connection error, {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         except (ValueError, Exception) as error:
             print(f"Udemy Says: {error} on {url}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         else:
             results = webpage.get("results", [])
         return results
@@ -418,7 +418,7 @@ class Udemy:
         except conn_error as error:
             print(f"Udemy Says: Connection error, {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         else:
             return resp
 
@@ -437,7 +437,7 @@ class Udemy:
         except conn_error as error:
             print(f"Udemy Says: Connection error, {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         except (ValueError, Exception):
             resp = self._extract_large_course_content(url=url)
             return resp
@@ -451,7 +451,7 @@ class Udemy:
         except conn_error as error:
             print(f"Udemy Says: Connection error, {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         else:
             _next = data.get("next")
             while _next:
@@ -461,7 +461,7 @@ class Udemy:
                 except conn_error as error:
                     print(f"Udemy Says: Connection error, {error}")
                     time.sleep(0.8)
-                    sys.exit(0)
+                    sys.exit(1)
                 else:
                     _next = resp.get("next")
                     results = resp.get("results")
@@ -489,11 +489,11 @@ class Udemy:
         except conn_error as error:
             print(f"Udemy Says: Connection error, {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         except (ValueError, Exception) as error:
             print(f"Udemy Says: {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         else:
             results = webpage.get("results", [])
         return results
@@ -506,11 +506,11 @@ class Udemy:
         except conn_error as error:
             print(f"Udemy Says: Connection error, {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         except (ValueError, Exception) as error:
             print(f"Udemy Says: {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         else:
             results = webpage.get("results", [])
             if results:
@@ -529,11 +529,11 @@ class Udemy:
         except conn_error as error:
             print(f"Udemy Says: Connection error, {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         except (ValueError, Exception) as error:
             print(f"Udemy Says: {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         else:
             results = webpage.get("results", [])
         return results
@@ -546,11 +546,11 @@ class Udemy:
         except conn_error as error:
             print(f"Udemy Says: Connection error, {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         except (ValueError, Exception) as error:
             print(f"Udemy Says: {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         else:
             results = webpage.get("results", [])
         return results
@@ -563,11 +563,11 @@ class Udemy:
         except conn_error as error:
             print(f"Udemy Says: Connection error, {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         except (ValueError, Exception) as error:
             print(f"Udemy Says: {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         else:
             results = webpage.get("results", [])
             if results:
@@ -586,11 +586,11 @@ class Udemy:
         except conn_error as error:
             print(f"Udemy Says: Connection error, {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         except (ValueError, Exception) as error:
             print(f"Udemy Says: {error}")
             time.sleep(0.8)
-            sys.exit(0)
+            sys.exit(1)
         else:
             results = webpage.get("results", [])
         return results
@@ -619,8 +619,14 @@ class Udemy:
         if not course:
             course_html = self.session._get(url).text
             soup = BeautifulSoup(course_html, "lxml")
-            data_args = soup.find(
-                "div", {"class": "ud-component--course-taking--app"}).attrs["data-module-args"]
+            data = soup.find(
+                "div", {"class": "ud-component--course-taking--app"})
+            if not data:
+                print(
+                    "Unable to extract arguments from course page! Make sure you have a cookies.txt file!")
+                self.session.terminate()
+                sys.exit(1)
+            data_args = data.attrs["data-module-args"]
             data_json = json.loads(data_args)
             course_id = data_json.get("courseId", None)
             portal_name = self.extract_portal_name(url)
@@ -638,7 +644,7 @@ class Udemy:
             print("Trying to logout now...", )
             self.session.terminate()
             print("Logged out successfully.", )
-            sys.exit(0)
+            sys.exit(1)
 
 
 class Session(object):
