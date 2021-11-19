@@ -91,30 +91,33 @@ Note the link is `/course` not `/program-taking`. It is also important that the 
 # Advanced Usage
 
 ```
-usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_DOWNLOADS] [--skip-lectures] [--download-assets]
-               [--download-captions] [--keep-vtt] [--skip-hls] [--info]
+usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_DOWNLOADS] [--disable-ipv6]
+               [--skip-lectures] [--download-assets] [--download-captions] [--keep-vtt] [--skip-hls] [--info] [-v]
 
 Udemy Downloader
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -c COURSE_URL, --course-url COURSE_URL
                         The URL of the course to download
   -b BEARER_TOKEN, --bearer BEARER_TOKEN
                         The Bearer token to use
   -q QUALITY, --quality QUALITY
-                        Download specific video quality. If the requested quality isn't available, the closest quality will be used. If not
-                        specified, the best quality will be downloaded for each lecture
-  -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is 'en')
+                        Download specific video quality. If the requested quality isn't available, the closest quality
+                        will be used. If not specified, the best quality will be downloaded for each lecture
+  -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is
+                        'en')
   -cd CONCURRENT_DOWNLOADS, --concurrent-downloads CONCURRENT_DOWNLOADS
-                        The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-50)
+                        The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-30)
+  --disable-ipv6        If specified, ipv6 will be disabled in aria2
   --skip-lectures       If specified, lectures won't be downloaded
   --download-assets     If specified, lecture assets will be downloaded
   --download-captions   If specified, captions will be downloaded
   --keep-vtt            If specified, .vtt files won't be removed
-  --skip-hls            If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p quality for non-drm
-                        lectures)
+  --skip-hls            If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p
+                        quality for non-drm lectures)
   --info                If specified, only course information will be printed, nothing will be downloaded
+  -v, --version         show program's version number and exit
 ```
 
 - Passing a Bearer Token and Course ID as an argument
@@ -147,6 +150,16 @@ optional arguments:
 - Specify max number of concurrent downloads:
   - `python main.py -c <Course URL> --concurrent-downloads 20`
   - `python main.py -c <Course URL> -cd 20`
+
+If you encounter errors while downloading such as
+
+`errorCode=1 Network problem has occurred. cause:Unknown socket error 10051 (0x2743)`
+
+or
+
+`errorCode=1 Network problem has occurred. cause:A socket operation was attempted to an unreachable network.`
+
+Then try disabling ipv6 in aria2 using the `--disable-ipv6` option
 
 # Support
 

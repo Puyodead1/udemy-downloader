@@ -9,8 +9,8 @@ import time
 import cloudscraper
 import m3u8
 import requests
-from pathlib import Path
 import yt_dlp
+from pathlib import Path
 from html.parser import HTMLParser as compat_HTMLParser
 from dotenv import load_dotenv
 from requests.exceptions import ConnectionError as conn_error
@@ -893,7 +893,7 @@ def decrypt(kid, in_filepath, out_filepath):
 
 
 def handle_segments(url, format_id, video_title,
-                    output_path, lecture_file_name, concurrent_connections, chapter_dir):
+                    output_path, lecture_file_name, concurrent_connections, chapter_dir, disable_ipv6):
     os.chdir(os.path.join(chapter_dir))
     file_name = lecture_file_name.replace("%", "").replace(".mp4", "")
     video_filepath_enc = file_name + ".encrypted.mp4"
@@ -901,12 +901,16 @@ def handle_segments(url, format_id, video_title,
     video_filepath_dec = file_name + ".decrypted.mp4"
     audio_filepath_dec = file_name + ".decrypted.m4a"
     print("> Downloading Lecture Tracks...")
-    ret_code = subprocess.Popen([
+    args = [
         "yt-dlp", "--force-generic-extractor", "--allow-unplayable-formats",
         "--concurrent-fragments", f"{concurrent_connections}", "--downloader",
         "aria2c", "--fixup", "never", "-k", "-o", f"{file_name}.encrypted.%(ext)s",
         "-f", format_id, f"{url}"
-    ]).wait()
+    ]
+    if disable_ipv6:
+        args.append("--downloader-args")
+        args.append("aria2c:\"--disable-ipv6\"")
+    ret_code = subprocess.Popen(args).wait()
     print("> Lecture Tracks Downloaded")
 
     print("Return code: " + str(ret_code))
@@ -1007,21 +1011,24 @@ def download(url, path, filename):
     return file_size
 
 
-def download_aria(url, file_dir, filename):
+def download_aria(url, file_dir, filename, disable_ipv6):
     """
     @author Puyodead1
     """
     print("    > Downloading File...")
-    ret_code = subprocess.Popen([
+    args = [
         "aria2c", url, "-o", filename, "-d", file_dir, "-j16", "-s20", "-x16",
         "-c", "--auto-file-renaming=false", "--summary-interval=0"
-    ]).wait()
+    ]
+    if disable_ipv6:
+        args.append("--disable-ipv6")
+    ret_code = subprocess.Popen(args).wait()
     print("    > File Downloaded")
 
     print("Return code: " + str(ret_code))
 
 
-def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
+def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0, disable_ipv6=False):
     filename = f"%s_%s.%s" % (sanitize(lecture_title), caption.get("language"),
                               caption.get("extension"))
     filename_no_ext = f"%s_%s" % (sanitize(lecture_title),
@@ -1033,7 +1040,7 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
     else:
         print(f"    >  Downloading caption: '%s'" % filename)
         try:
-            download_aria(caption.get("download_url"), lecture_dir, filename)
+            download_aria(caption.get("download_url"), lecture_dir, filename, disable_ipv6)
         except Exception as e:
             if tries >= 3:
                 print(
@@ -1045,7 +1052,7 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
                     f"    > Error downloading caption: {e}. Will retry {3-tries} more times."
                 )
                 process_caption(caption, lecture_title, lecture_dir, keep_vtt,
-                                tries + 1)
+                                tries + 1, disable_ipv6)
         if caption.get("extension") == "vtt":
             try:
                 print("    > Converting caption to SRT format...")
@@ -1058,7 +1065,7 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0):
 
 
 def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_token,
-                    concurrent_connections, chapter_dir):
+                    concurrent_connections, chapter_dir, disable_ipv6):
     lecture_title = lecture.get("lecture_title")
     is_encrypted = lecture.get("is_encrypted")
     lecture_sources = lecture.get("video_sources")
@@ -1075,7 +1082,7 @@ def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_to
             handle_segments(source.get("download_url"),
                             source.get(
                                 "format_id"), lecture_title, lecture_path, lecture_file_name,
-                            concurrent_connections, chapter_dir)
+                            concurrent_connections, chapter_dir, disable_ipv6)
         else:
             print(f"      > Lecture '%s' is missing media links" %
                   lecture_title)
@@ -1103,17 +1110,21 @@ def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_to
                     if source_type == "hls":
                         temp_filepath = lecture_path.replace(
                             ".mp4", ".%(ext)s")
-                        ret_code = subprocess.Popen([
+                        args = [
                             "yt-dlp", "--force-generic-extractor",
                             "--concurrent-fragments",
                             f"{concurrent_connections}", "--downloader",
                             "aria2c", "-o", f"{temp_filepath}", f"{url}"
-                        ]).wait()
+                        ]
+                        if disable_ipv6:
+                            args.append("--downloader-args")
+                            args.append( "aria2c:\"--disable-ipv6\"")
+                        ret_code = subprocess.Popen(args).wait()
                         if ret_code == 0:
                             # os.rename(temp_filepath, lecture_path)
                             print("      > HLS Download success")
                     else:
-                        download_aria(url, chapter_dir, lecture_title + ".mp4")
+                        download_aria(url, chapter_dir, lecture_title + ".mp4", disable_ipv6)
                 except EnvironmentError as e:
                     print(">        Error downloading lecture")
                     raise e
@@ -1126,7 +1137,7 @@ def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_to
 
 
 def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
-              caption_locale, keep_vtt, access_token, concurrent_connections):
+              caption_locale, keep_vtt, access_token, concurrent_connections, disable_ipv6):
     total_chapters = _udemy.get("total_chapters")
     total_lectures = _udemy.get("total_lectures")
     print(f"Chapter(s) ({total_chapters})")
@@ -1187,7 +1198,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                     else:
                         process_lecture(lecture, lecture_path, lecture_file_name,
                                         quality, access_token,
-                                        concurrent_connections, chapter_dir)
+                                        concurrent_connections, chapter_dir, disable_ipv6)
 
             if dl_assets:
                 assets = lecture.get("assets")
@@ -1223,7 +1234,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                     elif asset_type == "audio" or asset_type == "e-book" or asset_type == "file" or asset_type == "presentation":
                         try:
                             download_aria(download_url, chapter_dir,
-                                          f"{asset_id}-{filename}")
+                                          f"{asset_id}-{filename}", disable_ipv6)
                         except Exception as e:
                             print("> Error downloading asset: ", e)
                             continue
@@ -1257,7 +1268,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                     lang = subtitle.get("language")
                     if lang == caption_locale or caption_locale == "all":
                         process_caption(subtitle, lecture_title, chapter_dir,
-                                        keep_vtt)
+                                        keep_vtt, disable_ipv6)
 
 
 def _print_course_info(course_data):
@@ -1366,6 +1377,12 @@ if __name__ == "__main__":
         help="The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-30)",
     )
     parser.add_argument(
+        "--disable-ipv6",
+        dest="disable_ipv6",
+        action="store_true",
+        help="If specified, ipv6 will be disabled in aria2",
+    )
+    parser.add_argument(
         "--skip-lectures",
         dest="skip_lectures",
         action="store_true",
@@ -1428,6 +1445,7 @@ if __name__ == "__main__":
     keep_vtt = False
     skip_hls = False
     concurrent_downloads = 10
+    disable_ipv6 = False
 
     args = parser.parse_args()
     if args.download_assets:
@@ -1453,6 +1471,8 @@ if __name__ == "__main__":
         elif concurrent_downloads > 30:
             # if the user gave a number thats greater than 30, set cc to the max of 30
             concurrent_downloads = 30
+    if args.disable_ipv6:
+        disable_ipv6 = args.disable_ipv6
 
     aria_ret_val = check_for_aria()
     if not aria_ret_val:
@@ -1530,7 +1550,7 @@ if __name__ == "__main__":
         else:
             parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                       caption_locale, keep_vtt, access_token,
-                      concurrent_downloads)
+                      concurrent_downloads, disable_ipv6)
     else:
         _udemy = {}
         _udemy["access_token"] = access_token
@@ -1765,4 +1785,4 @@ if __name__ == "__main__":
         else:
             parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                       caption_locale, keep_vtt, access_token,
-                      concurrent_downloads)
+                      concurrent_downloads, disable_ipv6)
