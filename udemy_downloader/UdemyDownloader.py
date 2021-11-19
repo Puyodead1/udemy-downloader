@@ -84,6 +84,7 @@ ffmpeg_preset = "medium"
 h265_encoder = "copy"
 ffmpeg_framerate = "30"
 cookies = ""
+disable_ipv6 = False
 
 
 def download_segments(url, format_id, video_title, output_path, lecture_file_name, chapter_dir):
@@ -94,12 +95,17 @@ def download_segments(url, format_id, video_title, output_path, lecture_file_nam
     video_filepath_dec = file_name + ".decrypted.mp4"
     audio_filepath_dec = file_name + ".decrypted.m4a"
     print("> Downloading Lecture Tracks...")
-    ret_code = subprocess.Popen([
+    args = [
         "yt-dlp", "--force-generic-extractor", "--allow-unplayable-formats",
         "--concurrent-fragments", f"{concurrent_connections}", "--downloader",
         "aria2c", "--fixup", "never", "-k", "-o", f"{file_name}.encrypted.%(ext)s",
-        "-f", format_id, f"{url}"
-    ]).wait()
+        "-f", format_id
+    ]
+    if disable_ipv6:
+        args.append("--downloader-args")
+        args.append("aria2c:\"--disable-ipv6\"")
+    args.append(f"{url}")
+    ret_code = subprocess.Popen(args).wait()
     print("> Lecture Tracks Downloaded")
 
     print("Return code: " + str(ret_code))
@@ -199,10 +205,13 @@ def download_aria(url, file_dir, filename):
     @author Puyodead1
     """
     print("    > Downloading File...")
-    ret_code = subprocess.Popen([
+    args = [
         "aria2c", url, "-o", filename, "-d", file_dir, "-j16", "-s20", "-x16",
         "-c", "--auto-file-renaming=false", "--summary-interval=0"
-    ]).wait()
+    ]
+    if disable_ipv6:
+        args.append("--disable-ipv6")
+    ret_code = subprocess.Popen(args).wait()
     print("    > File Downloaded")
 
     print("Return code: " + str(ret_code))
@@ -360,13 +369,17 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                     if source_type == "hls":
                         temp_filepath = lecture_path.replace(
                             ".mp4", ".%(ext)s")
-                        command = [
+                        args = [
                             "yt-dlp", "--force-generic-extractor",
                             "--concurrent-fragments",
                             f"{concurrent_connections}", "--downloader",
-                            "aria2c", "-o", f"{temp_filepath}", f"{url}"
+                            "aria2c", "-o", f"{temp_filepath}"
                         ]
-                        ret_code = subprocess.Popen(command).wait()
+                        if disable_ipv6:
+                            args.append("--downloader-args")
+                            args.append("aria2c:\"--disable-ipv6\"")
+                        args.append(f"{url}")
+                        ret_code = subprocess.Popen(args).wait()
                         if ret_code == 0:
                             print("      > HLS Download success")
 
@@ -883,6 +896,12 @@ def setup_parser():
         help="Changes the HEVC encder that is used. Default is copy when not using h265, otherwise the default is libx265",
     )
     parser.add_argument(
+        "--disable-ipv6",
+        dest="disable_ipv6",
+        action="store_true",
+        help="If specified, ipv6 will be disabled in aria2",
+    )
+    parser.add_argument(
         "--iknowwhatimdoing",
         dest="iknowwhatimdoing",
         action="store_true",
@@ -905,7 +924,7 @@ def setup_parser():
 
 
 def process_args(args):
-    global course_url, bearer_token, dl_assets, dl_captions, caption_locale, skip_lectures, quality, keep_vtt, skip_hls, print_info, load_from_file, save_to_file, concurrent_connections, use_h265, h265_crf, ffmpeg_preset, iknowwhatimdoing, h265_encoder, ffmpeg_framerate
+    global course_url, bearer_token, dl_assets, dl_captions, caption_locale, skip_lectures, quality, keep_vtt, skip_hls, print_info, load_from_file, save_to_file, concurrent_connections, use_h265, h265_crf, ffmpeg_preset, iknowwhatimdoing, h265_encoder, ffmpeg_framerate, disable_ipv6
 
     course_url = args.course_url
     if args.download_assets:
@@ -956,6 +975,8 @@ def process_args(args):
     if args.ffmpeg_preset:
         ffmpeg_preset = args.ffmpeg_preset
         print("> Selected HEVC Encoder Preset: " + ffmpeg_preset)
+    if args.disable_ipv6:
+        disable_ipv6 = args.disable_ipv6
     if args.load_from_file:
         print(
             "> 'load_from_file' was specified, data will be loaded from json files instead of fetched"

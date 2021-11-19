@@ -87,27 +87,33 @@ To download a course included in a subscription plan that you did not purchase i
 # Advanced Usage
 
 ```
-usage: udemy_downloader [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_CONNECTIONS] [--skip-lectures] [--download-assets] [--download-captions] [--keep-vtt] [--skip-hls] [--info]
-                        [--use-h265] [--h265-crf H265_CRF] [--ffmpeg-preset FFMPEG_PRESET] [--ffmpeg-framerate FFMPEG_FRAMERATE] [--h265-encoder H265_ENCODER] [-v]
+usage: udemy_downloader [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_CONNECTIONS]
+                        [--skip-lectures] [--download-assets] [--download-captions] [--keep-vtt] [--skip-hls] [--info]
+                        [--use-h265] [--h265-crf H265_CRF] [--ffmpeg-preset FFMPEG_PRESET]
+                        [--ffmpeg-framerate FFMPEG_FRAMERATE] [--h265-encoder H265_ENCODER] [--disable-ipv6] [-v]
 
 Udemy Downloader
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -c COURSE_URL, --course-url COURSE_URL
                         The URL of the course to download
   -b BEARER_TOKEN, --bearer BEARER_TOKEN
                         The Bearer token to use
   -q QUALITY, --quality QUALITY
-                        Download specific video quality. If the requested quality isn't available, the closest quality will be used. If not specified, the best quality will be downloaded for each lecture
-  -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is 'en')
+                        Download specific video quality. If the requested quality isn't available, the closest quality
+                        will be used. If not specified, the best quality will be downloaded for each lecture
+  -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is
+                        'en')
   -cd CONCURRENT_CONNECTIONS, --concurrent-connections CONCURRENT_CONNECTIONS
-                        The number of maximum concurrent connections per download for segments (HLS and DASH, must be a number 1-30)
+                        The number of maximum concurrent connections per download for segments (HLS and DASH, must be
+                        a number 1-30)
   --skip-lectures       If specified, lectures won't be downloaded
   --download-assets     If specified, lecture assets will be downloaded
   --download-captions   If specified, captions will be downloaded
   --keep-vtt            If specified, .vtt files won't be removed
-  --skip-hls            If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p quality for non-drm lectures)
+  --skip-hls            If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p
+                        quality for non-drm lectures)
   --info                If specified, only course information will be printed, nothing will be downloaded
   --use-h265            If specified, videos will be encoded with the H.265 codec
   --h265-crf H265_CRF   Set a custom CRF value for H.265 encoding. FFMPEG default is 28
@@ -116,7 +122,9 @@ optional arguments:
   --ffmpeg-framerate FFMPEG_FRAMERATE
                         Changes the FPS used for encoding. FFMPEG default is 30
   --h265-encoder H265_ENCODER
-                        Changes the HEVC encder that is used. Default is copy when not using h265, otherwise the default is libx265
+                        Changes the HEVC encder that is used. Default is copy when not using h265, otherwise the
+                        default is libx265
+  --disable-ipv6        If specified, ipv6 will be disabled in aria2
   -v, --version         show program's version number and exit
 ```
 
@@ -162,6 +170,16 @@ optional arguments:
   - `python udemy_downloader -c <Course URL> --use-h265 --h265-encoder hevc_nvenc --h265-preset p7`
 - Encode in H.265 with a custom framerate:
   - `python udemy_downloader -c <Course URL> --use-h265 --ffmpeg-framerate 24`
+
+If you encounter errors while downloading such as
+
+`errorCode=1 Network problem has occurred. cause:Unknown socket error 10051 (0x2743)`
+
+or
+
+`errorCode=1 Network problem has occurred. cause:A socket operation was attempted to an unreachable network.`
+
+Then try disabling ipv6 in aria2 using the `--disable-ipv6` option
 
 # Credits
 
