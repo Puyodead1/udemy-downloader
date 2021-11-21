@@ -78,7 +78,7 @@ _**NOTE**:_ _You do **NOT** need to follow this section if you don't have a **Ud
 - copy and paste `document.cookie` and press enter
 - copy the text between the quotes
 
-## Setup token file
+## Setup cookie file
 
 - Create a file called `cookies.txt` in the same folder as `main.py`
 - Paste the cookie into the file
