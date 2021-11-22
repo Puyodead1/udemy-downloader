@@ -918,11 +918,19 @@ def handle_segments(url, format_id, video_title,
         print("Return code from the downloader was non-0 (error), skipping!")
         return
 
-    video_kid = extract_kid(video_filepath_enc)
-    print("KID for video file is: " + video_kid)
+    try:
+        video_kid = extract_kid(video_filepath_enc)
+        print("KID for video file is: " + video_kid)
+    except Exception as e:
+        print(f"Error extracting video kid: {e}")
+        return
 
-    audio_kid = extract_kid(audio_filepath_enc)
-    print("KID for audio file is: " + audio_kid)
+    try:
+        audio_kid = extract_kid(audio_filepath_enc)
+        print("KID for audio file is: " + audio_kid)
+    except Exception as e:
+        print(f"Error extracting audio kid: {e}")
+        return
 
     try:
         decrypt(video_kid, video_filepath_enc, video_filepath_dec)
