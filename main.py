@@ -49,13 +49,13 @@ Path(download_dir).mkdir(parents=True, exist_ok=True)
 Path(saved_dir).mkdir(parents=True, exist_ok=True)
 
 # Get the keys
-with open(keyfile_path, 'r') as keyfile:
+with open(keyfile_path, encoding="utf8", mode='r') as keyfile:
     keyfile = keyfile.read()
 keyfile = json.loads(keyfile)
 
 # Read cookies from file
 if os.path.exists(cookiefile_path):
-    with open(cookiefile_path, 'r') as cookiefile:
+    with open(cookiefile_path, encoding="utf8", mode='r') as cookiefile:
         cookies = cookiefile.read()
 else:
     print("No cookies.txt file was found, you won't be able to download subscription courses! You can ignore ignore this if you don't plan to download a course included in a subscription plan.")
@@ -1010,7 +1010,7 @@ def download(url, path, filename):
                 desc=filename)
     res = requests.get(url, headers=header, stream=True)
     res.raise_for_status()
-    with (open(path, 'ab')) as f:
+    with (open(path, encoding="utf8", mode='ab')) as f:
         for chunk in res.iter_content(chunk_size=1024):
             if chunk:
                 f.write(chunk)
@@ -1197,7 +1197,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                         lecture_path = os.path.join(
                             chapter_dir, "{}.html".format(sanitize(lecture_title)))
                         try:
-                            with open(lecture_path, 'w') as f:
+                            with open(lecture_path, encoding="utf8", mode='w') as f:
                                 f.write(html_content)
                                 f.close()
                         except Exception as e:
@@ -1533,7 +1533,7 @@ if __name__ == "__main__":
     if args.load_from_file:
         course_json = json.loads(
             open(os.path.join(os.getcwd(), "saved", "course_content.json"),
-                 'r').read())
+                encoding="utf8", mode='r').read())
         title = course_json.get("title")
         course_title = course_json.get("published_title")
         portal_name = course_json.get("portal_name")
@@ -1542,7 +1542,7 @@ if __name__ == "__main__":
                                                  portal_name)
     if args.save_to_file:
         with open(os.path.join(os.getcwd(), "saved", "course_content.json"),
-                  'w') as f:
+                  encoding="utf8", mode='w') as f:
             f.write(json.dumps(course_json))
             f.close()
 
@@ -1552,7 +1552,7 @@ if __name__ == "__main__":
 
     if args.load_from_file:
         _udemy = json.loads(
-            open(os.path.join(os.getcwd(), "saved", "_udemy.json")).read())
+            open(os.path.join(os.getcwd(), "saved", "_udemy.json"), encoding="utf8", mode='r').read())
         if args.info:
             _print_course_info(_udemy)
         else:
@@ -1783,7 +1783,7 @@ if __name__ == "__main__":
 
         if args.save_to_file:
             with open(os.path.join(os.getcwd(), "saved", "_udemy.json"),
-                      'w') as f:
+                      encoding="utf8", mode='w') as f:
                 f.write(json.dumps(_udemy))
                 f.close()
             print("Saved parsed data to json")
