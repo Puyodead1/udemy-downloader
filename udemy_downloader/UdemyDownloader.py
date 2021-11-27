@@ -191,7 +191,7 @@ def download(url, path, filename):
                 desc=filename)
     res = requests.get(url, headers=header, stream=True)
     res.raise_for_status()
-    with (open(path, 'ab')) as f:
+    with (open(path, encoding="utf8", mode='ab')) as f:
         for chunk in res.iter_content(chunk_size=1024):
             if chunk:
                 f.write(chunk)
@@ -681,7 +681,7 @@ def get_course_information():
     global course_info, course_id, title, course_title, portal_name
     if(load_from_file):
         if os.path.exists(course_info_path):
-            f = open(course_info_path, 'r')
+            f = open(course_info_path, encoding="utf8", mode='r')
             course_info = json.loads(f.read())
         else:
             print("course_info.json not found, falling back to fetching")
@@ -699,7 +699,7 @@ def get_course_content():
     global course_content
     if load_from_file:
         if os.path.exists(course_content_path):
-            f = open(course_content_path, 'r')
+            f = open(course_content_path, encoding="utf8", mode='r')
             course_content = json.loads(f.read())
         else:
             print("course_content.json not found, falling back to fetching")
@@ -713,7 +713,7 @@ def get_course_content():
 def parse_data():
     global _udemy
     if load_from_file and os.path.exists(_udemy_path):
-        f = open(_udemy_path, 'r')
+        f = open(_udemy_path, encoding="utf8", mode='r')
         _udemy = json.loads(f.read())
     else:
         process_course()
@@ -1020,13 +1020,13 @@ def check_dirs():
 
 def try_load_keys():
     global keys
-    f = open(keyfile_path, 'r')
+    f = open(keyfile_path, encoding="utf8", mode='r')
     keys = json.loads(f.read())
 
 
 def try_load_cookies():
     global cookies
-    f = open(cookiefile_path, 'r')
+    f = open(cookiefile_path, encoding="utf8", mode='r')
     cookies = f.read()
 
 
@@ -1074,7 +1074,7 @@ def UdemyDownloader():
 
     if save_to_file:
         with open(course_info_path,
-                  'w') as f:
+                  encoding="utf8", mode='w') as f:
             f.write(json.dumps(course_info))
             print("Saved course info to file")
 
@@ -1087,7 +1087,7 @@ def UdemyDownloader():
 
     if save_to_file:
         with open(course_content_path,
-                  'w') as f:
+                  encoding="utf8", mode='w') as f:
             f.write(json.dumps(course_content))
             print("Saved course content to file")
 
@@ -1111,7 +1111,7 @@ def UdemyDownloader():
 
     if save_to_file:
         with open(_udemy_path,
-                  'w') as f:
+                  encoding="utf8", mode='w') as f:
             f.write(json.dumps(_udemy))
             print("Saved parsed data to file")
 

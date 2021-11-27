@@ -8,7 +8,7 @@ def convert(directory, filename):
     index = 0
     vtt_filepath = os.path.join(directory, filename + ".vtt")
     srt_filepath = os.path.join(directory, filename + ".srt")
-    srt = open(srt_filepath, "w")
+    srt = open(srt_filepath, 'w')
 
     for caption in WebVTT().read(vtt_filepath):
         index += 1
