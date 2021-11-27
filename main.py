@@ -15,11 +15,11 @@ from html.parser import HTMLParser as compat_HTMLParser
 from dotenv import load_dotenv
 from requests.exceptions import ConnectionError as conn_error
 from tqdm import tqdm
-from sanitize import sanitize, slugify, SLUG_OK
 from utils import extract_kid
 from vtt_to_srt import convert
 from _version import __version__
 from bs4 import BeautifulSoup
+from pathvalidate import sanitize_filename
 
 home_dir = os.getcwd()
 download_dir = os.path.join(os.getcwd(), "out_dir")
@@ -61,19 +61,6 @@ else:
     print("No cookies.txt file was found, you won't be able to download subscription courses! You can ignore ignore this if you don't plan to download a course included in a subscription plan.")
 
 
-def _clean(text):
-    ok = re.compile(r'[^\\/:*?!"<>|]')
-    text = "".join(x if ok.match(x) else "_" for x in text)
-    text = re.sub(r"\.+$", "", text.strip())
-    return text
-
-
-def _sanitize(self, unsafetext):
-    text = _clean(sanitize(
-        slugify(unsafetext, lower=False, spaces=True, ok=SLUG_OK + "().[]")))
-    return text
-
-
 class Udemy:
     def __init__(self, access_token):
         self.session = None
@@ -98,7 +85,7 @@ class Udemy:
     def _extract_supplementary_assets(self, supp_assets):
         _temp = []
         for entry in supp_assets:
-            title = _clean(entry.get("title"))
+            title = sanitize_filename(entry.get("title"))
             filename = entry.get("filename")
             download_urls = entry.get("download_urls")
             external_url = entry.get("external_url")
@@ -1037,9 +1024,9 @@ def download_aria(url, file_dir, filename, disable_ipv6):
 
 
 def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0, disable_ipv6=False):
-    filename = f"%s_%s.%s" % (sanitize(lecture_title), caption.get("language"),
+    filename = f"%s_%s.%s" % (sanitize_filename(lecture_title), caption.get("language"),
                               caption.get("extension"))
-    filename_no_ext = f"%s_%s" % (sanitize(lecture_title),
+    filename_no_ext = f"%s_%s" % (sanitize_filename(lecture_title),
                                   caption.get("language"))
     filepath = os.path.join(lecture_dir, filename)
 
@@ -1174,7 +1161,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
             if lecture_extension != None:
                 # if the lecture extension property isnt none, set the extension to the lecture extension
                 extension = lecture_extension
-            lecture_file_name = sanitize(lecture_title + "." + extension)
+            lecture_file_name = sanitize_filename(lecture_title + "." + extension)
             lecture_path = os.path.join(
                 chapter_dir,
                 lecture_file_name)
@@ -1195,7 +1182,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                         html_content = lecture.get("html_content").encode(
                             "ascii", "ignore").decode("utf8")
                         lecture_path = os.path.join(
-                            chapter_dir, "{}.html".format(sanitize(lecture_title)))
+                            chapter_dir, "{}.html".format(sanitize_filename(lecture_title)))
                         try:
                             with open(lecture_path, encoding="utf8", mode='w') as f:
                                 f.write(html_content)
@@ -1525,7 +1512,7 @@ if __name__ == "__main__":
         course_id, course_info = udemy._extract_course_info(args.course_url)
         print("> Course information retrieved!")
         if course_info and isinstance(course_info, dict):
-            title = _clean(course_info.get("title"))
+            title = sanitize_filename(course_info.get("title"))
             course_title = course_info.get("published_title")
             portal_name = course_info.get("portal_name")
 
@@ -1585,7 +1572,7 @@ if __name__ == "__main__":
                     lecture_counter = 0
                     lectures = []
                     chapter_index = entry.get("object_index")
-                    chapter_title = "{0:02d} - ".format(chapter_index) + _clean(
+                    chapter_title = "{0:02d} - ".format(chapter_index) + sanitize_filename(
                         entry.get("title"))
 
                     if chapter_title not in _udemy["chapters"]:
@@ -1603,7 +1590,7 @@ if __name__ == "__main__":
                         lectures = []
                         chapter_index = entry.get("object_index")
                         chapter_title = "{0:02d} - ".format(
-                            chapter_index) + _clean(entry.get("title"))
+                            chapter_index) + sanitize_filename(entry.get("title"))
                         if chapter_title not in _udemy["chapters"]:
                             _udemy["chapters"].append({
                                 "chapter_title": chapter_title,
@@ -1643,7 +1630,7 @@ if __name__ == "__main__":
 
                         lecture_index = entry.get("object_index")
                         lecture_title = "{0:03d} ".format(
-                            lecture_counter) + _clean(entry.get("title"))
+                            lecture_counter) + sanitize_filename(entry.get("title"))
 
                         if asset.get("stream_urls") != None:
                             # not encrypted
@@ -1760,7 +1747,7 @@ if __name__ == "__main__":
                         lectures = []
                         chapter_index = entry.get("object_index")
                         chapter_title = "{0:02d} - ".format(
-                            chapter_index) + _clean(entry.get("title"))
+                            chapter_index) + sanitize_filename(entry.get("title"))
                         if chapter_title not in _udemy["chapters"]:
                             lecture_counter = 0
                             _udemy["chapters"].append({

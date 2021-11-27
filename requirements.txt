@@ -15,3 +15,4 @@ unidecode
 beautifulsoup4
 lxml
 six
+pathvalidate
