@@ -82,7 +82,7 @@ class Udemy:
             print("Login Failure! You are probably missing an access token!")
             sys.exit(1)
 
-    def _extract_supplementary_assets(self, supp_assets):
+    def _extract_supplementary_assets(self, supp_assets, lecture_counter):
         _temp = []
         for entry in supp_assets:
             title = sanitize_filename(entry.get("title"))
@@ -99,7 +99,8 @@ class Udemy:
                     _temp.append({
                         "type": "file",
                         "title": title,
-                        "filename": filename,
+                        "filename": "{0:03d} ".format(
+                            lecture_counter) + filename,
                         "extension": extension,
                         "download_url": download_url,
                         "id": id
@@ -113,7 +114,8 @@ class Udemy:
                     _temp.append({
                         "type": "source_code",
                         "title": title,
-                        "filename": filename,
+                        "filename": "{0:03d} ".format(
+                            lecture_counter) + filename,
                         "extension": extension,
                         "download_url": download_url,
                         "id": id
@@ -122,14 +124,15 @@ class Udemy:
                 _temp.append({
                     "type": "external_link",
                     "title": title,
-                    "filename": filename,
+                    "filename": "{0:03d} ".format(
+                            lecture_counter) + filename,
                     "extension": "txt",
                     "download_url": external_url,
                     "id": id
                 })
         return _temp
 
-    def _extract_ppt(self, assets):
+    def _extract_ppt(self, assets, lecture_counter):
         _temp = []
         download_urls = assets.get("download_urls")
         filename = assets.get("filename")
@@ -139,14 +142,15 @@ class Udemy:
             download_url = download_urls.get("Presentation", [])[0].get("file")
             _temp.append({
                 "type": "presentation",
-                "filename": filename,
+                "filename": "{0:03d} ".format(
+                            lecture_counter) + filename,
                 "extension": extension,
                 "download_url": download_url,
                 "id": id
             })
         return _temp
 
-    def _extract_file(self, assets):
+    def _extract_file(self, assets, lecture_counter):
         _temp = []
         download_urls = assets.get("download_urls")
         filename = assets.get("filename")
@@ -156,14 +160,15 @@ class Udemy:
             download_url = download_urls.get("File", [])[0].get("file")
             _temp.append({
                 "type": "file",
-                "filename": filename,
+                "filename": "{0:03d} ".format(
+                            lecture_counter) + filename,
                 "extension": extension,
                 "download_url": download_url,
                 "id": id
             })
         return _temp
 
-    def _extract_ebook(self, assets):
+    def _extract_ebook(self, assets, lecture_counter):
         _temp = []
         download_urls = assets.get("download_urls")
         filename = assets.get("filename")
@@ -173,14 +178,15 @@ class Udemy:
             download_url = download_urls.get("E-Book", [])[0].get("file")
             _temp.append({
                 "type": "ebook",
-                "filename": filename,
+                "filename": "{0:03d} ".format(
+                            lecture_counter) + filename,
                 "extension": extension,
                 "download_url": download_url,
                 "id": id
             })
         return _temp
 
-    def _extract_audio(self, assets):
+    def _extract_audio(self, assets, lecture_counter):
         _temp = []
         download_urls = assets.get("download_urls")
         filename = assets.get("filename")
@@ -190,7 +196,8 @@ class Udemy:
             download_url = download_urls.get("Audio", [])[0].get("file")
             _temp.append({
                 "type": "audio",
-                "filename": filename,
+                "filename": "{0:03d} ".format(
+                            lecture_counter) + filename,
                 "extension": extension,
                 "download_url": download_url,
                 "id": id
@@ -1035,7 +1042,8 @@ def process_caption(caption, lecture_title, lecture_dir, keep_vtt, tries=0, disa
     else:
         print(f"    >  Downloading caption: '%s'" % filename)
         try:
-            download_aria(caption.get("download_url"), lecture_dir, filename, disable_ipv6)
+            download_aria(caption.get("download_url"),
+                          lecture_dir, filename, disable_ipv6)
         except Exception as e:
             if tries >= 3:
                 print(
@@ -1113,13 +1121,14 @@ def process_lecture(lecture, lecture_path, lecture_file_name, quality, access_to
                         ]
                         if disable_ipv6:
                             args.append("--downloader-args")
-                            args.append( "aria2c:\"--disable-ipv6\"")
+                            args.append("aria2c:\"--disable-ipv6\"")
                         ret_code = subprocess.Popen(args).wait()
                         if ret_code == 0:
                             # os.rename(temp_filepath, lecture_path)
                             print("      > HLS Download success")
                     else:
-                        download_aria(url, chapter_dir, lecture_title + ".mp4", disable_ipv6)
+                        download_aria(url, chapter_dir,
+                                      lecture_title + ".mp4", disable_ipv6)
                 except EnvironmentError as e:
                     print(">        Error downloading lecture")
                     raise e
@@ -1161,7 +1170,8 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
             if lecture_extension != None:
                 # if the lecture extension property isnt none, set the extension to the lecture extension
                 extension = lecture_extension
-            lecture_file_name = sanitize_filename(lecture_title + "." + extension)
+            lecture_file_name = sanitize_filename(
+                lecture_title + "." + extension)
             lecture_path = os.path.join(
                 chapter_dir,
                 lecture_file_name)
@@ -1519,7 +1529,7 @@ if __name__ == "__main__":
     if args.load_from_file:
         course_json = json.loads(
             open(os.path.join(os.getcwd(), "saved", "course_content.json"),
-                encoding="utf8", mode='r').read())
+                 encoding="utf8", mode='r').read())
         title = course_json.get("title")
         course_title = course_json.get("published_title")
         portal_name = course_json.get("portal_name")
@@ -1612,20 +1622,24 @@ if __name__ == "__main__":
                                 if isinstance(supp_assets,
                                               list) and len(supp_assets) > 0:
                                     retVal = udemy._extract_supplementary_assets(
-                                        supp_assets)
+                                        supp_assets, lecture_counter)
                             elif asset_type == "video":
                                 if isinstance(supp_assets,
                                               list) and len(supp_assets) > 0:
                                     retVal = udemy._extract_supplementary_assets(
-                                        supp_assets)
+                                        supp_assets, lecture_counter)
                             elif asset_type == "e-book":
-                                retVal = udemy._extract_ebook(asset)
+                                retVal = udemy._extract_ebook(
+                                    asset, lecture_counter)
                             elif asset_type == "file":
-                                retVal = udemy._extract_file(asset)
+                                retVal = udemy._extract_file(
+                                    asset, lecture_counter)
                             elif asset_type == "presentation":
-                                retVal = udemy._extract_ppt(asset)
+                                retVal = udemy._extract_ppt(
+                                    asset, lecture_counter)
                             elif asset_type == "audio":
-                                retVal = udemy._extract_audio(asset)
+                                retVal = udemy._extract_audio(
+                                    asset, lecture_counter)
 
                         lecture_index = entry.get("object_index")
                         lecture_title = "{0:03d} ".format(
