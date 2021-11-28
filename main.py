@@ -1204,7 +1204,6 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                     asset_type = asset.get("type")
                     filename = asset.get("filename")
                     download_url = asset.get("download_url")
-                    asset_id = asset.get("id")
 
                     if asset_type == "article":
                         print(
@@ -1229,7 +1228,7 @@ def parse_new(_udemy, quality, skip_lectures, dl_assets, dl_captions,
                     elif asset_type == "audio" or asset_type == "e-book" or asset_type == "file" or asset_type == "presentation":
                         try:
                             download_aria(download_url, chapter_dir,
-                                          f"{asset_id}-{filename}", disable_ipv6)
+                                          filename, disable_ipv6)
                         except Exception as e:
                             print("> Error downloading asset: ", e)
                             continue
