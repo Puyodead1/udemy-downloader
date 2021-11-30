@@ -9,12 +9,11 @@ body:
     id: is-related-to-problem
     attributes:
       label: Is your feature request related to a problem?
-      multiple: false
       options:
-        - Yes
-        - No
+        - label: Yes
+        - label: No
     validations:
-      required: true
+      required: false
   - type: textarea
     id: problem
     attributes:
