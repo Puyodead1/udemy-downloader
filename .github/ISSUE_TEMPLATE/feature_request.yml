@@ -5,7 +5,7 @@ labels: ["enhancement"]
 assignees:
   - Puyodead1
 body:
-  - type: checkbox
+  - type: checkboxes
     id: is-related-to-problem
     attributes:
       label: Is your feature request related to a problem?
