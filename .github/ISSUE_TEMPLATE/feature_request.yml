@@ -17,7 +17,7 @@ body:
   - type: textarea
     id: problem
     attributes:
-      label: Is your feature request related to a problem?
+      label: If yes, please describe
       placeholder: A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
     validations:
       required: false
