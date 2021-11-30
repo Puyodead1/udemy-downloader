@@ -10,8 +10,8 @@ body:
     attributes:
       label: Is your feature request related to a problem?
       options:
-        - label: Yes
-        - label: No
+        - label: "Yes"
+        - label: "No"
     validations:
       required: false
   - type: textarea
