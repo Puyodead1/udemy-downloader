@@ -57,6 +57,7 @@ keyfile = json.loads(keyfile)
 if os.path.exists(cookiefile_path):
     with open(cookiefile_path, encoding="utf8", mode='r') as cookiefile:
         cookies = cookiefile.read()
+        cookies = cookies.rstrip()
 else:
     print("No cookies.txt file was found, you won't be able to download subscription courses! You can ignore ignore this if you don't plan to download a course included in a subscription plan.")
 
