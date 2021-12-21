@@ -1369,22 +1369,22 @@ def parse_new(_udemy):
                     logger.info(
                         "      > Lecture '%s' is already downloaded, skipping..." %
                         lecture_title)
-                    continue
                 else:
                     # Check if the file is an html file
                     if extension == "html":
-                        html_content = lecture.get("html_content").encode(
-                            "ascii", "ignore").decode("utf8")
-                        lecture_path = os.path.join(
-                            chapter_dir, "{}.html".format(sanitize_filename(lecture_title)))
-                        try:
-                            with open(lecture_path, encoding="utf8", mode='w') as f:
-                                f.write(html_content)
-                                f.close()
-                        except Exception as e:
-                            logger.error(
-                                "    > Failed to write html file: ", e)
-                            continue
+                        # if the html content is None or an empty string, skip it so we dont save empty html files
+                        if lecture.get("html_content") != None and lecture.get("html_content") != "":
+                            html_content = lecture.get("html_content").encode(
+                                "ascii", "ignore").decode("utf8")
+                            lecture_path = os.path.join(
+                                chapter_dir, "{}.html".format(sanitize_filename(lecture_title)))
+                            try:
+                                with open(lecture_path, encoding="utf8", mode='w') as f:
+                                    f.write(html_content)
+                                    f.close()
+                            except Exception as e:
+                                logger.error(
+                                    "    > Failed to write html file: ", e)
                     else:
                         process_lecture(lecture, lecture_path,
                                         lecture_file_name, chapter_dir)
@@ -1426,7 +1426,6 @@ def parse_new(_udemy):
                                           filename)
                         except Exception as e:
                             logger.error("> Error downloading asset: ", e)
-                            continue
                     elif asset_type == "external_link":
                         # write the external link to a shortcut file
                         file_path = os.path.join(
@@ -1729,8 +1728,6 @@ def main():
                                     "asset_id": asset.get("id")
                                 })
                             else:
-                                logger.debug(
-                                    f"Reached an area with no media sources: {asset}")
                                 lectures.append({
                                     "index":
                                     lecture_counter,
@@ -1783,8 +1780,6 @@ def main():
                                     "asset_id": asset.get("id")
                                 })
                             else:
-                                logger.debug(
-                                    f"Reached an area with no media sources: {asset}")
                                 lectures.append({
                                     "index":
                                     lecture_counter,
