@@ -1258,8 +1258,7 @@ def download_aria(url, file_dir, filename):
     ]
     if disable_ipv6:
         args.append("--disable-ipv6")
-    ret_code = subprocess.Popen(
-        args, stderr=subprocess.PIPE, stdout=subprocess.PIPE).wait()
+    ret_code = subprocess.Popen(args).wait()
     if ret_code != 0:
         raise Exception("Download returned a non-zero exit code")
     logger.info("    > File Downloaded")
