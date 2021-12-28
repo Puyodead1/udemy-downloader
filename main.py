@@ -45,11 +45,12 @@ load_from_file = None
 course_url = None
 info = None
 keys = {}
+id_as_course_name = False
 
 
 # this is the first function that is called, we parse the arguments, setup the logger, and ensure that required directories exist
 def pre_run():
-    global dl_assets, skip_lectures, dl_captions, caption_locale, quality, bearer_token, portal_name, course_name, keep_vtt, skip_hls, concurrent_downloads, disable_ipv6, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys
+    global dl_assets, skip_lectures, dl_captions, caption_locale, quality, bearer_token, portal_name, course_name, keep_vtt, skip_hls, concurrent_downloads, disable_ipv6, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name
 
     # make sure the directory exists
     if not os.path.exists(DOWNLOAD_DIR):
@@ -160,6 +161,12 @@ def pre_run():
         action="store_true",
         help="If specified, only course information will be printed, nothing will be downloaded",
     )
+    parser.add_argument(
+        "--id-as-course-name",
+        dest="id_as_course_name",
+        action="store_true",
+        help="If specified, the course id will be used in place of the course name for the output directory. This is a 'hack' to reduce the path length",
+    )
 
     parser.add_argument(
         "--save-to-file",
@@ -232,6 +239,8 @@ def pre_run():
         else:
             logger.warning("Invalid log level: %s; Using INFO", args.log_level)
             logger.setLevel(logging.INFO)
+    if args.id_as_course_name:
+        id_as_course_name = args.id_as_course_name
 
     Path(DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
     Path(SAVED_DIR).mkdir(parents=True, exist_ok=True)
@@ -1351,7 +1360,8 @@ def parse_new(_udemy):
     logger.info(f"Chapter(s) ({total_chapters})")
     logger.info(f"Lecture(s) ({total_lectures})")
 
-    course_name = _udemy.get("course_title")
+    course_name = str(_udemy.get("course_id")
+                      ) if id_as_course_name else _udemy.get("course_title")
     course_dir = os.path.join(DOWNLOAD_DIR, course_name)
     if not os.path.exists(course_dir):
         os.mkdir(course_dir)
