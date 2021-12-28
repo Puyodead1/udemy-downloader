@@ -1093,7 +1093,8 @@ def handle_segments(url, format_id, video_title,
     if disable_ipv6:
         args.append("--downloader-args")
         args.append("aria2c:\"--disable-ipv6\"")
-    ret_code = subprocess.Popen(args).wait()
+    ret_code = subprocess.Popen(
+        args, stderr=subprocess.PIPE, stdout=subprocess.PIPE).wait()
     logger.info("> Lecture Tracks Downloaded")
 
     logger.debug("Return code: " + str(ret_code))
@@ -1214,7 +1215,8 @@ def download_aria(url, file_dir, filename):
     ]
     if disable_ipv6:
         args.append("--disable-ipv6")
-    ret_code = subprocess.Popen(args).wait()
+    ret_code = subprocess.Popen(
+        args, stderr=subprocess.PIPE, stdout=subprocess.PIPE).wait()
     logger.info("    > File Downloaded")
 
     logger.debug("Return code: " + str(ret_code))
@@ -1308,7 +1310,8 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                         if disable_ipv6:
                             args.append("--downloader-args")
                             args.append("aria2c:\"--disable-ipv6\"")
-                        ret_code = subprocess.Popen(args).wait()
+                        ret_code = subprocess.Popen(
+                            args, stderr=subprocess.PIPE, stdout=subprocess.PIPE).wait()
                         if ret_code == 0:
                             # os.rename(temp_filepath, lecture_path)
                             logger.info("      > HLS Download success")
