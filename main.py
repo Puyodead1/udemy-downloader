@@ -1225,7 +1225,6 @@ def download_aria(url, file_dir, filename):
     """
     @author Puyodead1
     """
-    logger.info("    > Downloading File...")
     args = [
         "aria2c", url, "-o", filename, "-d", file_dir, "-j16", "-s20", "-x16",
         "-c", "--auto-file-renaming=false", "--summary-interval=0"
@@ -1234,9 +1233,9 @@ def download_aria(url, file_dir, filename):
         args.append("--disable-ipv6")
     ret_code = subprocess.Popen(
         args, stderr=subprocess.PIPE, stdout=subprocess.PIPE).wait()
-    logger.info("    > File Downloaded")
-
-    logger.debug("Return code: " + str(ret_code))
+    if ret_code != 0:
+        raise Exception("Return code from the downloader was non-0 (error)")
+    return ret_code
 
 
 def process_caption(caption, lecture_title, lecture_dir, tries=0):
@@ -1251,7 +1250,8 @@ def process_caption(caption, lecture_title, lecture_dir, tries=0):
     else:
         logger.info(f"    >  Downloading caption: '%s'" % filename)
         try:
-            download_aria(caption.get("download_url"), lecture_dir, filename)
+            download_aria(caption.get(
+                "download_url"), lecture_dir, filename)
         except Exception as e:
             if tries >= 3:
                 logger.error(
@@ -1335,13 +1335,12 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                     else:
                         download_aria(url, chapter_dir,
                                       lecture_title + ".mp4")
-                except EnvironmentError as e:
-                    logger.error(">        Error downloading lecture")
+                except Exception as e:
+                    logger.error(f">        Error downloading lecture: {e}")
                     raise e
             else:
                 logger.info(
-                    "      > Lecture '%s' is already downloaded, skipping..." %
-                    lecture_title)
+                    f"      > Lecture '{lecture_title}' is already downloaded, skipping...")
         else:
             logger.error("      > Missing sources for lecture", lecture)
 
