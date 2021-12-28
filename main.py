@@ -1054,23 +1054,22 @@ def mux_process(video_title, video_filepath, audio_filepath, output_path):
     else:
         command = "nice -n 7 ffmpeg -y -i \"{}\" -i \"{}\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
             video_filepath, audio_filepath, video_title, output_path)
-    os.system(command)
+    return os.system(command)
 
 
 def decrypt(kid, in_filepath, out_filepath):
     """
     @author Jayapraveen
     """
-    logger.info("> Decrypting, this might take a minute...")
     try:
         key = keys[kid.lower()]
         if (os.name == "nt"):
-            os.system(f"mp4decrypt --key 1:%s \"%s\" \"%s\"" %
-                      (key, in_filepath, out_filepath))
+            ret_code = os.system(f"mp4decrypt --key 1:%s \"%s\" \"%s\"" %
+                                 (key, in_filepath, out_filepath))
         else:
-            os.system(f"nice -n 7 mp4decrypt --key 1:%s \"%s\" \"%s\"" %
-                      (key, in_filepath, out_filepath))
-        logger.info("> Decryption complete")
+            ret_code = os.system(f"nice -n 7 mp4decrypt --key 1:%s \"%s\" \"%s\"" %
+                                 (key, in_filepath, out_filepath))
+        return ret_code
     except KeyError:
         raise KeyError("Key not found")
 
@@ -1118,10 +1117,28 @@ def handle_segments(url, format_id, video_title,
         return
 
     try:
-        decrypt(video_kid, video_filepath_enc, video_filepath_dec)
+        logger.info("> Decrypting video, this might take a minute...")
+        ret_code = decrypt(video_kid, video_filepath_enc, video_filepath_dec)
+        if ret_code != 0:
+            logger.error(
+                "> Return code from the decrypter was non-0 (error), skipping!")
+            return
+        logger.info("> Decryption complete")
+        logger.info("> Decrypting audio, this might take a minute...")
         decrypt(audio_kid, audio_filepath_enc, audio_filepath_dec)
+        if ret_code != 0:
+            logger.error(
+                "> Return code from the decrypter was non-0 (error), skipping!")
+            return
+        logger.info("> Decryption complete")
+        logger.info("> Merging video and audio, this might take a minute...")
         mux_process(video_title, video_filepath_dec, audio_filepath_dec,
                     output_path)
+        if ret_code != 0:
+            logger.error(
+                "> Return code from ffmpeg was non-0 (error), skipping!")
+            return
+        logger.info("> Merging complete, removing temporary files...")
         os.remove(video_filepath_enc)
         os.remove(audio_filepath_enc)
         os.remove(video_filepath_dec)
