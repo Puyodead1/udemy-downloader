@@ -1051,16 +1051,10 @@ def mux_process(video_title, video_filepath, audio_filepath, output_path):
     else:
         command = "nice -n 7 ffmpeg -y -i \"{}\" -i \"{}\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
             video_filepath, audio_filepath, video_title, output_path)
-    ret_code = subprocess.Popen(
-        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).wait()
-    if ret_code != 0:
-        raise Exception("Muxing returned a non-zero exit code")
-
-    return ret_code
+    return subprocess.Popen(command, shell=True).wait()
 
 
 def decrypt(kid, in_filepath, out_filepath):
-    logger.info("> Decrypting, this might take a minute...")
     try:
         key = keys[kid.lower()]
     except KeyError:
@@ -1072,14 +1066,7 @@ def decrypt(kid, in_filepath, out_filepath):
     else:
         command = f"nice -n 7 shaka-packager --enable_raw_key_decryption --keys key_id={kid}:key={key} input=\"{in_filepath}\",stream_selector=\"0\",output=\"{out_filepath}\""
 
-    ret_code = subprocess.Popen(
-        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).wait()
-    if ret_code != 0:
-        raise Exception("Decryption returned a non-zero exit code")
-
-    logger.info("> Decryption complete")
-
-    return ret_code
+    return subprocess.Popen(command, shell=True).wait()
 
 
 def handle_segments(url, format_id, video_title,
@@ -1101,8 +1088,7 @@ def handle_segments(url, format_id, video_title,
     if disable_ipv6:
         args.append("--downloader-args")
         args.append("aria2c:\"--disable-ipv6\"")
-    ret_code = subprocess.Popen(
-        args, stderr=subprocess.PIPE, stdout=subprocess.PIPE).wait()
+    ret_code = subprocess.Popen(args).wait()
     logger.info("> Lecture Tracks Downloaded")
 
     if ret_code != 0:
@@ -1125,10 +1111,32 @@ def handle_segments(url, format_id, video_title,
         return
 
     try:
-        decrypt(video_kid, video_filepath_enc, video_filepath_dec)
-        decrypt(audio_kid, audio_filepath_enc, audio_filepath_dec)
-        mux_process(video_title, video_filepath_dec, audio_filepath_dec,
-                    output_path)
+        logger.info("Decrypting video file, this may take a minute...")
+        ret_code = decrypt(video_kid, video_filepath_enc, video_filepath_dec)
+        if ret_code != 0:
+            logger.error(
+                "Decryption of video file returned a non-zero exit code")
+            return
+        logger.info("Video decryption complete")
+
+        logger.info("Decrypting audio file, this may take a minute...")
+        ret_code = decrypt(audio_kid, audio_filepath_enc, audio_filepath_dec)
+        if ret_code != 0:
+            logger.error(
+                "Decryption of audio file returned a non-zero exit code")
+            return
+
+        logger.info("Audio decryption complete")
+
+        logger.info("Merging audio and video, this may take a minute...")
+        ret_code = mux_process(
+            video_title, video_filepath_dec, audio_filepath_dec, output_path)
+        if ret_code != 0:
+            logger.error(
+                "Merging audio and video returned a non-zero exit code")
+            return
+
+        logger.info("Merging complete, removing temporary files...")
         os.remove(video_filepath_enc)
         os.remove(audio_filepath_enc)
         os.remove(video_filepath_dec)
@@ -1223,8 +1231,7 @@ def download_aria(url, file_dir, filename):
     ]
     if disable_ipv6:
         args.append("--disable-ipv6")
-    ret_code = subprocess.Popen(
-        args, stderr=subprocess.PIPE, stdout=subprocess.PIPE).wait()
+    ret_code = subprocess.Popen(args).wait()
     if ret_code != 0:
         raise Exception("Download returned a non-zero exit code")
     logger.info("    > File Downloaded")
@@ -1319,8 +1326,7 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                         if disable_ipv6:
                             args.append("--downloader-args")
                             args.append("aria2c:\"--disable-ipv6\"")
-                        ret_code = subprocess.Popen(
-                            args, stderr=subprocess.PIPE, stdout=subprocess.PIPE).wait()
+                        ret_code = subprocess.Popen(args).wait()
                         if ret_code == 0:
                             # os.rename(temp_filepath, lecture_path)
                             logger.info("      > HLS Download success")
