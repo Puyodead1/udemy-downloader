@@ -1072,16 +1072,10 @@ def mux_process(video_title, video_filepath, audio_filepath, output_path):
     else:
         command = "nice -n 7 ffmpeg -y -i \"{}\" -i \"{}\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
             video_filepath, audio_filepath, video_title, output_path)
-    ret_code = subprocess.Popen(
-        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).wait()
-    if ret_code != 0:
-        raise Exception("Muxing returned a non-zero exit code")
-
-    return ret_code
+    return subprocess.Popen(command, shell=True).wait()
 
 
 def decrypt(kid, in_filepath, out_filepath):
-    logger.info("> Decrypting, this might take a minute...")
     try:
         key = keys[kid.lower()]
     except KeyError:
@@ -1093,14 +1087,7 @@ def decrypt(kid, in_filepath, out_filepath):
     else:
         command = f"nice -n 7 shaka-packager --enable_raw_key_decryption --keys key_id={kid}:key={key} input=\"{in_filepath}\",stream_selector=\"0\",output=\"{out_filepath}\""
 
-    ret_code = subprocess.Popen(
-        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).wait()
-    if ret_code != 0:
-        raise Exception("Decryption returned a non-zero exit code")
-
-    logger.info("> Decryption complete")
-
-    return ret_code
+    return subprocess.Popen(command, shell=True).wait()
 
 
 def handle_segments(url, format_id, video_title,
@@ -1145,28 +1132,32 @@ def handle_segments(url, format_id, video_title,
         return
 
     try:
-        logger.info("> Decrypting video, this might take a minute...")
+        logger.info("Decrypting video file, this may take a minute...")
         ret_code = decrypt(video_kid, video_filepath_enc, video_filepath_dec)
         if ret_code != 0:
             logger.error(
-                "> Return code from the decrypter was non-0 (error), skipping!")
+                "Decryption of video file returned a non-zero exit code")
             return
-        logger.info("> Decryption complete")
-        logger.info("> Decrypting audio, this might take a minute...")
-        decrypt(audio_kid, audio_filepath_enc, audio_filepath_dec)
+        logger.info("Video decryption complete")
+
+        logger.info("Decrypting audio file, this may take a minute...")
+        ret_code = decrypt(audio_kid, audio_filepath_enc, audio_filepath_dec)
         if ret_code != 0:
             logger.error(
-                "> Return code from the decrypter was non-0 (error), skipping!")
+                "Decryption of audio file returned a non-zero exit code")
             return
-        logger.info("> Decryption complete")
-        logger.info("> Merging video and audio, this might take a minute...")
-        mux_process(video_title, video_filepath_dec, audio_filepath_dec,
-                    output_path)
+
+        logger.info("Audio decryption complete")
+
+        logger.info("Merging audio and video, this may take a minute...")
+        ret_code = mux_process(
+            video_title, video_filepath_dec, audio_filepath_dec, output_path)
         if ret_code != 0:
             logger.error(
-                "> Return code from ffmpeg was non-0 (error), skipping!")
+                "Merging audio and video returned a non-zero exit code")
             return
-        logger.info("> Merging complete, removing temporary files...")
+
+        logger.info("Merging complete, removing temporary files...")
         os.remove(video_filepath_enc)
         os.remove(audio_filepath_enc)
         os.remove(video_filepath_dec)
