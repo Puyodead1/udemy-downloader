@@ -27,7 +27,7 @@ from pathvalidate import sanitize_filename
 retry = 3
 cookies = ""
 downloader = None
-logger = None
+logger: logging.Logger = None
 dl_assets = False
 skip_lectures = False
 dl_captions = False
@@ -559,8 +559,8 @@ class Udemy:
                     # unknown format type
                     logger.debug(f"Unknown format type : {f}")
                     continue
-        except Exception as error:
-            logger.error(f"Error fetching MPD streams: '{error}'")
+        except Exception:
+            logger.exception(f"Error fetching MPD streams")
         return _temp
 
     def extract_course_name(self, url):
@@ -1049,7 +1049,7 @@ def cleanup(path):
         try:
             os.remove(file_list)
         except OSError:
-            logger.error(f"Error deleting file: {file_list}")
+            logger.exception(f"Error deleting file: {file_list}")
     os.removedirs(path)
 
 
@@ -1113,15 +1113,15 @@ def handle_segments(url, format_id, video_title,
     try:
         video_kid = extract_kid(video_filepath_enc)
         logger.info("KID for video file is: " + video_kid)
-    except Exception as e:
-        logger.error(f"Error extracting video kid: {e}")
+    except Exception:
+        logger.exception(f"Error extracting video kid")
         return
 
     try:
         audio_kid = extract_kid(audio_filepath_enc)
         logger.info("KID for audio file is: " + audio_kid)
-    except Exception as e:
-        logger.error(f"Error extracting audio kid: {e}")
+    except Exception:
+        logger.exception(f"Error extracting audio kid")
         return
 
     try:
@@ -1152,8 +1152,8 @@ def handle_segments(url, format_id, video_title,
         os.remove(video_filepath_dec)
         os.remove(audio_filepath_dec)
         os.chdir(HOME_DIR)
-    except Exception as e:
-        logger.error(f"Error: ", e)
+    except Exception:
+        logger.exception(f"Error: ")
 
 
 def check_for_aria():
@@ -1164,10 +1164,9 @@ def check_for_aria():
         return True
     except FileNotFoundError:
         return False
-    except Exception as e:
-        logger.error(
-            "> Unexpected exception while checking for Aria2c, please tell the program author about this! ",
-            e)
+    except Exception:
+        logger.exception(
+            "> Unexpected exception while checking for Aria2c, please tell the program author about this! ")
         return True
 
 
@@ -1179,10 +1178,9 @@ def check_for_ffmpeg():
         return True
     except FileNotFoundError:
         return False
-    except Exception as e:
-        logger.error(
-            "> Unexpected exception while checking for FFMPEG, please tell the program author about this! ",
-            e)
+    except Exception:
+        logger.exception(
+            "> Unexpected exception while checking for FFMPEG, please tell the program author about this! ")
         return True
 
 
@@ -1195,9 +1193,8 @@ def check_for_mp4decrypt():
     except FileNotFoundError:
         return False
     except Exception as e:
-        logger.error(
-            "> Unexpected exception while checking for MP4Decrypt, please tell the program author about this! ",
-            e)
+        logger.exception(
+            "> Unexpected exception while checking for MP4Decrypt, please tell the program author about this! ")
         return True
 
 
@@ -1278,8 +1275,8 @@ def process_caption(caption, lecture_title, lecture_dir, tries=0):
                 logger.info("    > Caption conversion complete.")
                 if not keep_vtt:
                     os.remove(filepath)
-            except Exception as e:
-                logger.error(f"    > Error converting caption: {e}")
+            except Exception:
+                logger.exception(f"    > Error converting caption")
 
 
 def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
@@ -1344,9 +1341,8 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                                                  lecture_title + ".mp4")
                         logger.debug(
                             f"      > Download return code: {ret_code}")
-                except Exception as e:
-                    logger.error(f">        Error downloading lecture: {e}")
-                    raise e
+                except Exception:
+                    logger.exception(f">        Error downloading lecture")
             else:
                 logger.info(
                     f"      > Lecture '{lecture_title}' is already downloaded, skipping...")
@@ -1411,9 +1407,9 @@ def parse_new(_udemy):
                                 with open(lecture_path, encoding="utf8", mode='w') as f:
                                     f.write(html_content)
                                     f.close()
-                            except Exception as e:
-                                logger.error(
-                                    "    > Failed to write html file: ", e)
+                            except Exception:
+                                logger.exception(
+                                    "    > Failed to write html file")
                     else:
                         process_lecture(lecture, lecture_path,
                                         lecture_file_name, chapter_dir)
@@ -1466,8 +1462,8 @@ def parse_new(_udemy):
                                                      filename)
                             logger.debug(
                                 f"      > Download return code: {ret_code}")
-                        except Exception as e:
-                            logger.error("> Error downloading asset: ", e)
+                        except Exception:
+                            logger.exception("> Error downloading asset")
                     elif asset_type == "external_link":
                         # write the external link to a shortcut file
                         file_path = os.path.join(
