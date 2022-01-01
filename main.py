@@ -1257,8 +1257,9 @@ def process_caption(caption, lecture_title, lecture_dir, tries=0):
     else:
         logger.info(f"    >  Downloading caption: '%s'" % filename)
         try:
-            download_aria(caption.get(
+            ret_code = download_aria(caption.get(
                 "download_url"), lecture_dir, filename)
+            logger.debug(f"      > Download return code: {ret_code}")
         except Exception as e:
             if tries >= 3:
                 logger.error(
@@ -1339,8 +1340,10 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                             # os.rename(temp_filepath, lecture_path)
                             logger.info("      > HLS Download success")
                     else:
-                        download_aria(url, chapter_dir,
-                                      lecture_title + ".mp4")
+                        ret_code = download_aria(url, chapter_dir,
+                                                 lecture_title + ".mp4")
+                        logger.debug(
+                            f"      > Download return code: {ret_code}")
                 except Exception as e:
                     logger.error(f">        Error downloading lecture: {e}")
                     raise e
@@ -1459,8 +1462,10 @@ def parse_new(_udemy):
                         logger.warning("AssetType: Video; AssetData: ", asset)
                     elif asset_type == "audio" or asset_type == "e-book" or asset_type == "file" or asset_type == "presentation" or asset_type == "ebook":
                         try:
-                            download_aria(download_url, chapter_dir,
-                                          filename)
+                            ret_code = download_aria(download_url, chapter_dir,
+                                                     filename)
+                            logger.debug(
+                                f"      > Download return code: {ret_code}")
                         except Exception as e:
                             logger.error("> Error downloading asset: ", e)
                     elif asset_type == "external_link":
