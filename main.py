@@ -228,17 +228,23 @@ def pre_run():
     if args.log_level:
         if args.log_level.upper() == "DEBUG":
             logger.setLevel(logging.DEBUG)
+            stream.setLevel(logging.DEBUG)
         elif args.log_level.upper() == "INFO":
             logger.setLevel(logging.INFO)
+            stream.setLevel(logging.INFO)
         elif args.log_level.upper() == "ERROR":
             logger.setLevel(logging.ERROR)
+            stream.setLevel(logging.ERROR)
         elif args.log_level.upper() == "WARNING":
             logger.setLevel(logging.WARNING)
+            stream.setLevel(logging.WARNING)
         elif args.log_level.upper() == "CRITICAL":
             logger.setLevel(logging.CRITICAL)
+            stream.setLevel(logging.CRITICAL)
         else:
             logger.warning("Invalid log level: %s; Using INFO", args.log_level)
             logger.setLevel(logging.INFO)
+            stream.setLevel(logging.INFO)
     if args.id_as_course_name:
         id_as_course_name = args.id_as_course_name
 
@@ -1414,16 +1420,16 @@ def parse_new(_udemy):
                         process_lecture(lecture, lecture_path,
                                         lecture_file_name, chapter_dir)
 
-                        # download subtitles for this lecture
-                        subtitles = lecture.get("subtitles")
-                        if dl_captions and subtitles and lecture_extension:
-                            logger.info(
-                                "Processing {} caption(s)...".format(len(subtitles)))
-                            for subtitle in subtitles:
-                                lang = subtitle.get("language")
-                                if lang == caption_locale or caption_locale == "all":
-                                    process_caption(
-                                        subtitle, lecture_title, chapter_dir)
+            # download subtitles for this lecture
+            subtitles = lecture.get("subtitles")
+            if dl_captions and subtitles != None and lecture_extension == None:
+                logger.info(
+                    "Processing {} caption(s)...".format(len(subtitles)))
+                for subtitle in subtitles:
+                    lang = subtitle.get("language")
+                    if lang == caption_locale or caption_locale == "all":
+                        process_caption(
+                            subtitle, lecture_title, chapter_dir)
 
             if dl_assets:
                 assets = lecture.get("assets")
@@ -1560,7 +1566,7 @@ def _print_course_info(course_data):
             logger.info("    > Qualities: {}".format(lecture_qualities))
 
         if chapter_index != chapter_count:
-            logger.info("\n\n")
+            logger.info("==========================================")
 
 
 def main():
