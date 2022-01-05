@@ -46,11 +46,12 @@ course_url = None
 info = None
 keys = {}
 id_as_course_name = False
+is_subscription_course = False
 
 
 # this is the first function that is called, we parse the arguments, setup the logger, and ensure that required directories exist
 def pre_run():
-    global dl_assets, skip_lectures, dl_captions, caption_locale, quality, bearer_token, portal_name, course_name, keep_vtt, skip_hls, concurrent_downloads, disable_ipv6, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name
+    global cookies, dl_assets, skip_lectures, dl_captions, caption_locale, quality, bearer_token, portal_name, course_name, keep_vtt, skip_hls, concurrent_downloads, disable_ipv6, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, is_subscription_course
 
     # make sure the directory exists
     if not os.path.exists(DOWNLOAD_DIR):
@@ -167,6 +168,12 @@ def pre_run():
         action="store_true",
         help="If specified, the course id will be used in place of the course name for the output directory. This is a 'hack' to reduce the path length",
     )
+    parser.add_argument(
+        "--subscription-course",
+        dest="is_subscription_course",
+        action="store_true",
+        help="Mark the course as a subscription based course, use this if you are having problems with the program auto detecting it",
+    )
 
     parser.add_argument(
         "--save-to-file",
@@ -247,6 +254,8 @@ def pre_run():
             stream.setLevel(logging.INFO)
     if args.id_as_course_name:
         id_as_course_name = args.id_as_course_name
+    if args.is_subscription_course:
+        is_subscription_course = args.is_subscription_course
 
     Path(DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
     Path(SAVED_DIR).mkdir(parents=True, exist_ok=True)
@@ -796,41 +805,48 @@ class Udemy:
             results = webpage.get("results", [])
         return results
 
+    def _extract_subscription_course_info(self, url):
+        course_html = self.session._get(url).text
+        soup = BeautifulSoup(course_html, "lxml")
+        data = soup.find(
+            "div", {"class": "ud-component--course-taking--app"})
+        if not data:
+            logger.fatal(
+                "Unable to extract arguments from course page! Make sure you have a cookies.txt file!")
+            self.session.terminate()
+            sys.exit(1)
+        data_args = data.attrs["data-module-args"]
+        data_json = json.loads(data_args)
+        course_id = data_json.get("courseId", None)
+        portal_name = self.extract_portal_name(url)
+        return course_id, portal_name
+
     def _extract_course_info(self, url):
         portal_name, course_name = self.extract_course_name(url)
         course = {}
-        results = self._subscribed_courses(portal_name=portal_name,
-                                           course_name=course_name)
-        course = self._extract_course(response=results,
-                                      course_name=course_name)
-        if not course:
-            results = self._my_courses(portal_name=portal_name)
-            course = self._extract_course(response=results,
-                                          course_name=course_name)
-        if not course:
-            results = self._subscribed_collection_courses(
-                portal_name=portal_name)
-            course = self._extract_course(response=results,
-                                          course_name=course_name)
-        if not course:
-            results = self._archived_courses(portal_name=portal_name)
-            course = self._extract_course(response=results,
-                                          course_name=course_name)
 
-        if not course:
-            course_html = self.session._get(url).text
-            soup = BeautifulSoup(course_html, "lxml")
-            data = soup.find(
-                "div", {"class": "ud-component--course-taking--app"})
-            if not data:
-                logger.fatal(
-                    "Unable to extract arguments from course page! Make sure you have a cookies.txt file!")
-                self.session.terminate()
-                sys.exit(1)
-            data_args = data.attrs["data-module-args"]
-            data_json = json.loads(data_args)
-            course_id = data_json.get("courseId", None)
-            portal_name = self.extract_portal_name(url)
+        if not is_subscription_course:
+            results = self._subscribed_courses(portal_name=portal_name,
+                                               course_name=course_name)
+            course = self._extract_course(response=results,
+                                          course_name=course_name)
+            if not course:
+                results = self._my_courses(portal_name=portal_name)
+                course = self._extract_course(response=results,
+                                              course_name=course_name)
+            if not course:
+                results = self._subscribed_collection_courses(
+                    portal_name=portal_name)
+                course = self._extract_course(response=results,
+                                              course_name=course_name)
+            if not course:
+                results = self._archived_courses(portal_name=portal_name)
+                course = self._extract_course(response=results,
+                                              course_name=course_name)
+
+        if not course or is_subscription_course:
+            course_id, portal_name = self._extract_subscription_course_info(
+                url)
             course = self._extract_course_info_json(
                 url, course_id, portal_name)
 
