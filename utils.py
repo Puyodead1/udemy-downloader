@@ -1,8 +1,14 @@
-import mp4parse
-import codecs
-import widevine_pssh_pb2
 import base64
+import codecs
 import os
+import random
+import time
+
+from selenium.webdriver.remote.webelement import WebElement
+
+import mp4parse
+import widevine_pssh_pb2
+
 
 def extract_kid(mp4_file):
     """
@@ -33,3 +39,10 @@ def extract_kid(mp4_file):
 
     # No Moof or PSSH header found
     return None
+
+
+def slow_type(element: WebElement, text: str):
+    for character in text:
+        element.send_keys(character)
+        delay = random.randint(1, 5) / 10
+        time.sleep(delay)

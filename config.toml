@@ -1,0 +1,30 @@
+[general]
+# ex: bearer_token = "xxxxxxxxxxxxxxxxxxxxx"
+bearer_token = 
+# Automatically selects best quality if not set
+quality = 
+caption_locale = "en"
+concurrent_downloads = 10
+disable_ipv6 = false
+# whether to skip all lectures, useful if you only want to download captions or assets
+skip_lectures = false
+download_assets = false
+download_captions = false
+keep_vtt = false
+skip_hls = false
+# unused currently
+skip_dash = false
+# 'cache' course information, note that the download links expire after a certain amount of time so the course will have to be refreshed
+save_to_file = false
+# load 'cached' course information, note that the download links expire after a certain amount of time so the course will have to be refreshed
+load_from_file = false
+log_level = "INFO"
+id_as_course_name = false
+
+[selenium]
+# ex: username = "user@email.com"
+username = 
+# ex: password = "myCoolPassword123"
+password = 
+# set to false if you want to see the process, just dont interact with the browser at all or stuff will probably break
+headless = true
