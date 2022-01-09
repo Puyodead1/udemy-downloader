@@ -30,9 +30,10 @@ body:
       description: What branch are you using?
       options:
         - master/main
+        - feat-shaka
+        - feat-selenium
         - develop
         - native-ytdlp-downloader
-        - id-as-course-name
         - Other (Enter below)
     validations:
       required: true
