@@ -1,8 +1,10 @@
+# If you don't want to set an option here, comment it out (add a # in front of it)
+
 [general]
-# ex: bearer_token = "xxxxxxxxxxxxxxxxxxxxx"
-bearer_token
+#bearer_token = "xxxxxxxxxxxxxxx"
 # Automatically selects best quality if not set
-quality
+# ex: 360, 720, 1080
+# quality = 1080
 caption_locale = "en"
 concurrent_downloads = 10
 disable_ipv6 = false
@@ -22,9 +24,7 @@ log_level = "INFO"
 id_as_course_name = false
 
 [selenium]
-# ex: username = "user@email.com"
-username
-# ex: password = "myCoolPassword123"
-password
+#username = "user@email.com"
+#password = "myCoolPassword123"
 # set to false if you want to see the process, just dont interact with the browser at all or stuff will probably break
 headless = true
