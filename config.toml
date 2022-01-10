@@ -1,8 +1,8 @@
 [general]
 # ex: bearer_token = "xxxxxxxxxxxxxxxxxxxxx"
-bearer_token = 
+bearer_token
 # Automatically selects best quality if not set
-quality = 
+quality
 caption_locale = "en"
 concurrent_downloads = 10
 disable_ipv6 = false
@@ -23,8 +23,8 @@ id_as_course_name = false
 
 [selenium]
 # ex: username = "user@email.com"
-username = 
+username
 # ex: password = "myCoolPassword123"
-password = 
+password
 # set to false if you want to see the process, just dont interact with the browser at all or stuff will probably break
 headless = true
