@@ -65,6 +65,7 @@ stream: logging.StreamHandler = None
 username: str = None
 password: str = None
 headless = True
+selenium = None
 
 
 # from https://stackoverflow.com/a/21978778/9785713
@@ -1913,7 +1914,8 @@ def _print_course_info(udemy: Udemy, udemy_object: dict):
 
 
 def main():
-    global bearer_token
+    global bearer_token, selenium
+
     aria_ret_val = check_for_aria()
     if not aria_ret_val:
         logger.fatal("> Aria2c is missing from your system or path!")
