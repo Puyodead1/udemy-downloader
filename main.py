@@ -780,22 +780,29 @@ class Udemy:
             raise Exception("[-] Cloudflare captcha detected!")
 
         # wait for page load
-        WebDriverWait(selenium.driver, 60).until(EC.visibility_of_element_located((By.TAG_NAME, "pre")))
+        WebDriverWait(selenium.driver, 60).until(
+            EC.visibility_of_element_located((By.TAG_NAME, "body")))
         time.sleep(2)
 
-        # TODO: determine if the course content is large
-
-        # get the text from the page
-        page_text = selenium.driver.find_element(By.TAG_NAME, "pre").text
-        if not page_text or not isinstance(page_text, str):
-            raise Exception("[-] Could not get page text!")
-        page_json = json.loads(page_text)
-        if page_json:
-            return page_json
+        body_text = selenium.driver.find_element(By.TAG_NAME, "body").text
+        if not body_text:
+            raise Exception("[-] Could not get page body text!")
+        if "502 Bad Gateway" in body_text:
+            # its a large course, handle accordingly
+            logger.info("[+] Detected large course content, using large content extractor...")
+            return self._extract_large_course_content_sub(url=url, selenium=selenium)
         else:
-            logger.error("[-] Failed to extract course json!")
-            time.sleep(0.8)
-            sys.exit(1)
+            # get the text from the page
+            page_text = selenium.driver.find_element(By.TAG_NAME, "pre").text
+            if not page_text or not isinstance(page_text, str):
+                raise Exception("[-] Could not get page pre text!")
+            page_json = json.loads(page_text)
+            if page_json:
+                return page_json
+            else:
+                logger.error("[-] Failed to extract course json!")
+                time.sleep(0.8)
+                sys.exit(1)
 
     def _extract_large_course_content(self, url):
         url = url.replace("10000", "50") if url.endswith("10000") else url
@@ -811,6 +818,68 @@ class Udemy:
                 logger.info("> Downloading course information.. ")
                 try:
                     resp = self.session._get(_next).json()
+                except conn_error as error:
+                    logger.fatal(f"[-] Udemy Says: Connection error, {error}")
+                    time.sleep(0.8)
+                    sys.exit(1)
+                else:
+                    _next = resp.get("next")
+                    results = resp.get("results")
+                    if results and isinstance(results, list):
+                        for d in resp["results"]:
+                            data["results"].append(d)
+            return data
+
+    def _extract_large_course_content_sub(self, url, selenium: Selenium):
+        url = url.replace("10000", "50") if url.endswith("10000") else url
+        try:
+            selenium.driver.get(url)
+            time.sleep(2)
+
+            if "Attention" in selenium.driver.title:
+                # cloudflare captcha, panic
+                raise Exception("[-] Cloudflare captcha detected!")
+
+            # wait for page load
+            WebDriverWait(selenium.driver, 60).until(
+                EC.visibility_of_element_located((By.TAG_NAME, "body")))
+            time.sleep(2)
+
+            # get the text from the page
+            page_text = selenium.driver.find_element(By.TAG_NAME, "pre").text
+            if not page_text or not isinstance(page_text, str):
+                raise Exception("[-] Could not get page pre text!")
+            data = json.loads(page_text)
+            logger.debug(data)
+
+        except conn_error as error:
+            logger.fatal(f"[-] Udemy Says: Connection error, {error}")
+            time.sleep(0.8)
+            sys.exit(1)
+        else:
+            _next = data.get("next")
+            while _next:
+                logger.info("> Downloading course information.. ")
+                try:
+                    selenium.driver.get(_next)
+                    time.sleep(2)
+
+                    if "Attention" in selenium.driver.title:
+                        # cloudflare captcha, panic
+                        raise Exception("[-] Cloudflare captcha detected!")
+
+                    # wait for page load
+                    WebDriverWait(selenium.driver, 60).until(
+                        EC.visibility_of_element_located((By.TAG_NAME, "body")))
+                    time.sleep(2)
+
+                    # get the text from the page
+                    page_text = selenium.driver.find_element(
+                        By.TAG_NAME, "pre").text
+                    if not page_text or not isinstance(page_text, str):
+                        raise Exception("[-] Could not get page pre text!")
+                    resp = json.loads(page_text)
+                    logger.debug(resp)
                 except conn_error as error:
                     logger.fatal(f"[-] Udemy Says: Connection error, {error}")
                     time.sleep(0.8)
