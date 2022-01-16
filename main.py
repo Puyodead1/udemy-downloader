@@ -1246,9 +1246,9 @@ def check_for_shaka():
         return True
     except FileNotFoundError:
         return False
-    except Exception as e:
+    except Exception:
         logger.exception(
-            "> Unexpected exception while checking for shaka-packager, please tell the program author about this! ", e)
+            "> Unexpected exception while checking for shaka-packager, please tell the program author about this! ")
         return True
 
 
