@@ -1090,10 +1090,8 @@ def mux_process(video_title, video_filepath, audio_filepath, output_path):
 
     process = subprocess.Popen(
         command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    with process.stdout:
-        log_subprocess_output("FFMPEG-STDOUT", process.stdout)
-    with process.stderr:
-        log_subprocess_output("FFMPEG-STDERR", process.stderr)
+    log_subprocess_output("FFMPEG-STDOUT", process.stdout)
+    log_subprocess_output("FFMPEG-STDERR", process.stderr)
     ret_code = process.wait()
     if ret_code != 0:
         raise Exception("Muxing returned a non-zero exit code")
@@ -1114,10 +1112,8 @@ def decrypt(kid, in_filepath, out_filepath):
 
     process = subprocess.Popen(
         command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    with process.stdout:
-        log_subprocess_output("SHAKA-STDOUT", process.stdout)
-    with process.stderr:
-        log_subprocess_output("SHAKA-STDERR", process.stderr)
+    log_subprocess_output("SHAKA-STDOUT", process.stdout)
+    log_subprocess_output("SHAKA-STDERR", process.stderr)
     ret_code = process.wait()
     if ret_code != 0:
         raise Exception("Decryption returned a non-zero exit code")
@@ -1151,10 +1147,8 @@ def handle_segments(url, format_id, video_title,
         args.append("aria2c:\"--disable-ipv6\"")
     process = subprocess.Popen(
         args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    with process.stdout:
-        log_subprocess_output("YTDLP-STDOUT", process.stdout)
-    with process.stderr:
-        log_subprocess_output("YTDLP-STDERR", process.stderr)
+    log_subprocess_output("YTDLP-STDOUT", process.stdout)
+    log_subprocess_output("YTDLP-STDERR", process.stderr)
     ret_code = process.wait()
     logger.info("> Lecture Tracks Downloaded")
 
@@ -1291,10 +1285,8 @@ def download_aria(url, file_dir, filename):
     if disable_ipv6:
         args.append("--disable-ipv6")
     process = subprocess.Popen(args)
-    with process.stdout:
-        log_subprocess_output("ARIA2-STDOUT", process.stdout)
-    with process.stderr:
-        log_subprocess_output("ARIA2-STDERR", process.stderr)
+    log_subprocess_output("ARIA2-STDOUT", process.stdout)
+    log_subprocess_output("ARIA2-STDERR", process.stderr)
     ret_code = process.wait()
     if ret_code != 0:
         raise Exception("Return code from the downloader was non-0 (error)")
@@ -1392,12 +1384,8 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                             args.append("--downloader-args")
                             args.append("aria2c:\"--disable-ipv6\"")
                         process = subprocess.Popen(args)
-                        with process.stdout:
-                            log_subprocess_output(
-                                "YTDLP-STDOUT", process.stdout)
-                        with process.stderr:
-                            log_subprocess_output(
-                                "YTDLP-STDERR", process.stderr)
+                        log_subprocess_output("YTDLP-STDOUT", process.stdout)
+                        log_subprocess_output("YTDLP-STDERR", process.stderr)
                         ret_code = process.wait()
                         if ret_code == 0:
                             # os.rename(temp_filepath, lecture_path)
