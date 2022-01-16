@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 import time
+from typing import IO
 import cloudscraper
 import m3u8
 import requests
@@ -49,9 +50,15 @@ id_as_course_name = False
 is_subscription_course = False
 
 
+# from https://stackoverflow.com/a/21978778/9785713
+def log_subprocess_output(prefix: str, pipe: IO[bytes]):
+    for line in iter(pipe.readline, b''):  # b'\n'-separated lines
+        logger.debug('[%s]: %r', prefix, line.decode("utf8").strip())
+
+
 # this is the first function that is called, we parse the arguments, setup the logger, and ensure that required directories exist
 def pre_run():
-    global cookies, dl_assets, skip_lectures, dl_captions, caption_locale, quality, bearer_token, portal_name, course_name, keep_vtt, skip_hls, concurrent_downloads, disable_ipv6, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, is_subscription_course
+    global cookies, dl_assets, skip_lectures, dl_captions, caption_locale, quality, bearer_token, portal_name, course_name, keep_vtt, skip_hls, concurrent_downloads, disable_ipv6, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, is_subscription_course, LOG_LEVEL
 
     # make sure the directory exists
     if not os.path.exists(DOWNLOAD_DIR):
@@ -60,30 +67,6 @@ def pre_run():
     # make sure the logs directory exists
     if not os.path.exists(LOG_DIR_PATH):
         os.makedirs(LOG_DIR_PATH, exist_ok=True)
-
-    # setup a logger
-    logger = logging.getLogger(__name__)
-    logging.root.setLevel(LOG_LEVEL)
-
-    # create a colored formatter for the console
-    console_formatter = ColoredFormatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
-    # create a regular non-colored formatter for the log file
-    file_formatter = logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
-
-    # create a handler for console logging
-    stream = logging.StreamHandler()
-    stream.setLevel(LOG_LEVEL)
-    stream.setFormatter(console_formatter)
-
-    # create a handler for file logging
-    file_handler = logging.FileHandler(LOG_FILE_PATH)
-    file_handler.setFormatter(file_formatter)
-
-    # construct the logger
-    logger = logging.getLogger("udemy-downloader")
-    logger.setLevel(LOG_LEVEL)
-    logger.addHandler(stream)
-    logger.addHandler(file_handler)
 
     parser = argparse.ArgumentParser(description='Udemy Downloader')
     parser.add_argument("-c",
@@ -234,24 +217,43 @@ def pre_run():
         info = args.info
     if args.log_level:
         if args.log_level.upper() == "DEBUG":
-            logger.setLevel(logging.DEBUG)
-            stream.setLevel(logging.DEBUG)
+            LOG_LEVEL = logging.DEBUG
         elif args.log_level.upper() == "INFO":
-            logger.setLevel(logging.INFO)
-            stream.setLevel(logging.INFO)
+            LOG_LEVEL = logging.INFO
         elif args.log_level.upper() == "ERROR":
-            logger.setLevel(logging.ERROR)
-            stream.setLevel(logging.ERROR)
+            LOG_LEVEL = logging.ERROR
         elif args.log_level.upper() == "WARNING":
-            logger.setLevel(logging.WARNING)
-            stream.setLevel(logging.WARNING)
+            LOG_LEVEL = logging.WARNING
         elif args.log_level.upper() == "CRITICAL":
-            logger.setLevel(logging.CRITICAL)
-            stream.setLevel(logging.CRITICAL)
+            LOG_LEVEL = logging.CRITICAL
         else:
-            logger.warning("Invalid log level: %s; Using INFO", args.log_level)
-            logger.setLevel(logging.INFO)
-            stream.setLevel(logging.INFO)
+            print(f"Invalid log level: {args.log_level}; Using INFO")
+            LOG_LEVEL = logging.INFO
+
+    # setup a logger
+    logger = logging.getLogger(__name__)
+    logging.root.setLevel(LOG_LEVEL)
+
+    # create a colored formatter for the console
+    console_formatter = ColoredFormatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
+    # create a regular non-colored formatter for the log file
+    file_formatter = logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
+
+    # create a handler for console logging
+    stream = logging.StreamHandler()
+    stream.setLevel(LOG_LEVEL)
+    stream.setFormatter(console_formatter)
+
+    # create a handler for file logging
+    file_handler = logging.FileHandler(LOG_FILE_PATH)
+    file_handler.setFormatter(file_formatter)
+
+    # construct the logger
+    logger = logging.getLogger("udemy-downloader")
+    logger.setLevel(LOG_LEVEL)
+    logger.addHandler(stream)
+    logger.addHandler(file_handler)
+
     if args.id_as_course_name:
         id_as_course_name = args.id_as_course_name
     if args.is_subscription_course:
@@ -572,7 +574,7 @@ class Udemy:
                         })
                 else:
                     # unknown format type
-                    logger.debug(f"Unknown format type : {f}")
+                    # logger.debug(f"Unknown format type : {f}")
                     continue
         except Exception:
             logger.exception(f"Error fetching MPD streams")
@@ -1085,30 +1087,54 @@ def mux_process(video_title, video_filepath, audio_filepath, output_path):
     else:
         command = "nice -n 7 ffmpeg -y -i \"{}\" -i \"{}\" -acodec copy -vcodec copy -fflags +bitexact -map_metadata -1 -metadata title=\"{}\" \"{}\"".format(
             video_filepath, audio_filepath, video_title, output_path)
-    return os.system(command)
+
+    process = subprocess.Popen(
+        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    with process.stdout:
+        log_subprocess_output("FFMPEG-STDOUT", process.stdout)
+    with process.stderr:
+        log_subprocess_output("FFMPEG-STDERR", process.stderr)
+    ret_code = process.wait()
+    if ret_code != 0:
+        raise Exception("Muxing returned a non-zero exit code")
+
+    return ret_code
 
 
 def decrypt(kid, in_filepath, out_filepath):
-    """
-    @author Jayapraveen
-    """
     try:
         key = keys[kid.lower()]
-        if (os.name == "nt"):
-            ret_code = os.system(f"mp4decrypt --key 1:%s \"%s\" \"%s\"" %
-                                 (key, in_filepath, out_filepath))
-        else:
-            ret_code = os.system(f"nice -n 7 mp4decrypt --key 1:%s \"%s\" \"%s\"" %
-                                 (key, in_filepath, out_filepath))
-        return ret_code
     except KeyError:
         raise KeyError("Key not found")
+
+    if (os.name == "nt"):
+        command = f"shaka-packager --enable_raw_key_decryption --keys key_id={kid}:key={key} input=\"{in_filepath}\",stream_selector=\"0\",output=\"{out_filepath}\""
+    else:
+        command = f"nice -n 7 shaka-packager --enable_raw_key_decryption --keys key_id={kid}:key={key} input=\"{in_filepath}\",stream_selector=\"0\",output=\"{out_filepath}\""
+
+    process = subprocess.Popen(
+        command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    with process.stdout:
+        log_subprocess_output("SHAKA-STDOUT", process.stdout)
+    with process.stderr:
+        log_subprocess_output("SHAKA-STDERR", process.stderr)
+    ret_code = process.wait()
+    if ret_code != 0:
+        raise Exception("Decryption returned a non-zero exit code")
+
+    return ret_code
 
 
 def handle_segments(url, format_id, video_title,
                     output_path, lecture_file_name, chapter_dir):
     os.chdir(os.path.join(chapter_dir))
-    file_name = lecture_file_name.replace("%", "").replace(".mp4", "")
+
+    file_name = lecture_file_name.replace(
+        "%", "")
+    # commas cause problems with shaka-packager resulting in decryption failure
+    file_name = file_name.replace(",", "")
+    file_name = file_name.replace(".mp4", "")
+
     video_filepath_enc = file_name + ".encrypted.mp4"
     audio_filepath_enc = file_name + ".encrypted.m4a"
     video_filepath_dec = file_name + ".decrypted.mp4"
@@ -1123,10 +1149,15 @@ def handle_segments(url, format_id, video_title,
     if disable_ipv6:
         args.append("--downloader-args")
         args.append("aria2c:\"--disable-ipv6\"")
-    ret_code = subprocess.Popen(args).wait()
+    process = subprocess.Popen(
+        args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    with process.stdout:
+        log_subprocess_output("YTDLP-STDOUT", process.stdout)
+    with process.stderr:
+        log_subprocess_output("YTDLP-STDERR", process.stderr)
+    ret_code = process.wait()
     logger.info("> Lecture Tracks Downloaded")
 
-    logger.debug("Return code: " + str(ret_code))
     if ret_code != 0:
         logger.warning(
             "Return code from the downloader was non-0 (error), skipping!")
@@ -1173,9 +1204,10 @@ def handle_segments(url, format_id, video_title,
         os.remove(audio_filepath_enc)
         os.remove(video_filepath_dec)
         os.remove(audio_filepath_dec)
-        os.chdir(HOME_DIR)
     except Exception:
         logger.exception(f"Error: ")
+    finally:
+        os.chdir(HOME_DIR)
 
 
 def check_for_aria():
@@ -1206,9 +1238,9 @@ def check_for_ffmpeg():
         return True
 
 
-def check_for_mp4decrypt():
+def check_for_shaka():
     try:
-        subprocess.Popen(["mp4decrypt"],
+        subprocess.Popen(["shaka-packager", "-version"],
                          stderr=subprocess.DEVNULL,
                          stdout=subprocess.DEVNULL).wait()
         return True
@@ -1216,7 +1248,7 @@ def check_for_mp4decrypt():
         return False
     except Exception as e:
         logger.exception(
-            "> Unexpected exception while checking for MP4Decrypt, please tell the program author about this! ")
+            "> Unexpected exception while checking for shaka-packager, please tell the program author about this! ", e)
         return True
 
 
@@ -1258,7 +1290,12 @@ def download_aria(url, file_dir, filename):
     ]
     if disable_ipv6:
         args.append("--disable-ipv6")
-    ret_code = subprocess.Popen(args).wait()
+    process = subprocess.Popen(args)
+    with process.stdout:
+        log_subprocess_output("ARIA2-STDOUT", process.stdout)
+    with process.stderr:
+        log_subprocess_output("ARIA2-STDERR", process.stderr)
+    ret_code = process.wait()
     if ret_code != 0:
         raise Exception("Return code from the downloader was non-0 (error)")
     return ret_code
@@ -1354,7 +1391,14 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                         if disable_ipv6:
                             args.append("--downloader-args")
                             args.append("aria2c:\"--disable-ipv6\"")
-                        ret_code = subprocess.Popen(args).wait()
+                        process = subprocess.Popen(args)
+                        with process.stdout:
+                            log_subprocess_output(
+                                "YTDLP-STDOUT", process.stdout)
+                        with process.stderr:
+                            log_subprocess_output(
+                                "YTDLP-STDERR", process.stderr)
+                        ret_code = process.wait()
                         if ret_code == 0:
                             # os.rename(temp_filepath, lecture_path)
                             logger.info("      > HLS Download success")
@@ -1597,10 +1641,10 @@ def main():
         logger.fatal("> FFMPEG is missing from your system or path!")
         sys.exit(1)
 
-    mp4decrypt_ret_val = check_for_mp4decrypt()
-    if not mp4decrypt_ret_val:
+    shaka_ret_val = check_for_shaka()
+    if not shaka_ret_val:
         logger.fatal(
-            "> MP4Decrypt is missing from your system or path! (This is part of Bento4 tools)"
+            "> Shaka Packager is missing from your system or path!"
         )
         sys.exit(1)
 
