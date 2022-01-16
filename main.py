@@ -562,7 +562,7 @@ class Udemy:
                         })
                 else:
                     # unknown format type
-                    logger.debug(f"Unknown format type : {f}")
+                    # logger.debug(f"Unknown format type : {f}")
                     continue
         except Exception:
             logger.exception(f"Error fetching MPD streams")

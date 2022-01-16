@@ -28,10 +28,10 @@ The following are a list of required third-party tools, you will need to ensure 
 
 _**Note**:_ _These are seperate requirements that are not installed with the pip command! You will need to download and install these manually!_
 
-- [ffmpeg](https://www.ffmpeg.org/) - This tool is available in Linux package repositories
-- [aria2/aria2c](https://github.com/aria2/aria2/) - This tool is available in Linux package repositories
-- [mp4decrypt](https://www.bento4.com/)
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp/) - This tool is available in Linux package repositories, but can also be installed using pip if desired (`pip install yt-dlp`)
+- [ffmpeg](https://www.ffmpeg.org/) - This tool is also available in Linux package repositories
+- [aria2/aria2c](https://github.com/aria2/aria2/) - This tool is also available in Linux package repositories
+- [shaka-oackager](https://github.com/google/shaka-packager/releases/latest)
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp/) - This tool is also available in Linux package repositories, but can also be installed using pip if desired (`pip install yt-dlp`)
 
 # Usage
 
