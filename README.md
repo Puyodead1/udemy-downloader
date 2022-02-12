@@ -13,7 +13,7 @@
 - **This tool will not work without decryption keys. Do not bother installing unless you already have keys or can obtain them!**
 - **Downloading courses is against Udemy's Terms of Service, I am NOT held responsible for your account getting suspended as a result from the use of this program!**
 - This program is WIP, the code is provided as-is and I am not held resposible for any legal issues resulting from the use of this program.
-- ~~You can find information on downgrading the CDM version on the wiki, please note that CDM version 2209 is already revoked as of 12/5/2021 and most providers have already updated, 2209 is not guaranteed to work. This information is just to have it available.~~ _This method no longer works_
+- You can find information on downgrading the CDM version on the wiki, please note that CDM version 2209 is already revoked as of 12/5/2021 and no longer works on Udemy as of 2/1/2022. This information is just to have it available.
   - Chrome: https://github.com/Puyodead1/udemy-downloader/wiki/Downgrade-CDM-to-2209-on-Chrome-(Windows)
   - FireFox: https://github.com/Puyodead1/udemy-downloader/wiki/Downgrade-CDM-to-2209-on-FireFox-(Windows)
 
