@@ -52,8 +52,9 @@ is_subscription_course = False
 
 # from https://stackoverflow.com/a/21978778/9785713
 def log_subprocess_output(prefix: str, pipe: IO[bytes]):
-    for line in iter(pipe.readline, b''):  # b'\n'-separated lines
-        logger.debug('[%s]: %r', prefix, line.decode("utf8").strip())
+    if pipe:
+        for line in iter(pipe.readline, b''):  # b'\n'-separated lines
+            logger.debug('[%s]: %r', prefix, line.decode("utf8").strip())
 
 
 # this is the first function that is called, we parse the arguments, setup the logger, and ensure that required directories exist
