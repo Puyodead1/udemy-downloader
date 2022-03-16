@@ -641,7 +641,7 @@ class Udemy:
         url = COURSE_URL.format(portal_name=portal_name, course_id=course_id)
         try:
             resp = self.session._get(url)
-            if resp.status_code in [502, 503]:
+            if resp.status_code in [502, 503, 504]:
                 logger.info(
                     "> The course content is large, using large content extractor..."
                 )
