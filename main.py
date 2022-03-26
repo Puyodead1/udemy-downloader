@@ -610,7 +610,9 @@ class Udemy:
         url = COURSE_SEARCH.format(portal_name=portal_name,
                                    course_name=course_name)
         try:
-            webpage = self.session._get(url).json()
+            webpage = self.session._get(url).content
+            webpage = webpage.decode("utf8", "ignore")
+            webpage = json.loads(webpage)
         except conn_error as error:
             logger.fatal(f"Udemy Says: Connection error, {error}")
             time.sleep(0.8)
