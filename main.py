@@ -759,6 +759,17 @@ class Udemy:
                 resp = self._extract_large_course_content(url=url)
             else:
                 resp = resp.json()
+                e = resp.get("error")
+                if e:
+                    status_code = e.get("status_code")
+                    message = e.get("message")
+                    if status_code in [502, 503, 504]:
+                        logger.info(f"Looks like a large course: [{status_code}] {message}")
+                        resp = self._extract_large_course_content(url=url)
+                    else:
+                        logger.fatal(f"Error: [{status_code}] {message}")
+                        time.sleep(0.8)
+                        sys.exit(1)
         except conn_error as error:
             logger.fatal(f"[-] Udemy Says: Connection error, {error}")
             time.sleep(0.8)
