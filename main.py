@@ -764,7 +764,8 @@ class Udemy:
                     status_code = e.get("status_code")
                     message = e.get("message")
                     if status_code in [502, 503, 504]:
-                        logger.info(f"Looks like a large course: [{status_code}] {message}")
+                        logger.info(
+                            f"Looks like a large course: [{status_code}] {message}")
                         resp = self._extract_large_course_content(url=url)
                     else:
                         logger.fatal(f"Error: [{status_code}] {message}")
@@ -809,6 +810,19 @@ class Udemy:
                 raise Exception("[-] Could not get page pre text!")
             page_json = json.loads(page_text)
             if page_json:
+                # check if the page returned an error
+                error = page_json.get("error")
+                if error:
+                    status_code = error.get("status_code")
+                    message = error.get("message")
+                    if status_code in [502, 503, 504]:
+                        logger.info(
+                            "[+] Looks like a large course, using large content extractor...")
+                        return self._extract_large_course_content_sub(url=url, selenium=selenium)
+                    else:
+                        logger.fatal(f"Error: [{status_code}] {message}")
+                        time.sleep(0.8)
+                        sys.exit(1)
                 return page_json
             else:
                 logger.error("[-] Failed to extract course json!")
