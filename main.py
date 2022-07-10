@@ -53,7 +53,7 @@ is_subscription_course = False
 # from https://stackoverflow.com/a/21978778/9785713
 def log_subprocess_output(prefix: str, pipe: IO[bytes]):
     if pipe:
-        for line in iter(pipe.readline, b''):  # b'\n'-separated lines
+        for line in iter(lambda: pipe.read(1), ""):
             logger.debug('[%s]: %r', prefix, line.decode("utf8").strip())
         pipe.flush()
 
