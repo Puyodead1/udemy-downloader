@@ -2,7 +2,7 @@ mpegdash
 tqdm
 requests
 python-dotenv
-protobuf==3.20.0
+protobuf==4.21.2
 webvtt-py
 pysrt
 m3u8
