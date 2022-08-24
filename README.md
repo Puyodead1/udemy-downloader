@@ -183,7 +183,7 @@ Then try disabling ipv6 in aria2 using the `--disable-ipv6` option
 
 # Support
 
-if you want help using the program, join my [Discord](https://discord.gg/5B3XVb4RRX) server or use [GitHub Issues](https://github.com/Puyodead1/udemy-downloader/issues)
+if you want help using the program, join my [Discord](https://discord.gg/tMzrSxQ) server or use [GitHub Issues](https://github.com/Puyodead1/udemy-downloader/issues)
 
 # Credits
 
