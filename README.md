@@ -30,7 +30,7 @@ _**Note**:_ _These are seperate requirements that are not installed with the pip
 
 - [ffmpeg](https://www.ffmpeg.org/) - This tool is also available in Linux package repositories
 - [aria2/aria2c](https://github.com/aria2/aria2/) - This tool is also available in Linux package repositories
-- [shaka-packager (truedread fork)](https://github.com/truedread/shaka-packager/releases/latest)
+- [shaka-packager](https://github.com/shaka-project/shaka-packager/releases/latest)
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp/) - This tool is also available in Linux package repositories, but can also be installed using pip if desired (`pip install yt-dlp`)
 
 # Usage
