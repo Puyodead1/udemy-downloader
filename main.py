@@ -793,7 +793,7 @@ class Session(object):
     def __init__(self):
         self._headers = HEADERS
         self._session = requests.sessions.Session()
-        self._sesion.mount(
+        self._session.mount(
             "https://",
             SSLCiphers(
                 cipher_list="ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-SHA256:AES256-SH"
