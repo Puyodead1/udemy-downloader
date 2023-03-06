@@ -54,6 +54,7 @@ is_subscription_course = False
 use_h265 = False
 h265_crf = 28
 h265_preset = "medium"
+use_nvenc = False
 
 
 # from https://stackoverflow.com/a/21978778/9785713
@@ -66,7 +67,7 @@ def log_subprocess_output(prefix: str, pipe: IO[bytes]):
 
 # this is the first function that is called, we parse the arguments, setup the logger, and ensure that required directories exist
 def pre_run():
-    global cookies, dl_assets, skip_lectures, dl_captions, caption_locale, quality, bearer_token, portal_name, course_name, keep_vtt, skip_hls, concurrent_downloads, disable_ipv6, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, is_subscription_course, LOG_LEVEL, use_h265, h265_crf, h265_preset
+    global cookies, dl_assets, skip_lectures, dl_captions, caption_locale, quality, bearer_token, portal_name, course_name, keep_vtt, skip_hls, concurrent_downloads, disable_ipv6, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, is_subscription_course, LOG_LEVEL, use_h265, h265_crf, h265_preset, use_nvenc
 
     # make sure the directory exists
     if not os.path.exists(DOWNLOAD_DIR):
@@ -199,6 +200,12 @@ def pre_run():
         default="medium",
         help="Set a custom preset value for H.265 encoding. FFMPEG default is medium",
     )
+    parser.add_argument(
+        "--use-nvenc",
+        dest="use_nvenc",
+        action="store_true",
+        help="Whether to use the NVIDIA hardware transcoding for H.265. Only works if you have a supported NVIDIA GPU and ffmpeg with nvenc support",
+    )
     parser.add_argument("-v", "--version", action="version", version="You are running version {version}".format(version=__version__))
 
     args = parser.parse_args()
@@ -243,6 +250,8 @@ def pre_run():
         h265_crf = args.h265_crf
     if args.h265_preset:
         h265_preset = args.h265_preset
+    if args.use_nvenc:
+        use_nvenc = True
     if args.log_level:
         if args.log_level.upper() == "DEBUG":
             LOG_LEVEL = logging.DEBUG
@@ -291,8 +300,11 @@ def pre_run():
     Path(SAVED_DIR).mkdir(parents=True, exist_ok=True)
 
     # Get the keys
-    with open(KEY_FILE_PATH, encoding="utf8", mode="r") as keyfile:
-        keys = json.loads(keyfile.read())
+    if os.path.exists(KEY_FILE_PATH):
+        with open(KEY_FILE_PATH, encoding="utf8", mode="r") as keyfile:
+            keys = json.loads(keyfile.read())
+    else:
+        logger.warning("> Keyfile not found! You won't be able to decrypt videos!")
 
     # Read cookies from file
     if os.path.exists(COOKIE_FILE_PATH):
@@ -997,10 +1009,12 @@ def mux_process(video_title, video_filepath, audio_filepath, output_path):
     """
     @author Jayapraveen
     """
+    codec = "hevc_nvenc" if use_nvenc else "libx265"
+    transcode = "-hwaccel cuda -hwaccel_output_format cuda" if use_nvenc else []
     if os.name == "nt":
         if use_h265:
-            command = 'ffmpeg -y -i "{}" -i "{}" -c:v libx265 -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title="{}" "{}"'.format(
-                video_filepath, audio_filepath, h265_crf, h265_preset, video_title, output_path
+            command = 'ffmpeg {} -y -i "{}" -i "{}" -c:v {} -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title="{}" "{}"'.format(
+                transcode, video_filepath, audio_filepath, codec, h265_crf, h265_preset, video_title, output_path
             )
         else:
             command = 'ffmpeg -y -i "{}" -i "{}" -c:v copy -vtag hvc1 -c:a copy -fflags +bitexact -map_metadata -1 -metadata title="{}" "{}"'.format(
@@ -1008,11 +1022,11 @@ def mux_process(video_title, video_filepath, audio_filepath, output_path):
             )
     else:
         if use_h265:
-            command = 'nide -n 7 ffmpeg -y -i "{}" -i "{}" -c:v libx265 -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title="{}" "{}"'.format(
-                video_filepath, audio_filepath, h265_crf, h265_preset, video_title, output_path
+            command = 'nice -n 7 ffmpeg {} -y -i "{}" -i "{}" -c:v libx265 -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title="{}" "{}"'.format(
+                transcode, video_filepath, audio_filepath, codec, h265_crf, h265_preset, video_title, output_path
             )
         else:
-            command = 'nide -n 7 ffmpeg -y -i "{}" -i "{}" -c:v copy -vtag hvc1 -c:a copy -fflags +bitexact -map_metadata -1 -metadata title="{}" "{}"'.format(
+            command = 'nice -n 7 ffmpeg -y -i "{}" -i "{}" -c:v copy -vtag hvc1 -c:a copy -fflags +bitexact -map_metadata -1 -metadata title="{}" "{}"'.format(
                 video_filepath, audio_filepath, video_title, output_path
             )
 
@@ -1347,19 +1361,22 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                         log_subprocess_output("YTDLP-STDERR", process.stderr)
                         ret_code = process.wait()
                         if ret_code == 0:
-                            # os.rename(temp_filepath, lecture_path)
+                            tmp_file_path = lecture_path + ".tmp"
                             logger.info("      > HLS Download success")
-                            cmd = ["ffmpeg", "-y", "-i", lecture_path, "-c:v", "libx265", "-c:a", "copy", lecture_path + ".mp4"]
-                            process = subprocess.Popen(cmd)
-                            log_subprocess_output("FFMPEG-STDOUT", process.stdout)
-                            log_subprocess_output("FFMPEG-STDERR", process.stderr)
-                            ret_code = process.wait()
-                            if ret_code == 0:
-                                os.remove(lecture_path)
-                                os.remove(lecture_path + ".mp4", lecture_path)
-                                logger.info("      > Encoding complete")
-                            else:
-                                logger.error("      > Encoding returned non-zero return code")
+                            if use_h265:
+                                codec = "hevc_nvenc" if use_nvenc else "libx265"
+                                transcode = "-hwaccel cuda -hwaccel_output_format cuda".split(" ") if use_nvenc else []
+                                cmd = ["ffmpeg", *transcode, "-y", "-i", lecture_path, "-c:v", codec, "-c:a", "copy", "-f", "mp4", tmp_file_path]
+                                process = subprocess.Popen(cmd)
+                                log_subprocess_output("FFMPEG-STDOUT", process.stdout)
+                                log_subprocess_output("FFMPEG-STDERR", process.stderr)
+                                ret_code = process.wait()
+                                if ret_code == 0:
+                                    os.unlink(lecture_path)
+                                    os.rename(tmp_file_path, lecture_path)
+                                    logger.info("      > Encoding complete")
+                                else:
+                                    logger.error("      > Encoding returned non-zero return code")
                     else:
                         ret_code = download_aria(url, chapter_dir, lecture_title + ".mp4")
                         logger.debug(f"      > Download return code: {ret_code}")
@@ -1563,9 +1580,6 @@ def main():
         logger.info("> 'load_from_file' was specified, data will be loaded from json files instead of fetched")
     if save_to_file:
         logger.info("> 'save_to_file' was specified, data will be saved to json files")
-
-    if not os.path.isfile(KEY_FILE_PATH):
-        logger.warning("> Keyfile not found! You won't be able to decrypt videos!")
 
     load_dotenv()
     if bearer_token:

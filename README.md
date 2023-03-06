@@ -93,7 +93,7 @@ Note the link is `/course` not `/program-taking`. It is also important that the 
 
 ```
 usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_DOWNLOADS] [--disable-ipv6] [--skip-lectures] [--download-assets] [--download-captions] [--keep-vtt] [--skip-hls]
-               [--info] [--id-as-course-name] [-sc] [--save-to-file] [--load-from-file] [--log-level LOG_LEVEL] [--use-h265] [--h265-crf H265_CRF] [--h265-preset H265_PRESET] [-v]
+               [--info] [--id-as-course-name] [-sc] [--save-to-file] [--load-from-file] [--log-level LOG_LEVEL] [--use-h265] [--h265-crf H265_CRF] [--h265-preset H265_PRESET] [--use-nvenc] [-v]
 
 Udemy Downloader
 
@@ -128,6 +128,7 @@ options:
   --h265-crf H265_CRF   Set a custom CRF value for H.265 encoding. FFMPEG default is 28
   --h265-preset H265_PRESET
                         Set a custom preset value for H.265 encoding. FFMPEG default is medium
+  --use-nvenc           Whether to use the NVIDIA hardware transcoding for H.265. Only works if you have a supported NVIDIA GPU and ffmpeg with nvenc support
   -v, --version         show program's version number and exit
 ```
 
@@ -178,6 +179,8 @@ options:
   - `python main.py -c <Course URL> --use-h265 -h265-crf 20`
 - Encode in H.265 with custom preset:
   - `python main.py -c <Course URL> --use-h265 --h265-preset faster`
+- Encode in H.265 using NVIDIA hardware transcoding:
+  - `python main.py -c <Course URL> --use-h265 --use-nvenc`
 
 If you encounter errors while downloading such as
 
