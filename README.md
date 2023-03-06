@@ -13,13 +13,10 @@
 - **This tool will not work without decryption keys. Do not bother installing unless you already have keys or can obtain them!**
 - **Downloading courses is against Udemy's Terms of Service, I am NOT held responsible for your account getting suspended as a result from the use of this program!**
 - This program is WIP, the code is provided as-is and I am not held resposible for any legal issues resulting from the use of this program.
-- You can find information on downgrading the CDM version on the wiki, __please note that CDM version 2209 is already revoked as of 12/5/2021 and no longer works on Udemy as of 2/1/2022. This information is just to have it available.__
-  - Chrome: https://github.com/Puyodead1/udemy-downloader/wiki/Downgrade-CDM-to-2209-on-Chrome-(Windows)
-  - FireFox: https://github.com/Puyodead1/udemy-downloader/wiki/Downgrade-CDM-to-2209-on-FireFox-(Windows)
 
 # Description
 
-Utility script to download Udemy courses, has support for DRM videos but requires the user to aquire the decryption key (for legal reasons).<br>
+Utility script to download Udemy courses, has support for DRM videos but requires the user to acquire the decryption key (for legal reasons).<br>
 Windows is the primary development OS, but I've made an effort to support Linux also (Mac untested).
 
 # Requirements
@@ -50,7 +47,7 @@ You will need to get a few things before you can use this program:
 - rename `.env.sample` to `.env` _(you only need to do this if you plan to use the .env file to store your bearer token)_
 - rename `keyfile.example.json` to `keyfile.json`
 
-## Aquire Bearer Token
+## Acquire Bearer Token
 
 - Firefox: [Udemy-DL Guide](https://github.com/r0oth3x49/udemy-dl/issues/389#issuecomment-491903900)
 - Chrome: [Udemy-DL Guide](https://github.com/r0oth3x49/udemy-dl/issues/389#issuecomment-492569372)
@@ -58,7 +55,7 @@ You will need to get a few things before you can use this program:
 
 ## Key ID and Key
 
-It is up to you to aquire the key and key ID. Please **DO NOT** ask me for help acquiring these, decrypting DRM protected content can be considered piracy. The tool required for this has already been discused in a GitHub issue.
+It is up to you to acquire the key and key ID. Please **DO NOT** ask me for help acquiring these, decrypting DRM protected content can be considered piracy. The tool required for this has already been discused in a GitHub issue.
 
 - Enter the key and key id in the `keyfile.json`
 - ![keyfile example](https://i.imgur.com/e5aU0ng.png)
@@ -95,20 +92,19 @@ Note the link is `/course` not `/program-taking`. It is also important that the 
 # Advanced Usage
 
 ```
-usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_DOWNLOADS] [--disable-ipv6] [--skip-lectures] [--download-assets] [--download-captions]
-               [--keep-vtt] [--skip-hls] [--info] [--id-as-course-name] [--save-to-file] [--load-from-file] [--log-level LOG_LEVEL] [-v]
+usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_DOWNLOADS] [--disable-ipv6] [--skip-lectures] [--download-assets] [--download-captions] [--keep-vtt] [--skip-hls]
+               [--info] [--id-as-course-name] [-sc] [--save-to-file] [--load-from-file] [--log-level LOG_LEVEL] [--use-h265] [--h265-crf H265_CRF] [--h265-preset H265_PRESET] [-v]
 
 Udemy Downloader
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -c COURSE_URL, --course-url COURSE_URL
                         The URL of the course to download
   -b BEARER_TOKEN, --bearer BEARER_TOKEN
                         The Bearer token to use
   -q QUALITY, --quality QUALITY
-                        Download specific video quality. If the requested quality isn't available, the closest quality will be used. If not specified, the best quality will be downloaded
-                        for each lecture
+                        Download specific video quality. If the requested quality isn't available, the closest quality will be used. If not specified, the best quality will be downloaded for each lecture
   -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is 'en')
   -cd CONCURRENT_DOWNLOADS, --concurrent-downloads CONCURRENT_DOWNLOADS
                         The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-30)
@@ -120,12 +116,18 @@ optional arguments:
   --skip-hls            If specified, hls streams will be skipped (faster fetching) (hls streams usually contain 1080p quality for non-drm lectures)
   --info                If specified, only course information will be printed, nothing will be downloaded
   --id-as-course-name   If specified, the course id will be used in place of the course name for the output directory. This is a 'hack' to reduce the path length
-  --save-to-file        If specified, course content will be saved to a file that can be loaded later with --load-from-file, this can reduce processing time (Note that asset links expire
-                        after a certain amount of time)
-  --load-from-file      If specified, course content will be loaded from a previously saved file with --save-to-file, this can reduce processing time (Note that asset links expire after a
-                        certain amount of time)
+  -sc, --subscription-course
+                        Mark the course as a subscription based course, use this if you are having problems with the program auto detecting it
+  --save-to-file        If specified, course content will be saved to a file that can be loaded later with --load-from-file, this can reduce processing time (Note that asset links expire after a certain
+                        amount of time)
+  --load-from-file      If specified, course content will be loaded from a previously saved file with --save-to-file, this can reduce processing time (Note that asset links expire after a certain amount of
+                        time)
   --log-level LOG_LEVEL
                         Logging level: one of DEBUG, INFO, ERROR, WARNING, CRITICAL (Default is INFO)
+  --use-h265            If specified, videos will be encoded with the H.265 codec
+  --h265-crf H265_CRF   Set a custom CRF value for H.265 encoding. FFMPEG default is 28
+  --h265-preset H265_PRESET
+                        Set a custom preset value for H.265 encoding. FFMPEG default is medium
   -v, --version         show program's version number and exit
 ```
 
@@ -170,6 +172,12 @@ optional arguments:
   - `python main.py -c <Course URL> --log-level CRITICAL`
 - Use course ID as the course name:
   - `python main.py -c <Course URL> --id-as-course-name`
+- Encode in H.265:
+  - `python main.py -c <Course URL> --use-h265`
+- Encode in H.265 with custom CRF:
+  - `python main.py -c <Course URL> --use-h265 -h265-crf 20`
+- Encode in H.265 with custom preset:
+  - `python main.py -c <Course URL> --use-h265 --h265-preset faster`
 
 If you encounter errors while downloading such as
 
