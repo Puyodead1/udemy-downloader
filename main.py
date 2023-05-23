@@ -1388,18 +1388,18 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
             logger.error("      > Missing sources for lecture", lecture)
 
 
-def parse_new(_udemy):
-    total_chapters = _udemy.get("total_chapters")
-    total_lectures = _udemy.get("total_lectures")
+def parse_new(udemy_object: dict, udemy: Udemy):
+    total_chapters = udemy_object.get("total_chapters")
+    total_lectures = udemy_object.get("total_lectures")
     logger.info(f"Chapter(s) ({total_chapters})")
     logger.info(f"Lecture(s) ({total_lectures})")
 
-    course_name = str(_udemy.get("course_id")) if id_as_course_name else _udemy.get("course_title")
+    course_name = str(udemy_object.get("course_id")) if id_as_course_name else udemy_object.get("course_title")
     course_dir = os.path.join(DOWNLOAD_DIR, course_name)
     if not os.path.exists(course_dir):
         os.mkdir(course_dir)
 
-    for chapter in _udemy.get("chapters"):
+    for chapter in udemy_object.get("chapters"):
         chapter_title = chapter.get("chapter_title")
         chapter_index = chapter.get("chapter_index")
         chapter_dir = os.path.join(course_dir, chapter_title)
@@ -1408,8 +1408,104 @@ def parse_new(_udemy):
         logger.info(f"======= Processing chapter {chapter_index} of {total_chapters} =======")
 
         for lecture in chapter.get("lectures"):
+            index = lecture.get("index")  # this is lecture_counter
+            lecture_index = lecture.get("lecture_index")  # this is the raw object index from udemy
             lecture_title = lecture.get("lecture_title")
-            lecture_index = lecture.get("lecture_index")
+            lecture_data = lecture.get("data")
+            asset = lecture_data.get("asset")
+            supp_assets = lecture_data.get("supplementary_assets")
+
+            if isinstance(asset, dict):
+                asset_type = asset.get("asset_type").lower() or asset.get("assetType").lower
+                if asset_type == "article":
+                    if isinstance(supp_assets, list) and len(supp_assets) > 0:
+                        retVal = udemy._extract_supplementary_assets(supp_assets, index)
+                elif asset_type == "video":
+                    if isinstance(supp_assets, list) and len(supp_assets) > 0:
+                        retVal = udemy._extract_supplementary_assets(supp_assets, index)
+                elif asset_type == "e-book":
+                    retVal = udemy._extract_ebook(asset, index)
+                elif asset_type == "file":
+                    retVal = udemy._extract_file(asset, index)
+                elif asset_type == "presentation":
+                    retVal = udemy._extract_ppt(asset, index)
+                elif asset_type == "audio":
+                    retVal = udemy._extract_audio(asset, index)
+
+            stream_urls = asset.get("stream_urls")
+            if stream_urls != None:
+                # not encrypted
+                if stream_urls and isinstance(stream_urls, dict):
+                    sources = stream_urls.get("Video")
+                    tracks = asset.get("captions")
+                    # duration = asset.get("time_estimation")
+                    sources = udemy._extract_sources(sources, skip_hls)
+                    subtitles = udemy._extract_subtitles(tracks)
+                    sources_count = len(sources)
+                    subtitle_count = len(subtitles)
+                    lecture.pop("data")  # remove the raw data object after processing
+                    lecture = {
+                        **lecture,
+                        "assets": retVal,
+                        "assets_count": len(retVal),
+                        "sources": sources,
+                        "subtitles": subtitles,
+                        "subtitle_count": subtitle_count,
+                        "sources_count": sources_count,
+                        "is_encrypted": False,
+                        "asset_id": asset.get("id"),
+                    }
+                else:
+                    lecture.pop("data")  # remove the raw data object after processing
+                    lecture = {
+                        **lecture,
+                        "html_content": asset.get("body"),
+                        "extension": "html",
+                        "assets": retVal,
+                        "assets_count": len(retVal),
+                        "subtitle_count": 0,
+                        "sources_count": 0,
+                        "is_encrypted": False,
+                        "asset_id": asset.get("id"),
+                    }
+            else:
+                # encrypted
+                media_sources = asset.get("media_sources")
+                if media_sources and isinstance(media_sources, list):
+                    sources = udemy._extract_media_sources(media_sources)
+                    tracks = asset.get("captions")
+                    # duration = asset.get("time_estimation")
+                    subtitles = udemy._extract_subtitles(tracks)
+                    sources_count = len(sources)
+                    subtitle_count = len(subtitles)
+                    lecture.pop("data")  # remove the raw data object after processing
+                    lecture = {
+                        **lecture,
+                        # "duration": duration,
+                        "assets": retVal,
+                        "assets_count": len(retVal),
+                        "video_sources": sources,
+                        "subtitles": subtitles,
+                        "subtitle_count": subtitle_count,
+                        "sources_count": sources_count,
+                        "is_encrypted": True,
+                        "asset_id": asset.get("id"),
+                    }
+
+                else:
+                    lecture.pop("data")  # remove the raw data object after processing
+                    lecture = {
+                        **lecture,
+                        "html_content": asset.get("body"),
+                        "extension": "html",
+                        "assets": retVal,
+                        "assets_count": len(retVal),
+                        "subtitle_count": 0,
+                        "sources_count": 0,
+                        "is_encrypted": False,
+                        "asset_id": asset.get("id"),
+                    }
+
             lecture_extension = lecture.get("extension")
             extension = "mp4"  # video lectures dont have an extension property, so we assume its mp4
             if lecture_extension != None:
@@ -1616,18 +1712,18 @@ def main():
     resource = course_json.get("detail")
 
     if load_from_file:
-        _udemy = json.loads(open(os.path.join(os.getcwd(), "saved", "_udemy.json"), encoding="utf8", mode="r").read())
+        udemy_object = json.loads(open(os.path.join(os.getcwd(), "saved", "_udemy.json"), encoding="utf8", mode="r").read())
         if info:
-            _print_course_info(_udemy)
+            _print_course_info(udemy_object)
         else:
-            parse_new(_udemy)
+            parse_new(udemy_object)
     else:
-        _udemy = {}
-        _udemy["bearer_token"] = bearer_token
-        _udemy["course_id"] = course_id
-        _udemy["title"] = title
-        _udemy["course_title"] = course_title
-        _udemy["chapters"] = []
+        udemy_object = {}
+        udemy_object["bearer_token"] = bearer_token
+        udemy_object["course_id"] = course_id
+        udemy_object["title"] = title
+        udemy_object["course_title"] = course_title
+        udemy_object["chapters"] = []
         counter = -1
 
         if resource:
@@ -1640,8 +1736,6 @@ def main():
             lecture_counter = 0
             for entry in course:
                 clazz = entry.get("_class")
-                asset = entry.get("asset")
-                supp_assets = entry.get("supplementary_assets")
 
                 if clazz == "chapter":
                     lecture_counter = 0
@@ -1649,144 +1743,38 @@ def main():
                     chapter_index = entry.get("object_index")
                     chapter_title = "{0:02d} - ".format(chapter_index) + sanitize_filename(entry.get("title"))
 
-                    if chapter_title not in _udemy["chapters"]:
-                        _udemy["chapters"].append({"chapter_title": chapter_title, "chapter_id": entry.get("id"), "chapter_index": chapter_index, "lectures": []})
+                    if chapter_title not in udemy_object["chapters"]:
+                        udemy_object["chapters"].append({"chapter_title": chapter_title, "chapter_id": entry.get("id"), "chapter_index": chapter_index, "lectures": []})
                         counter += 1
                 elif clazz == "lecture":
                     lecture_counter += 1
                     lecture_id = entry.get("id")
-                    if len(_udemy["chapters"]) == 0:
+                    if len(udemy_object["chapters"]) == 0:
                         lectures = []
                         chapter_index = entry.get("object_index")
                         chapter_title = "{0:02d} - ".format(chapter_index) + sanitize_filename(entry.get("title"))
-                        if chapter_title not in _udemy["chapters"]:
-                            _udemy["chapters"].append({"chapter_title": chapter_title, "chapter_id": lecture_id, "chapter_index": chapter_index, "lectures": []})
+                        if chapter_title not in udemy_object["chapters"]:
+                            udemy_object["chapters"].append({"chapter_title": chapter_title, "chapter_id": lecture_id, "chapter_index": chapter_index, "lectures": []})
                             counter += 1
 
                     if lecture_id:
                         logger.info(f"Processing {course.index(entry)} of {len(course)}")
-                        retVal = []
-
-                        if isinstance(asset, dict):
-                            asset_type = asset.get("asset_type").lower() or asset.get("assetType").lower
-                            if asset_type == "article":
-                                if isinstance(supp_assets, list) and len(supp_assets) > 0:
-                                    retVal = udemy._extract_supplementary_assets(supp_assets, lecture_counter)
-                            elif asset_type == "video":
-                                if isinstance(supp_assets, list) and len(supp_assets) > 0:
-                                    retVal = udemy._extract_supplementary_assets(supp_assets, lecture_counter)
-                            elif asset_type == "e-book":
-                                retVal = udemy._extract_ebook(asset, lecture_counter)
-                            elif asset_type == "file":
-                                retVal = udemy._extract_file(asset, lecture_counter)
-                            elif asset_type == "presentation":
-                                retVal = udemy._extract_ppt(asset, lecture_counter)
-                            elif asset_type == "audio":
-                                retVal = udemy._extract_audio(asset, lecture_counter)
 
                         lecture_index = entry.get("object_index")
                         lecture_title = "{0:03d} ".format(lecture_counter) + sanitize_filename(entry.get("title"))
 
-                        if asset.get("stream_urls") != None:
-                            # not encrypted
-                            data = asset.get("stream_urls")
-                            if data and isinstance(data, dict):
-                                sources = data.get("Video")
-                                tracks = asset.get("captions")
-                                # duration = asset.get("time_estimation")
-                                sources = udemy._extract_sources(sources, skip_hls)
-                                subtitles = udemy._extract_subtitles(tracks)
-                                sources_count = len(sources)
-                                subtitle_count = len(subtitles)
-                                lectures.append(
-                                    {
-                                        "index": lecture_counter,
-                                        "lecture_index": lecture_index,
-                                        "lecture_id": lecture_id,
-                                        "lecture_title": lecture_title,
-                                        # "duration": duration,
-                                        "assets": retVal,
-                                        "assets_count": len(retVal),
-                                        "sources": sources,
-                                        "subtitles": subtitles,
-                                        "subtitle_count": subtitle_count,
-                                        "sources_count": sources_count,
-                                        "is_encrypted": False,
-                                        "asset_id": asset.get("id"),
-                                    }
-                                )
-                            else:
-                                lectures.append(
-                                    {
-                                        "index": lecture_counter,
-                                        "lecture_index": lecture_index,
-                                        "lectures_id": lecture_id,
-                                        "lecture_title": lecture_title,
-                                        "html_content": asset.get("body"),
-                                        "extension": "html",
-                                        "assets": retVal,
-                                        "assets_count": len(retVal),
-                                        "subtitle_count": 0,
-                                        "sources_count": 0,
-                                        "is_encrypted": False,
-                                        "asset_id": asset.get("id"),
-                                    }
-                                )
-                        else:
-                            # encrypted
-                            data = asset.get("media_sources")
-                            if data and isinstance(data, list):
-                                sources = udemy._extract_media_sources(data)
-                                tracks = asset.get("captions")
-                                # duration = asset.get("time_estimation")
-                                subtitles = udemy._extract_subtitles(tracks)
-                                sources_count = len(sources)
-                                subtitle_count = len(subtitles)
-                                lectures.append(
-                                    {
-                                        "index": lecture_counter,
-                                        "lecture_index": lecture_index,
-                                        "lectures_id": lecture_id,
-                                        "lecture_title": lecture_title,
-                                        # "duration": duration,
-                                        "assets": retVal,
-                                        "assets_count": len(retVal),
-                                        "video_sources": sources,
-                                        "subtitles": subtitles,
-                                        "subtitle_count": subtitle_count,
-                                        "sources_count": sources_count,
-                                        "is_encrypted": True,
-                                        "asset_id": asset.get("id"),
-                                    }
-                                )
-                            else:
-                                lectures.append(
-                                    {
-                                        "index": lecture_counter,
-                                        "lecture_index": lecture_index,
-                                        "lectures_id": lecture_id,
-                                        "lecture_title": lecture_title,
-                                        "html_content": asset.get("body"),
-                                        "extension": "html",
-                                        "assets": retVal,
-                                        "assets_count": len(retVal),
-                                        "subtitle_count": 0,
-                                        "sources_count": 0,
-                                        "is_encrypted": False,
-                                        "asset_id": asset.get("id"),
-                                    }
-                                )
-                    _udemy["chapters"][counter]["lectures"] = lectures
-                    _udemy["chapters"][counter]["lecture_count"] = len(lectures)
+                        lectures.append({"index": lecture_counter, "lecture_index": lecture_index, "lecture_title": lecture_title, "data": entry})
+                    udemy_object["chapters"][counter]["lectures"] = lectures
+                    udemy_object["chapters"][counter]["lecture_count"] = len(lectures)
                 elif clazz == "quiz":
                     lecture_id = entry.get("id")
-                    if len(_udemy["chapters"]) == 0:
+                    if len(udemy_object["chapters"]) == 0:
                         lectures = []
                         chapter_index = entry.get("object_index")
                         chapter_title = "{0:02d} - ".format(chapter_index) + sanitize_filename(entry.get("title"))
-                        if chapter_title not in _udemy["chapters"]:
+                        if chapter_title not in udemy_object["chapters"]:
                             lecture_counter = 0
-                            _udemy["chapters"].append(
+                            udemy_object["chapters"].append(
                                 {
                                     "chapter_title": chapter_title,
                                     "chapter_id": lecture_id,
@@ -1796,22 +1784,24 @@ def main():
                             )
                             counter += 1
 
-                    _udemy["chapters"][counter]["lectures"] = lectures
-                    _udemy["chapters"][counter]["lectures_count"] = len(lectures)
+                    udemy_object["chapters"][counter]["lectures"] = lectures
+                    udemy_object["chapters"][counter]["lectures_count"] = len(lectures)
 
-            _udemy["total_chapters"] = len(_udemy["chapters"])
-            _udemy["total_lectures"] = sum([entry.get("lecture_count", 0) for entry in _udemy["chapters"] if entry])
+            udemy_object["total_chapters"] = len(udemy_object["chapters"])
+            udemy_object["total_lectures"] = sum([entry.get("lecture_count", 0) for entry in udemy_object["chapters"] if entry])
 
         if save_to_file:
             with open(os.path.join(os.getcwd(), "saved", "_udemy.json"), encoding="utf8", mode="w") as f:
-                f.write(json.dumps(_udemy))
+                # remove "bearer_token" from the object before writing
+                udemy_object.pop("bearer_token")
+                f.write(json.dumps(udemy_object))
                 f.close()
             logger.info("> Saved parsed data to json")
 
         if info:
-            _print_course_info(_udemy)
+            _print_course_info(udemy_object)
         else:
-            parse_new(_udemy)
+            parse_new(udemy_object, udemy)
 
 
 if __name__ == "__main__":
