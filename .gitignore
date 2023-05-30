@@ -128,4 +128,5 @@ cookies.txt
 selenium_test.py
 selenium_data/
 config.dev.toml
-temp/*.exe
+temp/
+*.exe

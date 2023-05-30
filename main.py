@@ -483,42 +483,69 @@ class Udemy:
 
     def _extract_m3u8(self, url):
         """extracts m3u8 streams"""
+        asset_id_re = re.compile(r"assets/(?P<id>\d+)/")
         _temp = []
+
+        # get temp folder
+        temp_path = Path(Path.cwd(), "temp")
+
+        # ensure the folder exists
+        temp_path.mkdir(parents=True, exist_ok=True)
+
+        # # extract the asset id from the url
+        asset_id = asset_id_re.search(url).group("id")
+
+        m3u8_path = Path(temp_path, f"index_{asset_id}.m3u8")
+
         try:
-            resp = self.session._get(url)
-            resp.raise_for_status()
-            raw_data = resp.text
+            r = self.session._get(url)
+            r.raise_for_status()
+            raw_data = r.text
+
+            # write to temp file for later
+            with open(m3u8_path, "w") as f:
+                f.write(r.text)
+
             m3u8_object = m3u8.loads(raw_data)
             playlists = m3u8_object.playlists
             seen = set()
             for pl in playlists:
                 resolution = pl.stream_info.resolution
                 codecs = pl.stream_info.codecs
+                
                 if not resolution:
                     continue
                 if not codecs:
                     continue
                 width, height = resolution
-                download_url = pl.uri
-                if height not in seen:
-                    seen.add(height)
-                    _temp.append(
-                        {
-                            "type": "hls",
-                            "height": height,
-                            "width": width,
-                            "extension": "mp4",
-                            "download_url": download_url,
-                        }
-                    )
+                
+                if height in seen: continue
+
+                # we need to save the individual playlists to disk also
+                playlist_path = Path(temp_path, f"index_{asset_id}_{width}x{height}.m3u8")
+
+                with open(playlist_path, "w") as f:
+                    r = self.session._get(pl.uri)
+                    r.raise_for_status()
+                    f.write(r.text)
+
+                seen.add(height)
+                _temp.append(
+                    {
+                        "type": "hls",
+                        "height": height,
+                        "width": width,
+                        "extension": "mp4",
+                        "download_url": playlist_path.as_uri(),
+                    }
+                )
         except Exception as error:
             logger.error(f"Udemy Says : '{error}' while fetching hls streams..")
         return _temp
 
     def _extract_mpd(self, url):
         """extracts mpd streams"""
-
-        asset_id_re = re.compile(r"assets/(?P<id>\d+)/files")
+        asset_id_re = re.compile(r"assets/(?P<id>\d+)/")
         _temp = []
 
         # get temp folder
@@ -536,6 +563,7 @@ class Udemy:
         try:
             with open(mpd_path, "wb") as f:
                 r = self.session._get(url)
+                r.raise_for_status()
                 f.write(r.content)
 
             ytdl = yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "allow_unplayable_formats": True, "enable_file_urls": True})
@@ -1168,6 +1196,7 @@ def handle_segments(url, format_id, video_title, output_path, lecture_file_name,
     logger.info("> Downloading Lecture Tracks...")
     args = [
         "yt-dlp",
+        "--enable-file-urls",
         "--force-generic-extractor",
         "--allow-unplayable-formats",
         "--concurrent-fragments",
@@ -1237,6 +1266,12 @@ def handle_segments(url, format_id, video_title, output_path, lecture_file_name,
         logger.exception(f"Error: ")
     finally:
         os.chdir(HOME_DIR)
+        # if the url is a file url, we need to remove the file after we're done with it
+        if url.startswith("file://"):
+            try:
+                os.unlink(url[7:])
+            except:
+                pass
 
 
 def check_for_aria():
@@ -1372,7 +1407,7 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                     source_type = source.get("type")
                     if source_type == "hls":
                         temp_filepath = lecture_path.replace(".mp4", ".%(ext)s")
-                        cmd = ["yt-dlp", "--force-generic-extractor", "--concurrent-fragments", f"{concurrent_downloads}", "--downloader", "aria2c", "-o", f"{temp_filepath}", f"{url}"]
+                        cmd = ["yt-dlp",  "--enable-file-urls", "--force-generic-extractor", "--concurrent-fragments", f"{concurrent_downloads}", "--downloader", "aria2c", "-o", f"{temp_filepath}", f"{url}"]
                         if disable_ipv6:
                             cmd.append("--downloader-args")
                             cmd.append('aria2c:"--disable-ipv6"')
