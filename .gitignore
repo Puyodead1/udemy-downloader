@@ -112,14 +112,15 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
 *.mp4
 keyfile.json
 test_data.json
-out_dir
-working_dir
+out_dir/
+working_dir/
 manifest.mpd
 .vscode
-saved
+saved/
 *.aria2
 info.py
 .idea/
@@ -127,3 +128,4 @@ cookies.txt
 selenium_test.py
 selenium_data/
 config.dev.toml
+temp/
