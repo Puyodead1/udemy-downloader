@@ -310,17 +310,6 @@ def pre_run():
     with open(KEY_FILE_PATH, encoding="utf8", mode="r") as keyfile:
         keys = json.loads(keyfile.read())
 
-    # Read cookies from file
-    if os.path.exists(COOKIE_FILE_PATH):
-        with open(COOKIE_FILE_PATH, encoding="utf8", mode="r") as cookiefile:
-            cookies = cookiefile.read()
-            cookies = cookies.rstrip()
-    else:
-        logger.warning(
-            "No cookies.txt file was found, you won't be able to download subscription courses! You can ignore ignore this if you don't plan to download a course included in a subscription plan."
-        )
-
-
 class Udemy:
     def __init__(self, bearer_token):
         global cj
