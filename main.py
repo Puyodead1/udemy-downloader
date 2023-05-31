@@ -1469,6 +1469,7 @@ def parse_new(udemy_object: dict, udemy: Udemy):
             lecture_data = lecture.get("data")
             asset = lecture_data.get("asset")
             supp_assets = lecture_data.get("supplementary_assets")
+            retVal = []
 
             if isinstance(asset, dict):
                 asset_type = asset.get("asset_type").lower() or asset.get("assetType").lower
@@ -1486,6 +1487,8 @@ def parse_new(udemy_object: dict, udemy: Udemy):
                     retVal = udemy._extract_ppt(asset, index)
                 elif asset_type == "audio":
                     retVal = udemy._extract_audio(asset, index)
+                else:
+                    logger.warning(f"Unknown asset type: {asset_type}")
 
             stream_urls = asset.get("stream_urls")
             if stream_urls != None:
@@ -1771,7 +1774,7 @@ def main():
         if info:
             _print_course_info(udemy_object)
         else:
-            parse_new(udemy_object)
+            parse_new(udemy_object, udemy)
     else:
         udemy_object = {}
         udemy_object["bearer_token"] = bearer_token
