@@ -67,27 +67,7 @@ You can now run the program, see the examples below. The course will download to
 
 # Udemy Subscription Plans
 
-To download a course included in a subscription plan that you did not purchase individually, you will need to follow a few more steps to get setup.
-
-_**NOTE**:_ _You do **NOT** need to follow this section if you don't have a **Udemy Pro** or **Udemy Personal** subscription plan! This section is not for individually purchased courses._
-
-## Getting your cookies
-
-- Go to the page of the course you want to download
-- press `control` + `shift` + `i` (this may be different depending on your OS, just google how to open developer tools)
-- click the `Console` tab
-- copy and paste `document.cookie` and press enter
-- copy the text between the quotes
-
-## Setup cookie file
-
-- Create a file called `cookies.txt` in the same folder as `main.py`
-- Paste the cookie into the file
-- save and close the file
-
-You will also need to ensure the link is in the following format: `https://www.udemy.com/course/<course name>/learn/`.
-
-Note the link is `/course` not `/program-taking`. It is also important that the link has `/learn`, otherwise you will see an error when trying to fetch the course information.
+You will need to use a different branch of the program, please see [feat/cookies](https://github.com/Puyodead1/udemy-downloader/tree/feat/cookies).
 
 # Advanced Usage
 
