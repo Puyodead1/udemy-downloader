@@ -1721,12 +1721,12 @@ def main():
         sys.exit(1)
 
     ffmpeg_ret_val = check_for_ffmpeg()
-    if not ffmpeg_ret_val:
+    if not ffmpeg_ret_val and not skip_lectures:
         logger.fatal("> FFMPEG is missing from your system or path!")
         sys.exit(1)
 
     shaka_ret_val = check_for_shaka()
-    if not shaka_ret_val:
+    if not shaka_ret_val and not skip_lectures:
         logger.fatal("> Shaka Packager is missing from your system or path!")
         sys.exit(1)
 
