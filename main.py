@@ -877,6 +877,108 @@ class Udemy:
             )
             sys.exit(1)
 
+    def _parse_lecture(self, lecture: dict):
+        retVal = []
+
+        index = lecture.get("index")  # this is lecture_counter
+        lecture_data = lecture.get("data")
+        asset = lecture_data.get("asset")
+        supp_assets = lecture_data.get("supplementary_assets")
+
+        if isinstance(asset, dict):
+            asset_type = asset.get("asset_type").lower() or asset.get("assetType").lower
+            if asset_type == "article":
+                if isinstance(supp_assets, list) and len(supp_assets) > 0:
+                    retVal = self._extract_supplementary_assets(supp_assets, index)
+            elif asset_type == "video":
+                if isinstance(supp_assets, list) and len(supp_assets) > 0:
+                    retVal = self._extract_supplementary_assets(supp_assets, index)
+            elif asset_type == "e-book":
+                retVal = self._extract_ebook(asset, index)
+            elif asset_type == "file":
+                retVal = self._extract_file(asset, index)
+            elif asset_type == "presentation":
+                retVal = self._extract_ppt(asset, index)
+            elif asset_type == "audio":
+                retVal = self._extract_audio(asset, index)
+            else:
+                logger.warning(f"Unknown asset type: {asset_type}")
+
+        stream_urls = asset.get("stream_urls")
+        if stream_urls != None:
+            # not encrypted
+            if stream_urls and isinstance(stream_urls, dict):
+                sources = stream_urls.get("Video")
+                tracks = asset.get("captions")
+                # duration = asset.get("time_estimation")
+                sources = self._extract_sources(sources, skip_hls)
+                subtitles = self._extract_subtitles(tracks)
+                sources_count = len(sources)
+                subtitle_count = len(subtitles)
+                lecture.pop("data")  # remove the raw data object after processing
+                lecture = {
+                    **lecture,
+                    "assets": retVal,
+                    "assets_count": len(retVal),
+                    "sources": sources,
+                    "subtitles": subtitles,
+                    "subtitle_count": subtitle_count,
+                    "sources_count": sources_count,
+                    "is_encrypted": False,
+                    "asset_id": asset.get("id"),
+                }
+            else:
+                lecture.pop("data")  # remove the raw data object after processing
+                lecture = {
+                    **lecture,
+                    "html_content": asset.get("body"),
+                    "extension": "html",
+                    "assets": retVal,
+                    "assets_count": len(retVal),
+                    "subtitle_count": 0,
+                    "sources_count": 0,
+                    "is_encrypted": False,
+                    "asset_id": asset.get("id"),
+                }
+        else:
+            # encrypted
+            media_sources = asset.get("media_sources")
+            if media_sources and isinstance(media_sources, list):
+                sources = self._extract_media_sources(media_sources)
+                tracks = asset.get("captions")
+                # duration = asset.get("time_estimation")
+                subtitles = self._extract_subtitles(tracks)
+                sources_count = len(sources)
+                subtitle_count = len(subtitles)
+                lecture.pop("data")  # remove the raw data object after processing
+                lecture = {
+                    **lecture,
+                    # "duration": duration,
+                    "assets": retVal,
+                    "assets_count": len(retVal),
+                    "video_sources": sources,
+                    "subtitles": subtitles,
+                    "subtitle_count": subtitle_count,
+                    "sources_count": sources_count,
+                    "is_encrypted": True,
+                    "asset_id": asset.get("id"),
+                }
+
+            else:
+                lecture.pop("data")  # remove the raw data object after processing
+                lecture = {
+                    **lecture,
+                    "html_content": asset.get("body"),
+                    "extension": "html",
+                    "assets": retVal,
+                    "assets_count": len(retVal),
+                    "subtitle_count": 0,
+                    "sources_count": 0,
+                    "is_encrypted": False,
+                    "asset_id": asset.get("id"),
+                }
+
+        return lecture
 
 class Session(object):
     def __init__(self):
@@ -1443,7 +1545,7 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
             logger.error("      > Missing sources for lecture", lecture)
 
 
-def parse_new(udemy_object: dict, udemy: Udemy):
+def parse_new(udemy: Udemy, udemy_object: dict):
     total_chapters = udemy_object.get("total_chapters")
     total_lectures = udemy_object.get("total_lectures")
     logger.info(f"Chapter(s) ({total_chapters})")
@@ -1466,105 +1568,10 @@ def parse_new(udemy_object: dict, udemy: Udemy):
             index = lecture.get("index")  # this is lecture_counter
             lecture_index = lecture.get("lecture_index")  # this is the raw object index from udemy
             lecture_title = lecture.get("lecture_title")
-            lecture_data = lecture.get("data")
-            asset = lecture_data.get("asset")
-            supp_assets = lecture_data.get("supplementary_assets")
-            retVal = []
+            
+            parsed_lecture = udemy._parse_lecture(lecture)
 
-            if isinstance(asset, dict):
-                asset_type = asset.get("asset_type").lower() or asset.get("assetType").lower
-                if asset_type == "article":
-                    if isinstance(supp_assets, list) and len(supp_assets) > 0:
-                        retVal = udemy._extract_supplementary_assets(supp_assets, index)
-                elif asset_type == "video":
-                    if isinstance(supp_assets, list) and len(supp_assets) > 0:
-                        retVal = udemy._extract_supplementary_assets(supp_assets, index)
-                elif asset_type == "e-book":
-                    retVal = udemy._extract_ebook(asset, index)
-                elif asset_type == "file":
-                    retVal = udemy._extract_file(asset, index)
-                elif asset_type == "presentation":
-                    retVal = udemy._extract_ppt(asset, index)
-                elif asset_type == "audio":
-                    retVal = udemy._extract_audio(asset, index)
-                else:
-                    logger.warning(f"Unknown asset type: {asset_type}")
-
-            stream_urls = asset.get("stream_urls")
-            if stream_urls != None:
-                # not encrypted
-                if stream_urls and isinstance(stream_urls, dict):
-                    sources = stream_urls.get("Video")
-                    tracks = asset.get("captions")
-                    # duration = asset.get("time_estimation")
-                    sources = udemy._extract_sources(sources, skip_hls)
-                    subtitles = udemy._extract_subtitles(tracks)
-                    sources_count = len(sources)
-                    subtitle_count = len(subtitles)
-                    lecture.pop("data")  # remove the raw data object after processing
-                    lecture = {
-                        **lecture,
-                        "assets": retVal,
-                        "assets_count": len(retVal),
-                        "sources": sources,
-                        "subtitles": subtitles,
-                        "subtitle_count": subtitle_count,
-                        "sources_count": sources_count,
-                        "is_encrypted": False,
-                        "asset_id": asset.get("id"),
-                    }
-                else:
-                    lecture.pop("data")  # remove the raw data object after processing
-                    lecture = {
-                        **lecture,
-                        "html_content": asset.get("body"),
-                        "extension": "html",
-                        "assets": retVal,
-                        "assets_count": len(retVal),
-                        "subtitle_count": 0,
-                        "sources_count": 0,
-                        "is_encrypted": False,
-                        "asset_id": asset.get("id"),
-                    }
-            else:
-                # encrypted
-                media_sources = asset.get("media_sources")
-                if media_sources and isinstance(media_sources, list):
-                    sources = udemy._extract_media_sources(media_sources)
-                    tracks = asset.get("captions")
-                    # duration = asset.get("time_estimation")
-                    subtitles = udemy._extract_subtitles(tracks)
-                    sources_count = len(sources)
-                    subtitle_count = len(subtitles)
-                    lecture.pop("data")  # remove the raw data object after processing
-                    lecture = {
-                        **lecture,
-                        # "duration": duration,
-                        "assets": retVal,
-                        "assets_count": len(retVal),
-                        "video_sources": sources,
-                        "subtitles": subtitles,
-                        "subtitle_count": subtitle_count,
-                        "sources_count": sources_count,
-                        "is_encrypted": True,
-                        "asset_id": asset.get("id"),
-                    }
-
-                else:
-                    lecture.pop("data")  # remove the raw data object after processing
-                    lecture = {
-                        **lecture,
-                        "html_content": asset.get("body"),
-                        "extension": "html",
-                        "assets": retVal,
-                        "assets_count": len(retVal),
-                        "subtitle_count": 0,
-                        "sources_count": 0,
-                        "is_encrypted": False,
-                        "asset_id": asset.get("id"),
-                    }
-
-            lecture_extension = lecture.get("extension")
+            lecture_extension = parsed_lecture.get("extension")
             extension = "mp4"  # video lectures dont have an extension property, so we assume its mp4
             if lecture_extension != None:
                 # if the lecture extension property isnt none, set the extension to the lecture extension
@@ -1581,8 +1588,8 @@ def parse_new(udemy_object: dict, udemy: Udemy):
                     # Check if the file is an html file
                     if extension == "html":
                         # if the html content is None or an empty string, skip it so we dont save empty html files
-                        if lecture.get("html_content") != None and lecture.get("html_content") != "":
-                            html_content = lecture.get("html_content").encode("ascii", "ignore").decode("utf8")
+                        if parsed_lecture.get("html_content") != None and parsed_lecture.get("html_content") != "":
+                            html_content = parsed_lecture.get("html_content").encode("ascii", "ignore").decode("utf8")
                             lecture_path = os.path.join(chapter_dir, "{}.html".format(sanitize_filename(lecture_title)))
                             try:
                                 with open(lecture_path, encoding="utf8", mode="w") as f:
@@ -1591,10 +1598,10 @@ def parse_new(udemy_object: dict, udemy: Udemy):
                             except Exception:
                                 logger.exception("    > Failed to write html file")
                     else:
-                        process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir)
+                        process_lecture(parsed_lecture, lecture_path, lecture_file_name, chapter_dir)
 
             # download subtitles for this lecture
-            subtitles = lecture.get("subtitles")
+            subtitles = parsed_lecture.get("subtitles")
             if dl_captions and subtitles != None and lecture_extension == None:
                 logger.info("Processing {} caption(s)...".format(len(subtitles)))
                 for subtitle in subtitles:
@@ -1603,7 +1610,7 @@ def parse_new(udemy_object: dict, udemy: Udemy):
                         process_caption(subtitle, lecture_title, chapter_dir)
 
             if dl_assets:
-                assets = lecture.get("assets")
+                assets = parsed_lecture.get("assets")
                 logger.info("    > Processing {} asset(s) for lecture...".format(len(assets)))
 
                 for asset in assets:
@@ -1660,18 +1667,17 @@ def parse_new(udemy_object: dict, udemy: Udemy):
                                 f.close()
 
 
-def _print_course_info(course_data):
-    logger.info("\n\n\n\n")
-    course_title = course_data.get("title")
-    chapter_count = course_data.get("total_chapters")
-    lecture_count = course_data.get("total_lectures")
+def _print_course_info(udemy: Udemy, udemy_object: dict):
+    course_title = udemy_object.get("title")
+    chapter_count = udemy_object.get("total_chapters")
+    lecture_count = udemy_object.get("total_lectures")
 
     logger.info("> Course: {}".format(course_title))
     logger.info("> Total Chapters: {}".format(chapter_count))
     logger.info("> Total Lectures: {}".format(lecture_count))
     logger.info("\n")
 
-    chapters = course_data.get("chapters")
+    chapters = udemy_object.get("chapters")
     for chapter in chapters:
         chapter_title = chapter.get("chapter_title")
         chapter_index = chapter.get("chapter_index")
@@ -1681,19 +1687,21 @@ def _print_course_info(course_data):
         logger.info("> Chapter: {} ({} of {})".format(chapter_title, chapter_index, chapter_count))
 
         for lecture in chapter_lectures:
+            lecture_index = lecture.get("lecture_index")  # this is the raw object index from udemy
             lecture_title = lecture.get("lecture_title")
-            lecture_index = lecture.get("index")
-            lecture_asset_count = lecture.get("assets_count")
-            lecture_is_encrypted = lecture.get("is_encrypted")
-            lecture_subtitles = lecture.get("subtitles")
-            lecture_extension = lecture.get("extension")
-            lecture_sources = lecture.get("sources")
-            lecture_video_sources = lecture.get("video_sources")
+            parsed_lecture = udemy._parse_lecture(lecture)
+
+            lecture_sources = parsed_lecture.get("sources")
+            lecture_is_encrypted = parsed_lecture.get("is_encrypted")
+            lecture_extension = parsed_lecture.get("extension")
+            lecture_asset_count = parsed_lecture.get("assets_count")
+            lecture_subtitles = parsed_lecture.get("subtitles")
+            lecture_video_sources = parsed_lecture.get("video_sources")
 
             if lecture_sources:
-                lecture_sources = sorted(lecture.get("sources"), key=lambda x: int(x.get("height")), reverse=True)
+                lecture_sources = sorted(lecture_sources, key=lambda x: int(x.get("height")), reverse=True)
             if lecture_video_sources:
-                lecture_video_sources = sorted(lecture.get("video_sources"), key=lambda x: int(x.get("height")), reverse=True)
+                lecture_video_sources = sorted(lecture_video_sources, key=lambda x: int(x.get("height")), reverse=True)
 
             if lecture_is_encrypted:
                 lecture_qualities = ["{}@{}x{}".format(x.get("type"), x.get("width"), x.get("height")) for x in lecture_video_sources]
@@ -1706,7 +1714,7 @@ def _print_course_info(course_data):
             logger.info("  > Lecture: {} ({} of {})".format(lecture_title, lecture_index, chapter_lecture_count))
             logger.info("    > DRM: {}".format(lecture_is_encrypted))
             logger.info("    > Asset Count: {}".format(lecture_asset_count))
-            logger.info("    > Captions: {}".format([x.get("language") for x in lecture_subtitles]))
+            logger.info("    > Captions: {}".format(", ".join([x.get("language") for x in lecture_subtitles])))
             logger.info("    > Qualities: {}".format(lecture_qualities))
 
         if chapter_index != chapter_count:
@@ -1772,9 +1780,9 @@ def main():
     if load_from_file:
         udemy_object = json.loads(open(os.path.join(os.getcwd(), "saved", "_udemy.json"), encoding="utf8", mode="r").read())
         if info:
-            _print_course_info(udemy_object)
+            _print_course_info(udemy, udemy_object)
         else:
-            parse_new(udemy_object, udemy)
+            parse_new(udemy, udemy_object)
     else:
         udemy_object = {}
         udemy_object["bearer_token"] = bearer_token
