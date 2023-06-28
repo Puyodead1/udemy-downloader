@@ -307,8 +307,11 @@ def pre_run():
     Path(SAVED_DIR).mkdir(parents=True, exist_ok=True)
 
     # Get the keys
-    with open(KEY_FILE_PATH, encoding="utf8", mode="r") as keyfile:
-        keys = json.loads(keyfile.read())
+    if os.path.exists(KEY_FILE_PATH):
+        with open(KEY_FILE_PATH, encoding="utf8", mode="r") as keyfile:
+            keys = json.loads(keyfile.read())
+    else:
+        logger.warning("> Keyfile not found! You won't be able to decrypt videos!")
 
 class Udemy:
     def __init__(self, bearer_token):
