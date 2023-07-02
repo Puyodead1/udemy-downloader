@@ -1859,9 +1859,9 @@ def main():
             logger.info("> Saved parsed data to json")
 
         if info:
-            _print_course_info(udemy_object)
+            _print_course_info(udemy, udemy_object)
         else:
-            parse_new(udemy_object, udemy)
+            parse_new(udemy, udemy_object)
 
 
 if __name__ == "__main__":
