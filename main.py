@@ -12,6 +12,7 @@ from html.parser import HTMLParser as compat_HTMLParser
 from pathlib import Path
 from typing import IO
 
+import browser_cookie3
 import m3u8
 import requests
 import yt_dlp
@@ -29,7 +30,6 @@ from utils import extract_kid
 from vtt_to_srt import convert
 
 retry = 3
-cookies = ""
 downloader = None
 logger: logging.Logger = None
 dl_assets = False
@@ -51,11 +51,12 @@ course_url = None
 info = None
 keys = {}
 id_as_course_name = False
-is_subscription_course = False
 use_h265 = False
 h265_crf = 28
 h265_preset = "medium"
 use_nvenc = False
+browser = None
+cj = None
 
 
 # from https://stackoverflow.com/a/21978778/9785713
@@ -68,7 +69,7 @@ def log_subprocess_output(prefix: str, pipe: IO[bytes]):
 
 # this is the first function that is called, we parse the arguments, setup the logger, and ensure that required directories exist
 def pre_run():
-    global cookies, dl_assets, dl_captions, dl_quizzes, skip_lectures, caption_locale, quality, bearer_token, course_name, keep_vtt, skip_hls, concurrent_downloads, disable_ipv6, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, is_subscription_course, LOG_LEVEL, use_h265, h265_crf, h265_preset, use_nvenc
+    global dl_assets, dl_captions, dl_quizzes, skip_lectures, caption_locale, quality, bearer_token, course_name, keep_vtt, skip_hls, concurrent_downloads, disable_ipv6, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, LOG_LEVEL, use_h265, h265_crf, h265_preset, use_nvenc, browser
 
     # make sure the directory exists
     if not os.path.exists(DOWNLOAD_DIR):
@@ -163,13 +164,6 @@ def pre_run():
         help="If specified, the course id will be used in place of the course name for the output directory. This is a 'hack' to reduce the path length",
     )
     parser.add_argument(
-        "-sc",
-        "--subscription-course",
-        dest="is_subscription_course",
-        action="store_true",
-        help="Mark the course as a subscription based course, use this if you are having problems with the program auto detecting it",
-    )
-    parser.add_argument(
         "--save-to-file",
         dest="save_to_file",
         action="store_true",
@@ -186,6 +180,12 @@ def pre_run():
         dest="log_level",
         type=str,
         help="Logging level: one of DEBUG, INFO, ERROR, WARNING, CRITICAL (Default is INFO)",
+    )
+    parser.add_argument(
+        "--browser",
+        dest="browser",
+        help="The browser to extract cookies from",
+        choices=["chrome", "firefox", "opera", "edge", "brave", "chromium", "vivaldi", "safari"],
     )
     parser.add_argument(
         "--use-h265",
@@ -302,8 +302,8 @@ def pre_run():
 
     if args.id_as_course_name:
         id_as_course_name = args.id_as_course_name
-    if args.is_subscription_course:
-        is_subscription_course = args.is_subscription_course
+    if args.browser:
+        browser = args.browser
 
     Path(DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
     Path(SAVED_DIR).mkdir(parents=True, exist_ok=True)
@@ -315,32 +315,40 @@ def pre_run():
     else:
         logger.warning("> Keyfile not found! You won't be able to decrypt videos!")
 
-    # Read cookies from file
-    if os.path.exists(COOKIE_FILE_PATH):
-        with open(COOKIE_FILE_PATH, encoding="utf8", mode="r") as cookiefile:
-            cookies = cookiefile.read()
-            cookies = cookies.rstrip()
-    else:
-        logger.warning(
-            "No cookies.txt file was found, you won't be able to download subscription courses! You can ignore ignore this if you don't plan to download a course included in a subscription plan."
-        )
-
 
 class Udemy:
     def __init__(self, bearer_token):
+        global cj
+
         self.session = None
         self.bearer_token = None
         self.auth = UdemyAuth(cache_session=False)
         if not self.session:
-            self.session, self.bearer_token = self.auth.authenticate(bearer_token=bearer_token)
+            self.session = self.auth.authenticate(bearer_token=bearer_token)
 
-        if self.session and self.bearer_token:
-            self.session._headers.update({"Authorization": "Bearer {}".format(self.bearer_token)})
-            self.session._headers.update({"X-Udemy-Authorization": "Bearer {}".format(self.bearer_token)})
-            logger.info("Login Success")
-        else:
-            logger.fatal("Login Failure! You are probably missing an access token!")
-            sys.exit(1)
+        if not self.session:
+            if browser == None:
+                logger.error("No bearer token was provided, and no browser for cookie extraction was specified.")
+                sys.exit(1)
+
+            logger.warning("No bearer token was provided, attempting to use browser cookies.")
+
+            self.session = self.auth._session
+
+            if browser == "chrome":
+                cj = browser_cookie3.chrome()
+            elif browser == "firefox":
+                cj = browser_cookie3.firefox()
+            elif browser == "opera":
+                cj = browser_cookie3.opera()
+            elif browser == "edge":
+                cj = browser_cookie3.edge()
+            elif browser == "brave":
+                cj = browser_cookie3.brave()
+            elif browser == "chromium":
+                cj = browser_cookie3.chromium()
+            elif browser == "vivaldi":
+                cj = browser_cookie3.vivaldi()
 
     def _get_quiz(self, quiz_id):
         print(portal_name)
@@ -540,14 +548,15 @@ class Udemy:
             for pl in playlists:
                 resolution = pl.stream_info.resolution
                 codecs = pl.stream_info.codecs
-                
+
                 if not resolution:
                     continue
                 if not codecs:
                     continue
                 width, height = resolution
-                
-                if height in seen: continue
+
+                if height in seen:
+                    continue
 
                 # we need to save the individual playlists to disk also
                 playlist_path = Path(temp_path, f"index_{asset_id}_{width}x{height}.m3u8")
@@ -868,27 +877,8 @@ class Udemy:
 
     def _extract_course_info(self, url):
         global portal_name
-        portal_name, course_name = self.extract_course_name(url)
-        course = {
-            "portal_name": portal_name
-        }
-
-        if not is_subscription_course:
-            results = self._subscribed_courses(portal_name=portal_name, course_name=course_name)
-            course = self._extract_course(response=results, course_name=course_name)
-            if not course:
-                results = self._my_courses(portal_name=portal_name)
-                course = self._extract_course(response=results, course_name=course_name)
-            if not course:
-                results = self._subscribed_collection_courses(portal_name=portal_name)
-                course = self._extract_course(response=results, course_name=course_name)
-            if not course:
-                results = self._archived_courses(portal_name=portal_name)
-                course = self._extract_course(response=results, course_name=course_name)
-
-        if not course or is_subscription_course:
-            course_id = self._extract_subscription_course_info(url)
-            course = self._extract_course_info_json(url, course_id)
+        course_id, portal_name = self._extract_subscription_course_info(url)
+        course = self._extract_course_info_json(url, course_id, portal_name)
 
         if course:
             return course.get("id"), course
@@ -898,11 +888,11 @@ class Udemy:
                 "It seems either you are not enrolled or you have to visit the course atleast once while you are logged in.",
             )
             logger.info(
-                "Trying to logout now...",
+                "Terminating Session...",
             )
             self.session.terminate()
             logger.info(
-                "Logged out successfully.",
+                "Session terminated.",
             )
             sys.exit(1)
 
@@ -1009,6 +999,7 @@ class Udemy:
 
         return lecture
 
+
 class Session(object):
     def __init__(self):
         self._headers = HEADERS
@@ -1023,11 +1014,10 @@ class Session(object):
     def _set_auth_headers(self, bearer_token=""):
         self._headers["Authorization"] = "Bearer {}".format(bearer_token)
         self._headers["X-Udemy-Authorization"] = "Bearer {}".format(bearer_token)
-        self._headers["Cookie"] = cookies
 
     def _get(self, url):
         for i in range(10):
-            session = self._session.get(url, headers=self._headers)
+            session = self._session.get(url, headers=self._headers, cookies=cj)
             if session.ok or session.status_code in [502, 503]:
                 return session
             if not session.ok:
@@ -1036,7 +1026,7 @@ class Session(object):
                 time.sleep(0.8)
 
     def _post(self, url, data, redirect=True):
-        session = self._session.post(url, data, headers=self._headers, allow_redirects=redirect)
+        session = self._session.post(url, data, headers=self._headers, allow_redirects=redirect, cookies=cj)
         if session.ok:
             return session
         if not session.ok:
@@ -1140,14 +1130,12 @@ class UdemyAuth(object):
         self._cache = cache_session
         self._session = Session()
 
-    def authenticate(self, bearer_token=""):
+    def authenticate(self, bearer_token=None):
         if bearer_token:
             self._session._set_auth_headers(bearer_token=bearer_token)
-            self._session._session.cookies.update({"bearer_token": bearer_token})
-            return self._session, bearer_token
+            return self._session
         else:
-            self._session._set_auth_headers()
-            return None, None
+            return None
 
 
 def durationtoseconds(period):
@@ -1197,9 +1185,7 @@ def mux_process(video_title, video_filepath, audio_filepath, output_path):
                 transcode, video_filepath, audio_filepath, codec, h265_crf, h265_preset, video_title, output_path
             )
         else:
-            command = 'ffmpeg -y -i "{}" -i "{}" -c:v copy -c:a copy -fflags +bitexact -map_metadata -1 -metadata title="{}" "{}"'.format(
-                video_filepath, audio_filepath, video_title, output_path
-            )
+            command = 'ffmpeg -y -i "{}" -i "{}" -c:v copy -c:a copy -fflags +bitexact -map_metadata -1 -metadata title="{}" "{}"'.format(video_filepath, audio_filepath, video_title, output_path)
     else:
         if use_h265:
             command = 'nice -n 7 ffmpeg {} -y -i "{}" -i "{}" -c:v libx265 -vtag hvc1 -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title="{}" "{}"'.format(
@@ -1538,7 +1524,18 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                     source_type = source.get("type")
                     if source_type == "hls":
                         temp_filepath = lecture_path.replace(".mp4", ".%(ext)s")
-                        cmd = ["yt-dlp",  "--enable-file-urls", "--force-generic-extractor", "--concurrent-fragments", f"{concurrent_downloads}", "--downloader", "aria2c", "-o", f"{temp_filepath}", f"{url}"]
+                        cmd = [
+                            "yt-dlp",
+                            "--enable-file-urls",
+                            "--force-generic-extractor",
+                            "--concurrent-fragments",
+                            f"{concurrent_downloads}",
+                            "--downloader",
+                            "aria2c",
+                            "-o",
+                            f"{temp_filepath}",
+                            f"{url}",
+                        ]
                         if disable_ipv6:
                             cmd.append("--downloader-args")
                             cmd.append('aria2c:"--disable-ipv6"')
@@ -1574,7 +1571,6 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
             logger.error("      > Missing sources for lecture", lecture)
 
 
-
 def process_quiz(udemy: Udemy, lecture, chapter_dir):
     lecture_title = lecture.get("lecture_title")
     lecture_index = lecture.get("lecture_index")
@@ -1592,7 +1588,6 @@ def process_quiz(udemy: Udemy, lecture, chapter_dir):
         html = html.replace("__data_placeholder__", json.dumps(quiz_data))
         with open(lecture_path, "w") as f:
             f.write(html)
-
 
 
 def parse_new(udemy: Udemy, udemy_object: dict):
@@ -1851,9 +1846,9 @@ def main():
         counter = -1
 
         if resource:
-            logger.info("> Trying to logout")
+            logger.info("> Terminating Session...")
             udemy.session.terminate()
-            logger.info("> Logged out.")
+            logger.info("> Session Terminated.")
 
         if course:
             logger.info("> Processing course data, this may take a minute. ")
