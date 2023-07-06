@@ -333,6 +333,24 @@ class Udemy:
             logger.fatal("Login Failure! You are probably missing an access token!")
             sys.exit(1)
 
+    def _get_quiz(self, quiz_id):
+        self.session._headers.update(
+            {
+                "Host": "{portal_name}.udemy.com".format(portal_name=portal_name),
+                "Referer": "https://{portal_name}.udemy.com/course/{course_name}/learn/quiz/{quiz_id}".format(portal_name=portal_name, course_name=course_name, quiz_id=quiz_id),
+            }
+        )
+        url = QUIZ_URL.format(portal_name=portal_name, quiz_id=quiz_id)
+        print(url)
+        try:
+            resp = self.session._get(url).json()
+        except conn_error as error:
+            logger.fatal(f"[-] Udemy Says: Connection error, {error}")
+            time.sleep(0.8)
+            sys.exit(1)
+        else:
+            return resp
+
     def _extract_supplementary_assets(self, supp_assets, lecture_counter):
         _temp = []
         for entry in supp_assets:
@@ -1545,6 +1563,23 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
             logger.error("      > Missing sources for lecture", lecture)
 
 
+
+def process_quiz(udemy: Udemy, lecture, lecture_path, chapter_dir):
+    lecture_title = lecture.get("lecture_title")
+    lecture_index = lecture.get("quiz_index")
+    lecture_file_name = sanitize_filename(lecture_title + ".html")
+    lecture_path = os.path.join(chapter_dir, lecture_file_name)
+
+    logger.info(f"  > Processing quiz {lecture_index}")
+    questions = udemy._get_quiz(lecture.get("id"))
+    with open("quiz_template.html", "r") as f:
+        html = f.read()
+        html.replace("__questions_placeholder__", json.dumps(questions))
+        with open(lecture_path, "w") as f:
+            f.write(html)
+
+
+
 def parse_new(udemy: Udemy, udemy_object: dict):
     total_chapters = udemy_object.get("total_chapters")
     total_lectures = udemy_object.get("total_lectures")
@@ -1565,6 +1600,11 @@ def parse_new(udemy: Udemy, udemy_object: dict):
         logger.info(f"======= Processing chapter {chapter_index} of {total_chapters} =======")
 
         for lecture in chapter.get("lectures"):
+            clazz = lecture.get("_class")
+            if clazz == "quiz":
+                process_quiz(udemy, lecture, lecture_path, chapter_dir)
+                continue
+            
             index = lecture.get("index")  # this is lecture_counter
             lecture_index = lecture.get("lecture_index")  # this is the raw object index from udemy
             lecture_title = lecture.get("lecture_title")
