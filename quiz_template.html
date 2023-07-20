@@ -102,18 +102,31 @@
         background: #1c1d1f;
         box-shadow: 0 0 0 0.4rem #fff inset;
       }
+      .score {
+              position: fixed;
+            }
     </style>
   </head>
+
   <body onload="main()">
+    <div id="score" class="score">
+      <span>Score: N/A of N/A</span>
+    </div>
     <div id="quiz-container" class="quiz-content"></div>
 
     <script>
-      const quizData = __questions_placeholder__;
+      const quizData = __data_placeholder__;
+      var correct = 0;
+      var total = 0;
+      const questionData = quizData.questions
+      const passPercent = quizData.pass_percent
 
       function main() {
+        total = questionData.length;
+
         var questions = [];
-        for (var i = 0; i < quizData.length; i++) {
-          var question = quizData[i];
+        for (var i = 0; i < questionData.length; i++) {
+          var question = questionData[i];
           var questionText = question.prompt.question;
           var answers = question.prompt.answers;
           var correctAnswer = question.correct_response[0];
@@ -126,6 +139,8 @@
           };
           questions.push(questionObj);
         }
+
+        updateScore();
 
         // display the questions
         var questionsContainer = document.getElementById("quiz-container");
@@ -204,10 +219,12 @@
               if (answerText == question.correctAnswer) {
                 answer.parentElement.parentElement.style.borderColor =
                   "limegreen";
-                alert("Correct!");
+                // alert("Correct!");
+                correct++;
+                updateScore();
               } else {
                 answer.parentElement.parentElement.style.borderColor = "red";
-                alert("Incorrect!");
+                // alert("Incorrect!");
               }
             } else {
               alert("Please select an answer.");
@@ -234,6 +251,12 @@
         var input = answers[answer].children[0].children[0].children[1];
         span.classList.add("selected");
         input.checked = true;
+      }
+
+      function updateScore() {
+        var scoreElem = document.getElementById("score");
+        const score = (correct / total) * 100;
+        scoreElem.innerHTML = "Score: " + score + "/" + passPercent + "%";
       }
     </script>
   </body>
