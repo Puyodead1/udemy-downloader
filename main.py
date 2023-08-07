@@ -33,8 +33,9 @@ cookies = ""
 downloader = None
 logger: logging.Logger = None
 dl_assets = False
-skip_lectures = False
 dl_captions = False
+dl_quizzes = False
+skip_lectures = False
 caption_locale = "en"
 quality = None
 bearer_token = None
@@ -67,7 +68,7 @@ def log_subprocess_output(prefix: str, pipe: IO[bytes]):
 
 # this is the first function that is called, we parse the arguments, setup the logger, and ensure that required directories exist
 def pre_run():
-    global cookies, dl_assets, skip_lectures, dl_captions, caption_locale, quality, bearer_token, portal_name, course_name, keep_vtt, skip_hls, concurrent_downloads, disable_ipv6, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, is_subscription_course, LOG_LEVEL, use_h265, h265_crf, h265_preset, use_nvenc
+    global cookies, dl_assets, dl_captions, dl_quizzes, skip_lectures, caption_locale, quality, bearer_token, course_name, keep_vtt, skip_hls, concurrent_downloads, disable_ipv6, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, is_subscription_course, LOG_LEVEL, use_h265, h265_crf, h265_preset, use_nvenc
 
     # make sure the directory exists
     if not os.path.exists(DOWNLOAD_DIR):
@@ -130,6 +131,12 @@ def pre_run():
         dest="download_captions",
         action="store_true",
         help="If specified, captions will be downloaded",
+    )
+    parser.add_argument(
+        "--download-quizzes",
+        dest="download_quizzes",
+        action="store_true",
+        help="If specified, quizzes will be downloaded",
     )
     parser.add_argument(
         "--keep-vtt",
@@ -215,6 +222,8 @@ def pre_run():
         caption_locale = args.lang
     if args.download_captions:
         dl_captions = True
+    if args.download_quizzes:
+        dl_quizzes = True
     if args.skip_lectures:
         skip_lectures = True
     if args.quality:
@@ -332,6 +341,25 @@ class Udemy:
         else:
             logger.fatal("Login Failure! You are probably missing an access token!")
             sys.exit(1)
+
+    def _get_quiz(self, quiz_id):
+        print(portal_name)
+        self.session._headers.update(
+            {
+                "Host": "{portal_name}.udemy.com".format(portal_name=portal_name),
+                "Referer": "https://{portal_name}.udemy.com/course/{course_name}/learn/quiz/{quiz_id}".format(portal_name=portal_name, course_name=course_name, quiz_id=quiz_id),
+            }
+        )
+        url = QUIZ_URL.format(portal_name=portal_name, quiz_id=quiz_id)
+        print(url)
+        try:
+            resp = self.session._get(url).json()
+        except conn_error as error:
+            logger.fatal(f"[-] Udemy Says: Connection error, {error}")
+            time.sleep(0.8)
+            sys.exit(1)
+        else:
+            return resp.get("results")
 
     def _extract_supplementary_assets(self, supp_assets, lecture_counter):
         _temp = []
@@ -648,7 +676,7 @@ class Udemy:
             results = webpage.get("results", [])
         return results
 
-    def _extract_course_info_json(self, url, course_id, portal_name):
+    def _extract_course_info_json(self, url, course_id):
         self.session._headers.update({"Referer": url})
         url = COURSE_INFO_URL.format(portal_name=portal_name, course_id=course_id)
         try:
@@ -836,12 +864,14 @@ class Udemy:
         data_args = data.attrs["data-module-args"]
         data_json = json.loads(data_args)
         course_id = data_json.get("courseId", None)
-        portal_name = self.extract_portal_name(url)
-        return course_id, portal_name
+        return course_id
 
     def _extract_course_info(self, url):
+        global portal_name
         portal_name, course_name = self.extract_course_name(url)
-        course = {}
+        course = {
+            "portal_name": portal_name
+        }
 
         if not is_subscription_course:
             results = self._subscribed_courses(portal_name=portal_name, course_name=course_name)
@@ -857,11 +887,10 @@ class Udemy:
                 course = self._extract_course(response=results, course_name=course_name)
 
         if not course or is_subscription_course:
-            course_id, portal_name = self._extract_subscription_course_info(url)
-            course = self._extract_course_info_json(url, course_id, portal_name)
+            course_id = self._extract_subscription_course_info(url)
+            course = self._extract_course_info_json(url, course_id)
 
         if course:
-            course.update({"portal_name": portal_name})
             return course.get("id"), course
         if not course:
             logger.fatal("Downloading course information, course id not found .. ")
@@ -1545,6 +1574,27 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
             logger.error("      > Missing sources for lecture", lecture)
 
 
+
+def process_quiz(udemy: Udemy, lecture, chapter_dir):
+    lecture_title = lecture.get("lecture_title")
+    lecture_index = lecture.get("lecture_index")
+    lecture_file_name = sanitize_filename(lecture_title + ".html")
+    lecture_path = os.path.join(chapter_dir, lecture_file_name)
+
+    logger.info(f"  > Processing quiz {lecture_index}")
+    questions = udemy._get_quiz(lecture.get("id"))
+    with open("quiz_template.html", "r") as f:
+        html = f.read()
+        quiz_data = {
+            "pass_percent": lecture.get("data").get("pass_percent"),
+            "questions": questions,
+        }
+        html = html.replace("__data_placeholder__", json.dumps(quiz_data))
+        with open(lecture_path, "w") as f:
+            f.write(html)
+
+
+
 def parse_new(udemy: Udemy, udemy_object: dict):
     total_chapters = udemy_object.get("total_chapters")
     total_lectures = udemy_object.get("total_lectures")
@@ -1565,10 +1615,16 @@ def parse_new(udemy: Udemy, udemy_object: dict):
         logger.info(f"======= Processing chapter {chapter_index} of {total_chapters} =======")
 
         for lecture in chapter.get("lectures"):
+            clazz = lecture.get("_class")
+
+            if clazz == "quiz" and dl_quizzes:
+                process_quiz(udemy, lecture, chapter_dir)
+                continue
+
             index = lecture.get("index")  # this is lecture_counter
-            lecture_index = lecture.get("lecture_index")  # this is the raw object index from udemy
+            # lecture_index = lecture.get("lecture_index")  # this is the raw object index from udemy
+
             lecture_title = lecture.get("lecture_title")
-            
             parsed_lecture = udemy._parse_lecture(lecture)
 
             lecture_extension = parsed_lecture.get("extension")
@@ -1579,8 +1635,9 @@ def parse_new(udemy: Udemy, udemy_object: dict):
             lecture_file_name = sanitize_filename(lecture_title + "." + extension)
             lecture_path = os.path.join(chapter_dir, lecture_file_name)
 
-            logger.info(f"  > Processing lecture {lecture_index} of {total_lectures}")
             if not skip_lectures:
+                logger.info(f"  > Processing lecture {index} of {total_lectures}")
+
                 # Check if the lecture is already downloaded
                 if os.path.isfile(lecture_path):
                     logger.info("      > Lecture '%s' is already downloaded, skipping..." % lecture_title)
@@ -1722,7 +1779,7 @@ def _print_course_info(udemy: Udemy, udemy_object: dict):
 
 
 def main():
-    global bearer_token
+    global bearer_token, portal_name
     aria_ret_val = check_for_aria()
     if not aria_ret_val:
         logger.fatal("> Aria2c is missing from your system or path!")
@@ -1758,7 +1815,6 @@ def main():
         if course_info and isinstance(course_info, dict):
             title = sanitize_filename(course_info.get("title"))
             course_title = course_info.get("published_title")
-            portal_name = course_info.get("portal_name")
 
     logger.info("> Fetching course content, this may take a minute...")
     if load_from_file:
@@ -1768,6 +1824,8 @@ def main():
         portal_name = course_json.get("portal_name")
     else:
         course_json = udemy._extract_course_json(course_url, course_id, portal_name)
+        course_json["portal_name"] = portal_name
+
     if save_to_file:
         with open(os.path.join(os.getcwd(), "saved", "course_content.json"), encoding="utf8", mode="w") as f:
             f.write(json.dumps(course_json))
@@ -1815,13 +1873,13 @@ def main():
                 elif clazz == "lecture":
                     lecture_counter += 1
                     lecture_id = entry.get("id")
-                    if len(udemy_object["chapters"]) == 0:
-                        lectures = []
-                        chapter_index = entry.get("object_index")
-                        chapter_title = "{0:02d} - ".format(chapter_index) + sanitize_filename(entry.get("title"))
-                        if chapter_title not in udemy_object["chapters"]:
-                            udemy_object["chapters"].append({"chapter_title": chapter_title, "chapter_id": lecture_id, "chapter_index": chapter_index, "lectures": []})
-                            counter += 1
+                    # if len(udemy_object["chapters"]) == 0:
+                    #     lectures = []
+                    #     chapter_index = entry.get("object_index")
+                    #     chapter_title = "{0:02d} - ".format(chapter_index) + sanitize_filename(entry.get("title"))
+                    #     if chapter_title not in udemy_object["chapters"]:
+                    #         udemy_object["chapters"].append({"chapter_title": chapter_title, "chapter_id": lecture_id, "chapter_index": chapter_index, "lectures": []})
+                    #         counter += 1
 
                     if lecture_id:
                         logger.info(f"Processing {course.index(entry)} of {len(course)}")
@@ -1829,26 +1887,35 @@ def main():
                         lecture_index = entry.get("object_index")
                         lecture_title = "{0:03d} ".format(lecture_counter) + sanitize_filename(entry.get("title"))
 
-                        lectures.append({"index": lecture_counter, "lecture_index": lecture_index, "lecture_title": lecture_title, "data": entry})
+                        lectures.append({"index": lecture_counter, "lecture_index": lecture_index, "lecture_title": lecture_title, "_class": entry.get("_class"), "id": lecture_id, "data": entry})
                     udemy_object["chapters"][counter]["lectures"] = lectures
                     udemy_object["chapters"][counter]["lecture_count"] = len(lectures)
                 elif clazz == "quiz":
+                    lecture_counter += 1
                     lecture_id = entry.get("id")
-                    if len(udemy_object["chapters"]) == 0:
-                        lectures = []
-                        chapter_index = entry.get("object_index")
-                        chapter_title = "{0:02d} - ".format(chapter_index) + sanitize_filename(entry.get("title"))
-                        if chapter_title not in udemy_object["chapters"]:
-                            lecture_counter = 0
-                            udemy_object["chapters"].append(
-                                {
-                                    "chapter_title": chapter_title,
-                                    "chapter_id": lecture_id,
-                                    "chapter_index": chapter_index,
-                                    "lectures": [],
-                                }
-                            )
-                            counter += 1
+                    # if len(udemy_object["chapters"]) == 0:
+                    #     lectures = []
+                    #     chapter_index = entry.get("object_index")
+                    #     chapter_title = "{0:02d} - ".format(chapter_index) + sanitize_filename(entry.get("title"))
+                    #     if chapter_title not in udemy_object["chapters"]:
+                    #         lecture_counter = 0
+                    #         udemy_object["chapters"].append(
+                    #             {
+                    #                 "chapter_title": chapter_title,
+                    #                 "chapter_id": lecture_id,
+                    #                 "chapter_index": chapter_index,
+                    #                 "lectures": [],
+                    #             }
+                    #         )
+                    #         counter += 1
+
+                    if lecture_id:
+                        logger.info(f"Processing {course.index(entry)} of {len(course)}")
+
+                        lecture_index = entry.get("object_index")
+                        lecture_title = "{0:03d} ".format(lecture_counter) + sanitize_filename(entry.get("title"))
+
+                        lectures.append({"index": lecture_counter, "lecture_index": lecture_index, "lecture_title": lecture_title, "_class": entry.get("_class"), "id": lecture_id, "data": entry})
 
                     udemy_object["chapters"][counter]["lectures"] = lectures
                     udemy_object["chapters"][counter]["lectures_count"] = len(lectures)
@@ -1860,6 +1927,7 @@ def main():
             with open(os.path.join(os.getcwd(), "saved", "_udemy.json"), encoding="utf8", mode="w") as f:
                 # remove "bearer_token" from the object before writing
                 udemy_object.pop("bearer_token")
+                udemy_object["portal_name"] = portal_name
                 f.write(json.dumps(udemy_object))
                 f.close()
             logger.info("> Saved parsed data to json")
