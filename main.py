@@ -877,8 +877,11 @@ class Udemy:
 
     def _extract_course_info(self, url):
         global portal_name
-        course_id, portal_name = self._extract_subscription_course_info(url)
-        course = self._extract_course_info_json(url, course_id, portal_name)
+        portal_name, course_name = self.extract_course_name(url)
+        course = {"portal_name": portal_name}
+
+        course_id = self._extract_subscription_course_info(url)
+        course = self._extract_course_info_json(url, course_id)
 
         if course:
             return course.get("id"), course
