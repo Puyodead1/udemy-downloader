@@ -51,6 +51,7 @@ course_url = None
 info = None
 keys = {}
 id_as_course_name = False
+is_subscription_course = False
 use_h265 = False
 h265_crf = 28
 h265_preset = "medium"
@@ -162,6 +163,13 @@ def pre_run():
         dest="id_as_course_name",
         action="store_true",
         help="If specified, the course id will be used in place of the course name for the output directory. This is a 'hack' to reduce the path length",
+    )
+    parser.add_argument(
+        "-sc",
+        "--subscription-course",
+        dest="is_subscription_course",
+        action="store_true",
+        help="Mark the course as a subscription based course, use this if you are having problems with the program auto detecting it",
     )
     parser.add_argument(
         "--save-to-file",
@@ -302,6 +310,8 @@ def pre_run():
 
     if args.id_as_course_name:
         id_as_course_name = args.id_as_course_name
+    if args.is_subscription_course:
+        is_subscription_course = args.is_subscription_course
     if args.browser:
         browser = args.browser
 
@@ -880,8 +890,22 @@ class Udemy:
         portal_name, course_name = self.extract_course_name(url)
         course = {"portal_name": portal_name}
 
-        course_id = self._extract_subscription_course_info(url)
-        course = self._extract_course_info_json(url, course_id)
+        if not is_subscription_course:
+            results = self._subscribed_courses(portal_name=portal_name, course_name=course_name)
+            course = self._extract_course(response=results, course_name=course_name)
+            if not course:
+                results = self._my_courses(portal_name=portal_name)
+                course = self._extract_course(response=results, course_name=course_name)
+            if not course:
+                results = self._subscribed_collection_courses(portal_name=portal_name)
+                course = self._extract_course(response=results, course_name=course_name)
+            if not course:
+                results = self._archived_courses(portal_name=portal_name)
+                course = self._extract_course(response=results, course_name=course_name)
+
+        if not course or is_subscription_course:
+            course_id = self._extract_subscription_course_info(url)
+            course = self._extract_course_info_json(url, course_id)
 
         if course:
             return course.get("id"), course
@@ -1846,7 +1870,7 @@ def main():
         udemy_object["title"] = title
         udemy_object["course_title"] = course_title
         udemy_object["chapters"] = []
-        counter = -1
+        chapter_index_counter = -1
 
         if resource:
             logger.info("> Terminating Session...")
@@ -1856,18 +1880,27 @@ def main():
         if course:
             logger.info("> Processing course data, this may take a minute. ")
             lecture_counter = 0
+            lectures = []
+            
             for entry in course:
                 clazz = entry.get("_class")
 
                 if clazz == "chapter":
+                    # add all lectures for the previous chapter
+                    if len(lectures) > 0:
+                        udemy_object["chapters"][chapter_index_counter]["lectures"] = lectures
+                        udemy_object["chapters"][chapter_index_counter]["lecture_count"] = len(lectures)
+
+                    # reset lecture tracking
                     lecture_counter = 0
                     lectures = []
+
                     chapter_index = entry.get("object_index")
                     chapter_title = "{0:02d} - ".format(chapter_index) + sanitize_filename(entry.get("title"))
 
                     if chapter_title not in udemy_object["chapters"]:
                         udemy_object["chapters"].append({"chapter_title": chapter_title, "chapter_id": entry.get("id"), "chapter_index": chapter_index, "lectures": []})
-                        counter += 1
+                        chapter_index_counter += 1
                 elif clazz == "lecture":
                     lecture_counter += 1
                     lecture_id = entry.get("id")
@@ -1887,8 +1920,8 @@ def main():
                         lecture_title = "{0:03d} ".format(lecture_counter) + sanitize_filename(entry.get("title"))
 
                         lectures.append({"index": lecture_counter, "lecture_index": lecture_index, "lecture_title": lecture_title, "_class": entry.get("_class"), "id": lecture_id, "data": entry})
-                    udemy_object["chapters"][counter]["lectures"] = lectures
-                    udemy_object["chapters"][counter]["lecture_count"] = len(lectures)
+                    else:
+                        logger.debug("Lecture: ID is None, skipping")
                 elif clazz == "quiz":
                     lecture_counter += 1
                     lecture_id = entry.get("id")
@@ -1908,9 +1941,8 @@ def main():
                         lecture_title = "{0:03d} ".format(lecture_counter) + sanitize_filename(entry.get("title"))
 
                         lectures.append({"index": lecture_counter, "lecture_index": lecture_index, "lecture_title": lecture_title, "_class": entry.get("_class"), "id": lecture_id, "data": entry})
-
-                    udemy_object["chapters"][counter]["lectures"] = lectures
-                    udemy_object["chapters"][counter]["lectures_count"] = len(lectures)
+                    else:
+                        logger.debug("Quiz: ID is None, skipping")
 
             udemy_object["total_chapters"] = len(udemy_object["chapters"])
             udemy_object["total_lectures"] = sum([entry.get("lecture_count", 0) for entry in udemy_object["chapters"] if entry])
