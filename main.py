@@ -1861,7 +1861,6 @@ def main():
 
                 if clazz == "chapter":
                     lecture_counter = 0
-                    lectures = []
                     chapter_index = entry.get("object_index")
                     chapter_title = "{0:02d} - ".format(chapter_index) + sanitize_filename(entry.get("title"))
 
@@ -1870,6 +1869,7 @@ def main():
                         counter += 1
                 elif clazz == "lecture":
                     lecture_counter += 1
+                    lectures = []
                     lecture_id = entry.get("id")
                     if len(udemy_object["chapters"]) == 0:
                         # dummy chapters to handle lectures without chapters
@@ -1891,6 +1891,7 @@ def main():
                     udemy_object["chapters"][counter]["lecture_count"] = len(lectures)
                 elif clazz == "quiz":
                     lecture_counter += 1
+                    lectures = []
                     lecture_id = entry.get("id")
                     if len(udemy_object["chapters"]) == 0:
                         # dummy chapters to handle lectures without chapters
