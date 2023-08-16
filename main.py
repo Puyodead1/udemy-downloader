@@ -1886,11 +1886,6 @@ def main():
                 clazz = entry.get("_class")
 
                 if clazz == "chapter":
-                    # add all lectures for the previous chapter
-                    if len(lectures) > 0:
-                        udemy_object["chapters"][chapter_index_counter]["lectures"] = lectures
-                        udemy_object["chapters"][chapter_index_counter]["lecture_count"] = len(lectures)
-
                     # reset lecture tracking
                     lecture_counter = 0
                     lectures = []
@@ -1906,15 +1901,13 @@ def main():
                     lecture_id = entry.get("id")
                     if len(udemy_object["chapters"]) == 0:
                         # dummy chapters to handle lectures without chapters
-                        lectures = []
                         chapter_index = entry.get("object_index")
                         chapter_title = "{0:02d} - ".format(chapter_index) + sanitize_filename(entry.get("title"))
                         if chapter_title not in udemy_object["chapters"]:
                             udemy_object["chapters"].append({"chapter_title": chapter_title, "chapter_id": lecture_id, "chapter_index": chapter_index, "lectures": []})
                             chapter_index_counter += 1
-
                     if lecture_id:
-                        logger.info(f"Processing {course.index(entry)} of {len(course)}")
+                        logger.info(f"Processing {course.index(entry) + 1} of {len(course)}")
 
                         lecture_index = entry.get("object_index")
                         lecture_title = "{0:03d} ".format(lecture_counter) + sanitize_filename(entry.get("title"))
@@ -1927,7 +1920,6 @@ def main():
                     lecture_id = entry.get("id")
                     if len(udemy_object["chapters"]) == 0:
                         # dummy chapters to handle lectures without chapters
-                        lectures = []
                         chapter_index = entry.get("object_index")
                         chapter_title = "{0:02d} - ".format(chapter_index) + sanitize_filename(entry.get("title"))
                         if chapter_title not in udemy_object["chapters"]:
@@ -1935,7 +1927,7 @@ def main():
                             chapter_index_counter += 1
 
                     if lecture_id:
-                        logger.info(f"Processing {course.index(entry)} of {len(course)}")
+                        logger.info(f"Processing {course.index(entry) + 1} of {len(course)}")
 
                         lecture_index = entry.get("object_index")
                         lecture_title = "{0:03d} ".format(lecture_counter) + sanitize_filename(entry.get("title"))
@@ -1943,6 +1935,9 @@ def main():
                         lectures.append({"index": lecture_counter, "lecture_index": lecture_index, "lecture_title": lecture_title, "_class": entry.get("_class"), "id": lecture_id, "data": entry})
                     else:
                         logger.debug("Quiz: ID is None, skipping")
+                
+                udemy_object["chapters"][chapter_index_counter]["lectures"] = lectures
+                udemy_object["chapters"][chapter_index_counter]["lecture_count"] = len(lectures)
 
             udemy_object["total_chapters"] = len(udemy_object["chapters"])
             udemy_object["total_lectures"] = sum([entry.get("lecture_count", 0) for entry in udemy_object["chapters"] if entry])
