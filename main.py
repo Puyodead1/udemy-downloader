@@ -1639,7 +1639,10 @@ def parse_new(udemy: Udemy, udemy_object: dict):
         for lecture in chapter.get("lectures"):
             clazz = lecture.get("_class")
 
-            if clazz == "quiz" and dl_quizzes:
+            if clazz == "quiz":
+                # skip the quiz if we dont want to download it
+                if not dl_quizzes:
+                    continue
                 process_quiz(udemy, lecture, chapter_dir)
                 continue
 
