@@ -1,8 +1,10 @@
-import mp4parse
-import codecs
-import widevine_pssh_pb2
 import base64
+import codecs
 import os
+
+import mp4parse
+import widevine_pssh_data_pb2
+
 
 def extract_kid(mp4_file):
     """
@@ -26,7 +28,7 @@ def extract_kid(mp4_file):
             pssh_box = next(x for x in box.pssh if x.system_id == "edef8ba979d64acea3c827dcd51d21ed")
             hex = codecs.decode(pssh_box.payload, "hex")
 
-            pssh = widevine_pssh_pb2.WidevinePsshData()
+            pssh = widevine_pssh_data_pb2.WidevinePsshData()
             pssh.ParseFromString(hex)
             content_id = base64.b16encode(pssh.content_id)
             return content_id.decode("utf-8")
