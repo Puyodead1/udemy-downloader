@@ -29,6 +29,8 @@ from tls import SSLCiphers
 from utils import extract_kid
 from vtt_to_srt import convert
 
+DOWNLOAD_DIR = os.path.join(os.getcwd(), "out_dir")
+
 retry = 3
 downloader = None
 logger: logging.Logger = None
@@ -70,11 +72,7 @@ def log_subprocess_output(prefix: str, pipe: IO[bytes]):
 
 # this is the first function that is called, we parse the arguments, setup the logger, and ensure that required directories exist
 def pre_run():
-    global dl_assets, dl_captions, dl_quizzes, skip_lectures, caption_locale, quality, bearer_token, course_name, keep_vtt, skip_hls, concurrent_downloads, disable_ipv6, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, LOG_LEVEL, use_h265, h265_crf, h265_preset, use_nvenc, browser
-
-    # make sure the directory exists
-    if not os.path.exists(DOWNLOAD_DIR):
-        os.makedirs(DOWNLOAD_DIR)
+    global dl_assets, dl_captions, dl_quizzes, skip_lectures, caption_locale, quality, bearer_token, course_name, keep_vtt, skip_hls, concurrent_downloads, disable_ipv6, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, LOG_LEVEL, use_h265, h265_crf, h265_preset, use_nvenc, browser, is_subscription_course, DOWNLOAD_DIR
 
     # make sure the logs directory exists
     if not os.path.exists(LOG_DIR_PATH):
@@ -221,6 +219,12 @@ def pre_run():
         action="store_true",
         help="Whether to use the NVIDIA hardware transcoding for H.265. Only works if you have a supported NVIDIA GPU and ffmpeg with nvenc support",
     )
+    parser.add_argument(
+        "--out", "-o",
+        dest="out",
+        type=str,
+        help="Set the path to the output directory",
+    )
     parser.add_argument("-v", "--version", action="version", version="You are running version {version}".format(version=__version__))
 
     args = parser.parse_args()
@@ -283,6 +287,14 @@ def pre_run():
         else:
             print(f"Invalid log level: {args.log_level}; Using INFO")
             LOG_LEVEL = logging.INFO
+    if args.id_as_course_name:
+        id_as_course_name = args.id_as_course_name
+    if args.is_subscription_course:
+        is_subscription_course = args.is_subscription_course
+    if args.browser:
+        browser = args.browser
+    if args.out:
+        DOWNLOAD_DIR = os.path.abspath(args.out)
 
     # setup a logger
     logger = logging.getLogger(__name__)
@@ -308,12 +320,7 @@ def pre_run():
     logger.addHandler(stream)
     logger.addHandler(file_handler)
 
-    if args.id_as_course_name:
-        id_as_course_name = args.id_as_course_name
-    if args.is_subscription_course:
-        is_subscription_course = args.is_subscription_course
-    if args.browser:
-        browser = args.browser
+    logger.info(f"Output directory set to {DOWNLOAD_DIR}")
 
     Path(DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
     Path(SAVED_DIR).mkdir(parents=True, exist_ok=True)
