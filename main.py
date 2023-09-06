@@ -385,6 +385,38 @@ class Udemy:
             sys.exit(1)
         else:
             return resp.get("results")
+    
+    def _get_elem_value_or_none(self, elem, key):
+        return elem[key] if elem and key in elem else "(None)"
+
+    def _get_quiz_with_info(self, quiz_id):
+        resp = { "_class": None, "_type": None, "contents": None }
+        quiz_json = self._get_quiz(quiz_id)
+        is_only_one = len(quiz_json) == 1 and quiz_json[0]["_class"] == "assessment"
+        is_coding_assignment = quiz_json[0]["assessment_type"] == "coding-problem"
+
+        resp["_class"] = quiz_json[0]["_class"]
+
+        if is_only_one and is_coding_assignment:
+            assignment = quiz_json[0]
+            prompt = assignment["prompt"]
+            
+            resp["_type"] = assignment["assessment_type"]
+            
+            resp["contents"] = {
+                "instructions": self._get_elem_value_or_none(prompt, "instructions"),
+                "tests": self._get_elem_value_or_none(prompt, "test_files"),
+                "solutions": self._get_elem_value_or_none(prompt, "solution_files"),
+            }
+
+            resp["hasInstructions"] = False if resp["contents"]["instructions"] == "(None)" else True
+            resp["hasTests"] = False if isinstance(resp["contents"]["tests"], str) else True
+            resp["hasSolutions"] = False if isinstance(resp["contents"]["solutions"], str) else True
+        else: # Normal quiz
+            resp["_type"] = "normal-quiz"
+            resp["contents"] = quiz_json
+        
+        return resp
 
     def _extract_supplementary_assets(self, supp_assets, lecture_counter):
         _temp = []
@@ -1606,18 +1638,50 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
 
 
 def process_quiz(udemy: Udemy, lecture, chapter_dir):
+    quiz = udemy._get_quiz_with_info(lecture.get("id"))
+    if quiz["_type"] == "coding-problem":
+        process_coding_assignment(quiz, lecture, chapter_dir)
+    else: # Normal quiz
+        process_normal_quiz(quiz, lecture, chapter_dir)
+
+
+def process_normal_quiz(quiz, lecture, chapter_dir):
     lecture_title = lecture.get("lecture_title")
     lecture_index = lecture.get("lecture_index")
     lecture_file_name = sanitize_filename(lecture_title + ".html")
     lecture_path = os.path.join(chapter_dir, lecture_file_name)
 
     logger.info(f"  > Processing quiz {lecture_index}")
-    questions = udemy._get_quiz(lecture.get("id"))
+
     with open("quiz_template.html", "r") as f:
         html = f.read()
         quiz_data = {
             "pass_percent": lecture.get("data").get("pass_percent"),
-            "questions": questions,
+            "questions": quiz["contents"],
+        }
+        html = html.replace("__data_placeholder__", json.dumps(quiz_data))
+        with open(lecture_path, "w") as f:
+            f.write(html)
+
+
+def process_coding_assignment(quiz, lecture, chapter_dir):
+    lecture_title = lecture.get("lecture_title")
+    lecture_index = lecture.get("lecture_index")
+    lecture_file_name = sanitize_filename(lecture_title + ".html")
+    lecture_path = os.path.join(chapter_dir, lecture_file_name)
+
+    logger.info(f"  > Processing quiz {lecture_index} (coding assignment)")
+    
+    with open("coding_assignment_template.html", "r") as f:
+        html = f.read()
+        quiz_data = {
+            "title": lecture_title,
+            "hasInstructions": quiz["hasInstructions"],
+            "hasTests": quiz["hasTests"],
+            "hasSolutions": quiz["hasSolutions"],
+            "instructions": quiz["contents"]["instructions"],
+            "tests": quiz["contents"]["tests"],
+            "solutions": quiz["contents"]["solutions"],
         }
         html = html.replace("__data_placeholder__", json.dumps(quiz_data))
         with open(lecture_path, "w") as f:
