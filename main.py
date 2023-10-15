@@ -971,7 +971,7 @@ class Udemy:
         supp_assets = lecture_data.get("supplementary_assets")
 
         if isinstance(asset, dict):
-            asset_type = asset.get("asset_type").lower() or asset.get("assetType").lower
+            asset_type = asset.get("asset_type").lower() or asset.get("assetType").lower()
             if asset_type == "article":
                 if isinstance(supp_assets, list) and len(supp_assets) > 0:
                     retVal = self._extract_supplementary_assets(supp_assets, index)
