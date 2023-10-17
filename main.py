@@ -1791,7 +1791,7 @@ def parse_new(udemy: Udemy, udemy_object: dict):
                             "If you're seeing this message, that means that you reached a secret area that I haven't finished! jk I haven't implemented handling for this asset type, please report this at https://github.com/Puyodead1/udemy-downloader/issues so I can add it. When reporting, please provide the following information: "
                         )
                         logger.warning("AssetType: Video; AssetData: ", asset)
-                    elif asset_type == "audio" or asset_type == "e-book" or asset_type == "file" or asset_type == "presentation" or asset_type == "ebook":
+                    elif asset_type == "audio" or asset_type == "e-book" or asset_type == "file" or asset_type == "presentation" or asset_type == "ebook" or asset_type == "source_code":
                         try:
                             ret_code = download_aria(download_url, chapter_dir, filename)
                             logger.debug(f"      > Download return code: {ret_code}")
