@@ -368,7 +368,6 @@ class Udemy:
                 cj = browser_cookie3.vivaldi()
 
     def _get_quiz(self, quiz_id):
-        print(portal_name)
         self.session._headers.update(
             {
                 "Host": "{portal_name}.udemy.com".format(portal_name=portal_name),
@@ -376,7 +375,6 @@ class Udemy:
             }
         )
         url = QUIZ_URL.format(portal_name=portal_name, quiz_id=quiz_id)
-        print(url)
         try:
             resp = self.session._get(url).json()
         except conn_error as error:
@@ -989,79 +987,92 @@ class Udemy:
             else:
                 logger.warning(f"Unknown asset type: {asset_type}")
 
-        stream_urls = asset.get("stream_urls")
-        if stream_urls != None:
-            # not encrypted
-            if stream_urls and isinstance(stream_urls, dict):
-                sources = stream_urls.get("Video")
-                tracks = asset.get("captions")
-                # duration = asset.get("time_estimation")
-                sources = self._extract_sources(sources, skip_hls)
-                subtitles = self._extract_subtitles(tracks)
-                sources_count = len(sources)
-                subtitle_count = len(subtitles)
-                lecture.pop("data")  # remove the raw data object after processing
-                lecture = {
-                    **lecture,
-                    "assets": retVal,
-                    "assets_count": len(retVal),
-                    "sources": sources,
-                    "subtitles": subtitles,
-                    "subtitle_count": subtitle_count,
-                    "sources_count": sources_count,
-                    "is_encrypted": False,
-                    "asset_id": asset.get("id"),
-                }
+        if asset != None:
+            stream_urls = asset.get("stream_urls")
+            if stream_urls != None:
+                # not encrypted
+                if stream_urls and isinstance(stream_urls, dict):
+                    sources = stream_urls.get("Video")
+                    tracks = asset.get("captions")
+                    # duration = asset.get("time_estimation")
+                    sources = self._extract_sources(sources, skip_hls)
+                    subtitles = self._extract_subtitles(tracks)
+                    sources_count = len(sources)
+                    subtitle_count = len(subtitles)
+                    lecture.pop("data")  # remove the raw data object after processing
+                    lecture = {
+                        **lecture,
+                        "assets": retVal,
+                        "assets_count": len(retVal),
+                        "sources": sources,
+                        "subtitles": subtitles,
+                        "subtitle_count": subtitle_count,
+                        "sources_count": sources_count,
+                        "is_encrypted": False,
+                        "asset_id": asset.get("id"),
+                        "type": asset.get("asset_type")
+                    }
+                else:
+                    lecture.pop("data")  # remove the raw data object after processing
+                    lecture = {
+                        **lecture,
+                        "html_content": asset.get("body"),
+                        "extension": "html",
+                        "assets": retVal,
+                        "assets_count": len(retVal),
+                        "subtitle_count": 0,
+                        "sources_count": 0,
+                        "is_encrypted": False,
+                        "asset_id": asset.get("id"),
+                        "type": asset.get("asset_type")
+                    }
             else:
-                lecture.pop("data")  # remove the raw data object after processing
-                lecture = {
-                    **lecture,
-                    "html_content": asset.get("body"),
-                    "extension": "html",
-                    "assets": retVal,
-                    "assets_count": len(retVal),
-                    "subtitle_count": 0,
-                    "sources_count": 0,
-                    "is_encrypted": False,
-                    "asset_id": asset.get("id"),
-                }
-        else:
-            # encrypted
-            media_sources = asset.get("media_sources")
-            if media_sources and isinstance(media_sources, list):
-                sources = self._extract_media_sources(media_sources)
-                tracks = asset.get("captions")
-                # duration = asset.get("time_estimation")
-                subtitles = self._extract_subtitles(tracks)
-                sources_count = len(sources)
-                subtitle_count = len(subtitles)
-                lecture.pop("data")  # remove the raw data object after processing
-                lecture = {
-                    **lecture,
-                    # "duration": duration,
-                    "assets": retVal,
-                    "assets_count": len(retVal),
-                    "video_sources": sources,
-                    "subtitles": subtitles,
-                    "subtitle_count": subtitle_count,
-                    "sources_count": sources_count,
-                    "is_encrypted": True,
-                    "asset_id": asset.get("id"),
-                }
+                # encrypted
+                media_sources = asset.get("media_sources")
+                if media_sources and isinstance(media_sources, list):
+                    sources = self._extract_media_sources(media_sources)
+                    tracks = asset.get("captions")
+                    # duration = asset.get("time_estimation")
+                    subtitles = self._extract_subtitles(tracks)
+                    sources_count = len(sources)
+                    subtitle_count = len(subtitles)
+                    lecture.pop("data")  # remove the raw data object after processing
+                    lecture = {
+                        **lecture,
+                        # "duration": duration,
+                        "assets": retVal,
+                        "assets_count": len(retVal),
+                        "video_sources": sources,
+                        "subtitles": subtitles,
+                        "subtitle_count": subtitle_count,
+                        "sources_count": sources_count,
+                        "is_encrypted": True,
+                        "asset_id": asset.get("id"),
+                        "type": asset.get("asset_type")
+                    }
 
-            else:
-                lecture.pop("data")  # remove the raw data object after processing
-                lecture = {
-                    **lecture,
-                    "html_content": asset.get("body"),
-                    "extension": "html",
-                    "assets": retVal,
-                    "assets_count": len(retVal),
-                    "subtitle_count": 0,
-                    "sources_count": 0,
-                    "is_encrypted": False,
-                    "asset_id": asset.get("id"),
-                }
+                else:
+                    lecture.pop("data")  # remove the raw data object after processing
+                    lecture = {
+                        **lecture,
+                        "html_content": asset.get("body"),
+                        "extension": "html",
+                        "assets": retVal,
+                        "assets_count": len(retVal),
+                        "subtitle_count": 0,
+                        "sources_count": 0,
+                        "is_encrypted": False,
+                        "asset_id": asset.get("id"),
+                        "type": asset.get("asset_type")
+                    }
+        else:
+            lecture = {
+                **lecture,
+                "assets": retVal,
+                "assets_count": len(retVal),
+                "asset_id": lecture_data.get("id"),
+                "type": lecture_data.get("type")
+            }
 
         return lecture
 
@@ -1845,30 +1856,38 @@ def _print_course_info(udemy: Udemy, udemy_object: dict):
             parsed_lecture = udemy._parse_lecture(lecture)
 
             lecture_sources = parsed_lecture.get("sources")
-            lecture_is_encrypted = parsed_lecture.get("is_encrypted")
+            lecture_is_encrypted = parsed_lecture.get("is_encrypted", None)
             lecture_extension = parsed_lecture.get("extension")
             lecture_asset_count = parsed_lecture.get("assets_count")
             lecture_subtitles = parsed_lecture.get("subtitles")
             lecture_video_sources = parsed_lecture.get("video_sources")
+            lecture_type = parsed_lecture.get("type")
+
+            lecture_qualities = []
 
             if lecture_sources:
                 lecture_sources = sorted(lecture_sources, key=lambda x: int(x.get("height")), reverse=True)
             if lecture_video_sources:
                 lecture_video_sources = sorted(lecture_video_sources, key=lambda x: int(x.get("height")), reverse=True)
 
-            if lecture_is_encrypted:
+            if lecture_is_encrypted and lecture_video_sources != None:
                 lecture_qualities = ["{}@{}x{}".format(x.get("type"), x.get("width"), x.get("height")) for x in lecture_video_sources]
-            elif not lecture_is_encrypted and lecture_sources:
+            elif lecture_is_encrypted == False and lecture_sources != None:
                 lecture_qualities = ["{}@{}x{}".format(x.get("type"), x.get("height"), x.get("width")) for x in lecture_sources]
 
             if lecture_extension:
                 continue
 
             logger.info("  > Lecture: {} ({} of {})".format(lecture_title, lecture_index, chapter_lecture_count))
-            logger.info("    > DRM: {}".format(lecture_is_encrypted))
-            logger.info("    > Asset Count: {}".format(lecture_asset_count))
-            logger.info("    > Captions: {}".format(", ".join([x.get("language") for x in lecture_subtitles])))
-            logger.info("    > Qualities: {}".format(lecture_qualities))
+            logger.info("    > Type: {}".format(lecture_type))
+            if lecture_is_encrypted != None:
+                logger.info("    > DRM: {}".format(lecture_is_encrypted))
+            if lecture_asset_count:
+                logger.info("    > Asset Count: {}".format(lecture_asset_count))
+            if lecture_subtitles:
+                logger.info("    > Captions: {}".format(", ".join([x.get("language") for x in lecture_subtitles])))
+            if lecture_qualities:
+                logger.info("    > Qualities: {}".format(lecture_qualities))
 
         if chapter_index != chapter_count:
             logger.info("==========================================")
