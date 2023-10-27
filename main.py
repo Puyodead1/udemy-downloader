@@ -45,7 +45,6 @@ course_name = None
 keep_vtt = False
 skip_hls = False
 concurrent_downloads = 10
-disable_ipv6 = False
 save_to_file = None
 load_from_file = None
 course_url = None
@@ -72,7 +71,7 @@ def log_subprocess_output(prefix: str, pipe: IO[bytes]):
 
 # this is the first function that is called, we parse the arguments, setup the logger, and ensure that required directories exist
 def pre_run():
-    global dl_assets, dl_captions, dl_quizzes, skip_lectures, caption_locale, quality, bearer_token, course_name, keep_vtt, skip_hls, concurrent_downloads, disable_ipv6, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, LOG_LEVEL, use_h265, h265_crf, h265_preset, use_nvenc, browser, is_subscription_course, DOWNLOAD_DIR, use_continuous_lecture_numbers
+    global dl_assets, dl_captions, dl_quizzes, skip_lectures, caption_locale, quality, bearer_token, course_name, keep_vtt, skip_hls, concurrent_downloads, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, LOG_LEVEL, use_h265, h265_crf, h265_preset, use_nvenc, browser, is_subscription_course, DOWNLOAD_DIR, use_continuous_lecture_numbers
 
     # make sure the logs directory exists
     if not os.path.exists(LOG_DIR_PATH):
@@ -107,12 +106,6 @@ def pre_run():
         dest="concurrent_downloads",
         type=int,
         help="The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-30)",
-    )
-    parser.add_argument(
-        "--disable-ipv6",
-        dest="disable_ipv6",
-        action="store_true",
-        help="If specified, ipv6 will be disabled in aria2",
     )
     parser.add_argument(
         "--skip-lectures",
@@ -259,8 +252,6 @@ def pre_run():
         elif concurrent_downloads > 30:
             # if the user gave a number thats greater than 30, set cc to the max of 30
             concurrent_downloads = 30
-    if args.disable_ipv6:
-        disable_ipv6 = args.disable_ipv6
     if args.load_from_file:
         load_from_file = args.load_from_file
     if args.save_to_file:
@@ -665,10 +656,6 @@ class Udemy:
 
             format_id = results.get("format_id")
             best_audio_format_id = format_id.split("+")[1]
-            # I forget what this was for
-            # best_audio = next((x for x in formats
-            #                    if x.get("format_id") == best_audio_format_id),
-            #                   None)
             for f in formats:
                 if "video" in f.get("format_note"):
                     # is a video stream
@@ -1122,92 +1109,6 @@ class Session(object):
         return
 
 
-# Thanks to a great open source utility youtube-dl ..
-class HTMLAttributeParser(compat_HTMLParser):  # pylint: disable=W
-    """Trivial HTML parser to gather the attributes for a single element"""
-
-    def __init__(self):
-        self.attrs = {}
-        compat_HTMLParser.__init__(self)
-
-    def handle_starttag(self, tag, attrs):
-        self.attrs = dict(attrs)
-
-
-def extract_attributes(html_element):
-    """Given a string for an HTML element such as
-    <el
-         a="foo" B="bar" c="&98;az" d=boz
-         empty= noval entity="&amp;"
-         sq='"' dq="'"
-    >
-    Decode and return a dictionary of attributes.
-    {
-        'a': 'foo', 'b': 'bar', c: 'baz', d: 'boz',
-        'empty': '', 'noval': None, 'entity': '&',
-        'sq': '"', 'dq': '\''
-    }.
-    NB HTMLParser is stricter in Python 2.6 & 3.2 than in later versions,
-    but the cases in the unit test will work for all of 2.6, 2.7, 3.2-3.5.
-    """
-    parser = HTMLAttributeParser()
-    try:
-        parser.feed(html_element)
-        parser.close()
-    except Exception:  # pylint: disable=W
-        pass
-    return parser.attrs
-
-
-def hidden_inputs(html):
-    html = re.sub(r"<!--(?:(?!<!--).)*-->", "", html)
-    hidden_inputs = {}  # pylint: disable=W
-    for entry in re.findall(r"(?i)(<input[^>]+>)", html):
-        attrs = extract_attributes(entry)
-        if not entry:
-            continue
-        if attrs.get("type") not in ("hidden", "submit"):
-            continue
-        name = attrs.get("name") or attrs.get("id")
-        value = attrs.get("value")
-        if name and value is not None:
-            hidden_inputs[name] = value
-    return hidden_inputs
-
-
-def search_regex(pattern, string, name, default=object(), fatal=True, flags=0, group=None):
-    """
-    Perform a regex search on the given string, using a single or a list of
-    patterns returning the first matching group.
-    In case of failure return a default value or raise a WARNING or a
-    RegexNotFoundError, depending on fatal, specifying the field name.
-    """
-    if isinstance(pattern, str):
-        mobj = re.search(pattern, string, flags)
-    else:
-        for p in pattern:
-            mobj = re.search(p, string, flags)
-            if mobj:
-                break
-
-    _name = name
-
-    if mobj:
-        if group is None:
-            # return the first matching group
-            return next(g for g in mobj.groups() if g is not None)
-        else:
-            return mobj.group(group)
-    elif default is not object():
-        return default
-    elif fatal:
-        logger.fatal("[-] Unable to extract %s" % _name)
-        exit(0)
-    else:
-        logger.fatal("[-] unable to extract %s" % _name)
-        exit(0)
-
-
 class UdemyAuth(object):
     def __init__(self, username="", password="", cache_session=False):
         self.username = username
@@ -1243,19 +1144,6 @@ def durationtoseconds(period):
     else:
         logger.error("Duration Format Error")
         return None
-
-
-def cleanup(path):
-    """
-    @author Jayapraveen
-    """
-    leftover_files = glob.glob(path + "/*.mp4", recursive=True)
-    for file_list in leftover_files:
-        try:
-            os.remove(file_list)
-        except OSError:
-            logger.exception(f"Error deleting file: {file_list}")
-    os.removedirs(path)
 
 
 def mux_process(video_title, video_filepath, audio_filepath, output_path):
@@ -1312,89 +1200,15 @@ def decrypt(kid, in_filepath, out_filepath):
     return ret_code
 
 
-def handle_segments(url, format_id, video_title, output_path, lecture_file_name, chapter_dir):
+def handle_segments(url, format_id, lecture_id, video_title, output_path, chapter_dir):
     os.chdir(os.path.join(chapter_dir))
-    # for french language among others, this characters cause problems with shaka-packager resulting in decryption failure
-    # https://github.com/Puyodead1/udemy-downloader/issues/137
-    # Thank to cutecat !
-    lecture_file_name = (
-        lecture_file_name.replace("é", "e")
-        .replace("è", "e")
-        .replace("à", "a")
-        .replace("À", "A")
-        .replace("à", "a")
-        .replace("Á", "A")
-        .replace("á", "a")
-        .replace("Â", "a")
-        .replace("â", "a")
-        .replace("Ã", "A")
-        .replace("ã", "a")
-        .replace("Ä", "A")
-        .replace("ä", "a")
-        .replace("Å", "A")
-        .replace("å", "a")
-        .replace("Æ", "AE")
-        .replace("æ", "ae")
-        .replace("Ç", "C")
-        .replace("ç", "c")
-        .replace("Ð", "D")
-        .replace("ð", "o")
-        .replace("È", "E")
-        .replace("è", "e")
-        .replace("É", "e")
-        .replace("Ê", "e")
-        .replace("ê", "e")
-        .replace("Ë", "E")
-        .replace("ë", "e")
-        .replace("Ì", "I")
-        .replace("ì", "i")
-        .replace("Í", "I")
-        .replace("í", "I")
-        .replace("Î", "I")
-        .replace("î", "i")
-        .replace("Ï", "I")
-        .replace("ï", "i")
-        .replace("Ñ", "N")
-        .replace("ñ", "n")
-        .replace("Ò", "O")
-        .replace("ò", "o")
-        .replace("Ó", "O")
-        .replace("ó", "o")
-        .replace("Ô", "O")
-        .replace("ô", "o")
-        .replace("Õ", "O")
-        .replace("õ", "o")
-        .replace("Ö", "o")
-        .replace("ö", "o")
-        .replace("œ", "oe")
-        .replace("Œ", "OE")
-        .replace("Ø", "O")
-        .replace("ø", "o")
-        .replace("ß", "B")
-        .replace("Ù", "U")
-        .replace("ù", "u")
-        .replace("Ú", "U")
-        .replace("ú", "u")
-        .replace("Û", "U")
-        .replace("û", "u")
-        .replace("Ü", "U")
-        .replace("ü", "u")
-        .replace("Ý", "Y")
-        .replace("ý", "y")
-        .replace("Þ", "P")
-        .replace("þ", "P")
-        .replace("Ÿ", "Y")
-        .replace("ÿ", "y")
-        .replace("%", "")
-        # commas cause problems with shaka-packager resulting in decryption failure
-        .replace(",", "")
-        .replace(".mp4", "")
-    )
+    
+    video_filepath_enc = lecture_id + ".encrypted.mp4"
+    audio_filepath_enc = lecture_id + ".encrypted.m4a"
+    video_filepath_dec = lecture_id + ".decrypted.mp4"
+    audio_filepath_dec = lecture_id + ".decrypted.m4a"
+    temp_output_path = os.path.join(chapter_dir, lecture_id + ".mp4")
 
-    video_filepath_enc = lecture_file_name + ".encrypted.mp4"
-    audio_filepath_enc = lecture_file_name + ".encrypted.m4a"
-    video_filepath_dec = lecture_file_name + ".decrypted.mp4"
-    audio_filepath_dec = lecture_file_name + ".decrypted.m4a"
     logger.info("> Downloading Lecture Tracks...")
     args = [
         "yt-dlp",
@@ -1405,18 +1219,17 @@ def handle_segments(url, format_id, video_title, output_path, lecture_file_name,
         f"{concurrent_downloads}",
         "--downloader",
         "aria2c",
+        "--downloader-args",
+        'aria2c:"--disable-ipv6"',
         "--fixup",
         "never",
         "-k",
         "-o",
-        f"{lecture_file_name}.encrypted.%(ext)s",
+        f"{lecture_id}.encrypted.%(ext)s",
         "-f",
         format_id,
         f"{url}",
     ]
-    if disable_ipv6:
-        args.append("--downloader-args")
-        args.append('aria2c:"--disable-ipv6"')
     process = subprocess.Popen(args)
     log_subprocess_output("YTDLP-STDOUT", process.stdout)
     log_subprocess_output("YTDLP-STDERR", process.stderr)
@@ -1455,11 +1268,13 @@ def handle_segments(url, format_id, video_title, output_path, lecture_file_name,
             return
         logger.info("> Decryption complete")
         logger.info("> Merging video and audio, this might take a minute...")
-        mux_process(video_title, video_filepath_dec, audio_filepath_dec, output_path)
+        mux_process(video_title, video_filepath_dec, audio_filepath_dec, temp_output_path)
         if ret_code != 0:
             logger.error("> Return code from ffmpeg was non-0 (error), skipping!")
             return
-        logger.info("> Merging complete, removing temporary files...")
+        logger.info("> Merging complete, renaming final file...")
+        os.rename(temp_output_path, output_path)
+        logger.info("> Cleaning up temporary files...")
         os.remove(video_filepath_enc)
         os.remove(audio_filepath_enc)
         os.remove(video_filepath_dec)
@@ -1537,9 +1352,7 @@ def download_aria(url, file_dir, filename):
     """
     @author Puyodead1
     """
-    args = ["aria2c", url, "-o", filename, "-d", file_dir, "-j16", "-s20", "-x16", "-c", "--auto-file-renaming=false", "--summary-interval=0"]
-    if disable_ipv6:
-        args.append("--disable-ipv6")
+    args = ["aria2c", url, "-o", filename, "-d", file_dir, "-j16", "-s20", "-x16", "-c", "--auto-file-renaming=false", "--summary-interval=0", "--disable-ipv6"]
     process = subprocess.Popen(args)
     log_subprocess_output("ARIA2-STDOUT", process.stdout)
     log_subprocess_output("ARIA2-STDERR", process.stderr)
@@ -1579,7 +1392,8 @@ def process_caption(caption, lecture_title, lecture_dir, tries=0):
                 logger.exception(f"    > Error converting caption")
 
 
-def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
+def process_lecture(lecture, lecture_path, chapter_dir):
+    lecture_id = lecture.get("id")
     lecture_title = lecture.get("lecture_title")
     is_encrypted = lecture.get("is_encrypted")
     lecture_sources = lecture.get("video_sources")
@@ -1589,10 +1403,10 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
             source = lecture_sources[-1]  # last index is the best quality
             if isinstance(quality, int):
                 source = min(lecture_sources, key=lambda x: abs(int(x.get("height")) - quality))
-            logger.info(f"      > Lecture '%s' has DRM, attempting to download" % lecture_title)
-            handle_segments(source.get("download_url"), source.get("format_id"), lecture_title, lecture_path, lecture_file_name, chapter_dir)
+            logger.info(f"      > Lecture '{lecture_title}' has DRM, attempting to download")
+            handle_segments(source.get("download_url"), source.get("format_id"), str(lecture_id), lecture_title, lecture_path, chapter_dir)
         else:
-            logger.info(f"      > Lecture '%s' is missing media links" % lecture_title)
+            logger.info(f"      > Lecture '{lecture_title}' is missing media links")
             logger.debug(f"Lecture source count: {len(lecture_sources)}")
     else:
         sources = lecture.get("sources")
@@ -1617,13 +1431,12 @@ def process_lecture(lecture, lecture_path, lecture_file_name, chapter_dir):
                             f"{concurrent_downloads}",
                             "--downloader",
                             "aria2c",
+                            "--downloader-args",
+                            'aria2c:"--disable-ipv6"',
                             "-o",
                             f"{temp_filepath}",
                             f"{url}",
                         ]
-                        if disable_ipv6:
-                            cmd.append("--downloader-args")
-                            cmd.append('aria2c:"--disable-ipv6"')
                         process = subprocess.Popen(cmd)
                         log_subprocess_output("YTDLP-STDOUT", process.stdout)
                         log_subprocess_output("YTDLP-STDERR", process.stderr)
@@ -1770,7 +1583,7 @@ def parse_new(udemy: Udemy, udemy_object: dict):
                             except Exception:
                                 logger.exception("    > Failed to write html file")
                     else:
-                        process_lecture(parsed_lecture, lecture_path, lecture_file_name, chapter_dir)
+                        process_lecture(parsed_lecture, lecture_path, chapter_dir)
 
             # download subtitles for this lecture
             subtitles = parsed_lecture.get("subtitles")

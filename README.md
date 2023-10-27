@@ -84,7 +84,7 @@ You can now run the program, see the examples below. The course will download to
 # Advanced Usage
 
 ```
-usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_DOWNLOADS] [--disable-ipv6] [--skip-lectures] [--download-assets]
+usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_DOWNLOADS] [--skip-lectures] [--download-assets]
                [--download-captions] [--download-quizzes] [--keep-vtt] [--skip-hls] [--info] [--id-as-course-name] [-sc] [--save-to-file] [--load-from-file]
                [--log-level LOG_LEVEL] [--browser {chrome,firefox,opera,edge,brave,chromium,vivaldi,safari}] [--use-h265] [--h265-crf H265_CRF] [--h265-preset H265_PRESET]
                [--use-nvenc] [--out OUT] [--continue-lecture-numbers]
@@ -103,7 +103,6 @@ options:
   -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is 'en')
   -cd CONCURRENT_DOWNLOADS, --concurrent-downloads CONCURRENT_DOWNLOADS
                         The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-30)
-  --disable-ipv6        If specified, ipv6 will be disabled in aria2
   --skip-lectures       If specified, lectures won't be downloaded
   --download-assets     If specified, lecture assets will be downloaded
   --download-captions   If specified, captions will be downloaded
@@ -184,16 +183,6 @@ options:
 -   Use continuous numbering (don't restart at 1 in every chapter):
     -   `python main.py -c <Course URL> --continue-lecture-numbers`
     -   `python main.py -c <Course URL> -n`
-
-If you encounter errors while downloading such as
-
-`errorCode=1 Network problem has occurred. cause:Unknown socket error 10051 (0x2743)`
-
-or
-
-`errorCode=1 Network problem has occurred. cause:A socket operation was attempted to an unreachable network.`
-
-Then try disabling ipv6 in aria2 using the `--disable-ipv6` option
 
 # Support
 
