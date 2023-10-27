@@ -84,9 +84,10 @@ You can now run the program, see the examples below. The course will download to
 # Advanced Usage
 
 ```
-usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_DOWNLOADS] [--disable-ipv6] [--skip-lectures] [--download-assets] [--download-captions] [--download-quizzes]
-               [--keep-vtt] [--skip-hls] [--info] [--id-as-course-name] [-sc] [--save-to-file] [--load-from-file] [--log-level LOG_LEVEL] [--browser {chrome,firefox,opera,edge,brave,chromium,vivaldi,safari}]
-               [--use-h265] [--h265-crf H265_CRF] [--h265-preset H265_PRESET] [--use-nvenc] [-v]
+usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_DOWNLOADS] [--disable-ipv6] [--skip-lectures] [--download-assets]
+               [--download-captions] [--download-quizzes] [--keep-vtt] [--skip-hls] [--info] [--id-as-course-name] [-sc] [--save-to-file] [--load-from-file]
+               [--log-level LOG_LEVEL] [--browser {chrome,firefox,opera,edge,brave,chromium,vivaldi,safari}] [--use-h265] [--h265-crf H265_CRF] [--h265-preset H265_PRESET]
+               [--use-nvenc] [--out OUT] [--continue-lecture-numbers]
 
 Udemy Downloader
 
@@ -97,7 +98,8 @@ options:
   -b BEARER_TOKEN, --bearer BEARER_TOKEN
                         The Bearer token to use
   -q QUALITY, --quality QUALITY
-                        Download specific video quality. If the requested quality isn't available, the closest quality will be used. If not specified, the best quality will be downloaded for each lecture
+                        Download specific video quality. If the requested quality isn't available, the closest quality will be used. If not specified, the best quality will be
+                        downloaded for each lecture
   -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is 'en')
   -cd CONCURRENT_DOWNLOADS, --concurrent-downloads CONCURRENT_DOWNLOADS
                         The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-30)
@@ -112,10 +114,10 @@ options:
   --id-as-course-name   If specified, the course id will be used in place of the course name for the output directory. This is a 'hack' to reduce the path length
   -sc, --subscription-course
                         Mark the course as a subscription based course, use this if you are having problems with the program auto detecting it
-  --save-to-file        If specified, course content will be saved to a file that can be loaded later with --load-from-file, this can reduce processing time (Note that asset links expire after a certain
-                        amount of time)
-  --load-from-file      If specified, course content will be loaded from a previously saved file with --save-to-file, this can reduce processing time (Note that asset links expire after a certain amount of
-                        time)
+  --save-to-file        If specified, course content will be saved to a file that can be loaded later with --load-from-file, this can reduce processing time (Note that asset
+                        links expire after a certain amount of time)
+  --load-from-file      If specified, course content will be loaded from a previously saved file with --save-to-file, this can reduce processing time (Note that asset links
+                        expire after a certain amount of time)
   --log-level LOG_LEVEL
                         Logging level: one of DEBUG, INFO, ERROR, WARNING, CRITICAL (Default is INFO)
   --browser {chrome,firefox,opera,edge,brave,chromium,vivaldi,safari}
@@ -125,7 +127,9 @@ options:
   --h265-preset H265_PRESET
                         Set a custom preset value for H.265 encoding. FFMPEG default is medium
   --use-nvenc           Whether to use the NVIDIA hardware transcoding for H.265. Only works if you have a supported NVIDIA GPU and ffmpeg with nvenc support
-  -v, --version         show program's version number and exit
+  --out OUT, -o OUT     Set the path to the output directory
+  --continue-lecture-numbers, -n
+                        Use continuous lecture numbering instead of per-chapter
 ```
 
 -   Passing a Bearer Token and Course ID as an argument
@@ -177,6 +181,9 @@ options:
     -   `python main.py -c <Course URL> --use-h265 --h265-preset faster`
 -   Encode in H.265 using NVIDIA hardware transcoding:
     -   `python main.py -c <Course URL> --use-h265 --use-nvenc`
+-   Use continuous numbering (don't restart at 1 in every chapter):
+    -   `python main.py -c <Course URL> --continue-lecture-numbers`
+    -   `python main.py -c <Course URL> -n`
 
 If you encounter errors while downloading such as
 
