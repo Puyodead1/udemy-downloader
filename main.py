@@ -1574,7 +1574,7 @@ def parse_new(udemy: Udemy, udemy_object: dict):
                     if extension == "html":
                         # if the html content is None or an empty string, skip it so we dont save empty html files
                         if parsed_lecture.get("html_content") != None and parsed_lecture.get("html_content") != "":
-                            html_content = parsed_lecture.get("html_content").encode("ascii", "ignore").decode("ascii")
+                            html_content = parsed_lecture.get("html_content").encode("utf8", "ignore").decode("utf8")
                             lecture_path = os.path.join(chapter_dir, "{}.html".format(sanitize_filename(lecture_title)))
                             try:
                                 with open(lecture_path, encoding="utf8", mode="w") as f:
