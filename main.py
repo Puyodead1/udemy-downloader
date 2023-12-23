@@ -8,11 +8,11 @@ import re
 import subprocess
 import sys
 import time
-from html.parser import HTMLParser as compat_HTMLParser
 from pathlib import Path
 from typing import IO
 
 import browser_cookie3
+import demoji
 import m3u8
 import requests
 import yt_dlp
@@ -59,6 +59,10 @@ use_nvenc = False
 browser = None
 cj = None
 use_continuous_lecture_numbers = False
+
+
+def deEmojify(inputStr: str):
+    return demoji.replace(inputStr, "")
 
 
 # from https://stackoverflow.com/a/21978778/9785713
@@ -1561,6 +1565,7 @@ def parse_new(udemy: Udemy, udemy_object: dict):
                 # if the lecture extension property isnt none, set the extension to the lecture extension
                 extension = lecture_extension
             lecture_file_name = sanitize_filename(lecture_title + "." + extension)
+            lecture_file_name = deEmojify(lecture_file_name)
             lecture_path = os.path.join(chapter_dir, lecture_file_name)
 
             if not skip_lectures:
