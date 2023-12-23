@@ -16,3 +16,4 @@ six
 pathvalidate
 coloredlogs
 browser_cookie3
+demoji
