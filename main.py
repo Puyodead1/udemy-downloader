@@ -1388,6 +1388,7 @@ def handle_segments(url, format_id, video_title, output_path, lecture_file_name,
         .replace("%", "")
         # commas cause problems with shaka-packager resulting in decryption failure
         .replace(",", "")
+        .replace("–", "-")
         .replace(".mp4", "")
     )
 
