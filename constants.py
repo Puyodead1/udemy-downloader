@@ -20,7 +20,6 @@ COLLECTION_URL = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-co
 QUIZ_URL = "https://{portal_name}.udemy.com/api-2.0/quizzes/{quiz_id}/assessments/?version=1&page_size=250&fields[assessment]=id,assessment_type,prompt,correct_response,section,question_plain,related_lectures"
 
 HOME_DIR = os.getcwd()
-DOWNLOAD_DIR = os.path.join(os.getcwd(), "out_dir")
 SAVED_DIR = os.path.join(os.getcwd(), "saved")
 KEY_FILE_PATH = os.path.join(os.getcwd(), "keyfile.json")
 COOKIE_FILE_PATH = os.path.join(os.getcwd(), "cookies.txt")
