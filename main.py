@@ -3,6 +3,7 @@ import argparse
 import glob
 import json
 import logging
+import math
 import os
 import re
 import subprocess
@@ -337,7 +338,7 @@ def pre_run():
         with open(KEY_FILE_PATH, encoding="utf8", mode="r") as keyfile:
             keys = json.loads(keyfile.read())
     else:
-        logger.warning("> Keyfile not found! You won't be able to decrypt videos!")
+        logger.warning("> Keyfile not found! You won't be able to decrypt any encrypted videos!")
 
 
 class Udemy:
@@ -387,7 +388,7 @@ class Udemy:
         try:
             resp = self.session._get(url).json()
         except conn_error as error:
-            logger.fatal(f"[-] Udemy Says: Connection error, {error}")
+            logger.fatal(f"[-] Connection error: {error}")
             time.sleep(0.8)
             sys.exit(1)
         else:
@@ -794,11 +795,11 @@ class Udemy:
             webpage = webpage.decode("utf8", "ignore")
             webpage = json.loads(webpage)
         except conn_error as error:
-            logger.fatal(f"Udemy Says: Connection error, {error}")
+            logger.fatal(f"Connection error: {error}")
             time.sleep(0.8)
             sys.exit(1)
         except (ValueError, Exception) as error:
-            logger.fatal(f"Udemy Says: {error} on {url}")
+            logger.fatal(f"{error} on {url}")
             time.sleep(0.8)
             sys.exit(1)
         else:
@@ -811,7 +812,7 @@ class Udemy:
         try:
             resp = self.session._get(url).json()
         except conn_error as error:
-            logger.fatal(f"Udemy Says: Connection error, {error}")
+            logger.fatal(f"Connection error: {error}")
             time.sleep(0.8)
             sys.exit(1)
         else:
@@ -820,39 +821,23 @@ class Udemy:
     def _extract_course_json(self, url, course_id, portal_name):
         self.session._headers.update({"Referer": url})
         url = COURSE_URL.format(portal_name=portal_name, course_id=course_id)
-        try:
-            resp = self.session._get(url)
-            if resp.status_code in [502, 503, 504]:
-                logger.info("> The course content is large, using large content extractor...")
-                resp = self._extract_large_course_content(url=url)
-            else:
-                resp = resp.json()
-        except conn_error as error:
-            logger.fatal(f"Udemy Says: Connection error, {error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        except (ValueError, Exception):
-            resp = self._extract_large_course_content(url=url)
-            return resp
-        else:
-            return resp
-
-    def _extract_large_course_content(self, url):
-        url = url.replace("10000", "50") if url.endswith("10000") else url
+        page = 1
         try:
             data = self.session._get(url).json()
         except conn_error as error:
-            logger.fatal(f"Udemy Says: Connection error, {error}")
+            logger.fatal(f"Connection error: {error}")
             time.sleep(0.8)
             sys.exit(1)
         else:
             _next = data.get("next")
+            _count = data.get("count")
+            est_page_count = math.ceil(_count / 100)  # 100 is the max results per page
             while _next:
-                logger.info("> Downloading course information.. ")
+                logger.info(f"> Downloading course information.. (Page {page + 1}/{est_page_count})")
                 try:
                     resp = self.session._get(_next).json()
                 except conn_error as error:
-                    logger.fatal(f"Udemy Says: Connection error, {error}")
+                    logger.fatal(f"Connection error: {error}")
                     time.sleep(0.8)
                     sys.exit(1)
                 else:
@@ -861,6 +846,7 @@ class Udemy:
                     if results and isinstance(results, list):
                         for d in resp["results"]:
                             data["results"].append(d)
+                        page = page + 1
             return data
 
     def _extract_course(self, response, course_name):
@@ -880,11 +866,11 @@ class Udemy:
             url = MY_COURSES_URL.format(portal_name=portal_name)
             webpage = self.session._get(url).json()
         except conn_error as error:
-            logger.fatal(f"Udemy Says: Connection error, {error}")
+            logger.fatal(f"Connection error: {error}")
             time.sleep(0.8)
             sys.exit(1)
         except (ValueError, Exception) as error:
-            logger.fatal(f"Udemy Says: {error}")
+            logger.fatal(f"{error}")
             time.sleep(0.8)
             sys.exit(1)
         else:
@@ -897,11 +883,11 @@ class Udemy:
         try:
             webpage = self.session._get(url).json()
         except conn_error as error:
-            logger.fatal(f"Udemy Says: Connection error, {error}")
+            logger.fatal(f"Connection error: {error}")
             time.sleep(0.8)
             sys.exit(1)
         except (ValueError, Exception) as error:
-            logger.fatal(f"Udemy Says: {error}")
+            logger.fatal(f"{error}")
             time.sleep(0.8)
             sys.exit(1)
         else:
@@ -917,11 +903,11 @@ class Udemy:
             url = f"{url}&is_archived=true"
             webpage = self.session._get(url).json()
         except conn_error as error:
-            logger.fatal(f"Udemy Says: Connection error, {error}")
+            logger.fatal(f"Connection error: {error}")
             time.sleep(0.8)
             sys.exit(1)
         except (ValueError, Exception) as error:
-            logger.fatal(f"Udemy Says: {error}")
+            logger.fatal(f"{error}")
             time.sleep(0.8)
             sys.exit(1)
         else:
@@ -934,11 +920,11 @@ class Udemy:
             url = MY_COURSES_URL.format(portal_name=portal_name)
             webpage = self.session._get(url).json()
         except conn_error as error:
-            logger.fatal(f"Udemy Says: Connection error, {error}")
+            logger.fatal(f"Connection error: {error}")
             time.sleep(0.8)
             sys.exit(1)
         except (ValueError, Exception) as error:
-            logger.fatal(f"Udemy Says: {error}")
+            logger.fatal(f"{error}")
             time.sleep(0.8)
             sys.exit(1)
         else:
@@ -951,11 +937,11 @@ class Udemy:
         try:
             webpage = self.session._get(url).json()
         except conn_error as error:
-            logger.fatal(f"Udemy Says: Connection error, {error}")
+            logger.fatal(f"Connection error: {error}")
             time.sleep(0.8)
             sys.exit(1)
         except (ValueError, Exception) as error:
-            logger.fatal(f"Udemy Says: {error}")
+            logger.fatal(f"{error}")
             time.sleep(0.8)
             sys.exit(1)
         else:
@@ -971,11 +957,11 @@ class Udemy:
             url = f"{url}&is_archived=true"
             webpage = self.session._get(url).json()
         except conn_error as error:
-            logger.fatal(f"Udemy Says: Connection error, {error}")
+            logger.fatal(f"Connection error: {error}")
             time.sleep(0.8)
             sys.exit(1)
         except (ValueError, Exception) as error:
-            logger.fatal(f"Udemy Says: {error}")
+            logger.fatal(f"{error}")
             time.sleep(0.8)
             sys.exit(1)
         else:
@@ -1791,6 +1777,15 @@ def _print_course_info(udemy: Udemy, udemy_object: dict):
     course_title = udemy_object.get("title")
     chapter_count = udemy_object.get("total_chapters")
     lecture_count = udemy_object.get("total_lectures")
+
+    if lecture_count > 100:
+        logger.warning(
+            "This course has a lot of lectures! Fetching all the information can take a long time as well as spams Udemy's servers. It is NOT recommended to continue! Are you sure you want to do this?"
+        )
+        yn = input("(y/n): ")
+        if yn.lower() != "y":
+            logger.info("Probably wise. Please remove the --info argument and try again.")
+            sys.exit(0)
 
     logger.info("> Course: {}".format(course_title))
     logger.info("> Total Chapters: {}".format(chapter_count))

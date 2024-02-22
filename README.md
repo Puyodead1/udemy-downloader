@@ -20,11 +20,24 @@
 Utility script to download Udemy courses, has support for DRM videos but requires the user to acquire the decryption key (for legal reasons).<br>
 Windows is the primary development OS, but I've made an effort to support Linux also (Mac untested).
 
+> [!CAUTION]
+> The ability to download captions automatically is currently broken due to changes in Udemy's API!
+
+> [!IMPORTANT]  
+> This tool will not work on encrypted courses without decryption keys being provided!
+>
+> Downloading courses is against Udemy's Terms of Service, I am NOT held responsible for your account getting suspended as a result from the use of this program!
+>
+> This program is WIP, the code is provided as-is and I am not held resposible for any legal issues resulting from the use of this program.
+
 # Requirements
 
 The following are a list of required third-party tools, you will need to ensure they are in your systems path and that typing their name in a terminal invokes them.
 
-_**Note**:_ _These are seperate requirements that are not installed with the pip command! You will need to download and install these manually!_
+> [!NOTE]  
+> These are seperate requirements that are not installed with the pip command!
+>
+> You will need to download and install these manually!
 
 -   [Python 3](https://python.org/)
 -   [ffmpeg](https://www.ffmpeg.org/) - This tool is also available in Linux package repositories.
@@ -34,8 +47,6 @@ _**Note**:_ _These are seperate requirements that are not installed with the pip
 -   [yt-dlp](https://github.com/yt-dlp/yt-dlp/) - This tool is also available in Linux package repositories, but can also be installed using pip if desired (`pip install yt-dlp`)
 
 # Usage
-
-_quick and dirty how-to_
 
 You will need to get a few things before you can use this program:
 
@@ -58,7 +69,10 @@ You will need to get a few things before you can use this program:
 
 ## Key ID and Key
 
-It is up to you to acquire the key and key ID. Please **DO NOT** ask me for help acquiring these, decrypting DRM protected content can be considered piracy. The tool required for this has already been discused in a GitHub issue.
+> [!IMPORTANT]  
+> For courses that are encrypted, It is up to you to acquire the decryption keys.
+>
+> Please **DO NOT** ask me for help acquiring these!
 
 -   Enter the key and key id in the `keyfile.json`
 -   ![keyfile example](https://i.imgur.com/e5aU0ng.png)
@@ -66,18 +80,21 @@ It is up to you to acquire the key and key ID. Please **DO NOT** ask me for help
 
 ## Cookies
 
+> [!TIP]
+> Cookies are not required for individually purchased courses.
+
 To download a course included in a subscription plan that you did not purchase individually, you will need to use cookies. You can also use cookies as an alternative to Bearer Tokens.
 
 The program can automatically extract them from your browser. You can specify what browser to extract cookies from with the `--browser` argument. Supported browsers are:
 
--   chrome
--   firefox
--   opera
--   edge
--   brave
--   chromium
--   vivaldi
--   safari
+-   `chrome`
+-   `firefox`
+-   `opera`
+-   `edge`
+-   `brave`
+-   `chromium`
+-   `vivaldi`
+-   `safari`
 
 ## Ready to go
 

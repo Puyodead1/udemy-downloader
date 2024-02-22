@@ -11,7 +11,8 @@ HEADERS = {
 }
 LOGIN_URL = "https://www.udemy.com/join/login-popup/?ref=&display_type=popup&loc"
 LOGOUT_URL = "https://www.udemy.com/user/logout"
-COURSE_URL = "https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,title,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,media_license_token,course_is_drmed,media_sources,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000"
+# COURSE_URL = "https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/cached-subscriber-curriculum-items?fields[asset]=results,title,external_url,time_estimation,download_urls,slide_urls,filename,asset_type,captions,media_license_token,course_is_drmed,media_sources,stream_urls,body&fields[chapter]=object_index,title,sort_order&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&page_size=10000"
+COURSE_URL = "https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/subscriber-curriculum-items/?page_size=100&fields[asset]=asset_type,length,media_license_token,course_is_drmed,media_sources,thumbnail_sprite,slides,slide_urls,filename,download_urls,external_url&fields[chapter]=object_index,title&fields[lecture]=id,title,object_index,asset,supplementary_assets,view_html&caching_intent=True"
 COURSE_INFO_URL = "https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/"
 COURSE_SEARCH = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,title,published_title&page=1&page_size=500&search={course_name}"
 SUBSCRIBED_COURSES = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses/?ordering=-last_accessed&fields[course]=id,title,url&page=1&page_size=12"
@@ -24,8 +25,7 @@ SAVED_DIR = os.path.join(os.getcwd(), "saved")
 KEY_FILE_PATH = os.path.join(os.getcwd(), "keyfile.json")
 COOKIE_FILE_PATH = os.path.join(os.getcwd(), "cookies.txt")
 LOG_DIR_PATH = os.path.join(os.getcwd(), "logs")
-LOG_FILE_PATH = os.path.join(
-    os.getcwd(), "logs", f"{time.strftime('%Y-%m-%d-%I-%M-%S')}.log")
-LOG_FORMAT = '[%(asctime)s] [%(name)s] [%(funcName)s:%(lineno)d] %(levelname)s: %(message)s'
-LOG_DATE_FORMAT = '%I:%M:%S'
+LOG_FILE_PATH = os.path.join(os.getcwd(), "logs", f"{time.strftime('%Y-%m-%d-%I-%M-%S')}.log")
+LOG_FORMAT = "[%(asctime)s] [%(name)s] [%(funcName)s:%(lineno)d] %(levelname)s: %(message)s"
+LOG_DATE_FORMAT = "%I:%M:%S"
 LOG_LEVEL = logging.INFO
