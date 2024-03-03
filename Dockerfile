@@ -15,7 +15,6 @@ RUN apt-get update && apt-get install -y \
 # Install Shaka Packager
 RUN wget https://github.com/shaka-project/shaka-packager/releases/download/v2.6.1/packager-linux-x64 -o /usr/local/bin/shaka-packager
 RUN chmod +x /usr/local/bin/shaka-packager
-ENV PATH="/usr/local/bin/shaka-packager:${PATH}"
 
 # Copy the current directory contents into the container at /app.
 COPY . /app
