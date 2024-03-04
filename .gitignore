@@ -130,3 +130,5 @@ selenium_data/
 config.dev.toml
 temp/
 *.exe
+# Docker Compose output volume
+output/

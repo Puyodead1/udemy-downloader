@@ -1,0 +1,12 @@
+services:
+  udemy-downloader:
+    image: udemy-downloader:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./output:/app/out_dir:rw
+      - ./keyfile.json:/app/keyfile.json:ro
+    env_file:
+      - .env
+    command: python main.py -c $COURSE_URL
