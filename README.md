@@ -11,6 +11,7 @@
 # NOTE
 
 -   **This tool will not work without decryption keys. Do not bother installing unless you already have keys or can obtain them!**
+-   If you ask about keys in the issues, your message will be deleted and you will be blocked.
 -   **Downloading courses is against Udemy's Terms of Service, I am NOT held responsible for your account getting suspended as a result from the use of this program!**
 -   This program is WIP, the code is provided as-is and I am not held resposible for any legal issues resulting from the use of this program.
 
