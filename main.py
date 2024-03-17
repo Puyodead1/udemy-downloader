@@ -1263,7 +1263,7 @@ def mux_process(video_title, video_filepath, audio_filepath, output_path):
     @author Jayapraveen
     """
     codec = "hevc_nvenc" if use_nvenc else "libx265"
-    transcode = "-hwaccel cuda -hwaccel_output_format cuda" if use_nvenc else []
+    transcode = "-hwaccel cuda -hwaccel_output_format cuda" if use_nvenc else ""
     if os.name == "nt":
         if use_h265:
             command = 'ffmpeg {} -y -i "{}" -i "{}" -c:v {} -vtag hvc1 -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title="{}" "{}"'.format(
