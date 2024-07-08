@@ -1676,10 +1676,12 @@ def process_normal_quiz(quiz, lecture, chapter_dir):
     lecture_path = os.path.join(chapter_dir, lecture_file_name)
 
     logger.info(f"  > Processing quiz {lecture_index}")
-
     with open("quiz_template.html", "r") as f:
         html = f.read()
         quiz_data = {
+            "quiz_id":lecture["data"].get("id"),
+            "quiz_description":lecture["data"].get("description"),
+            "quiz_title": lecture["data"].get("title"),
             "pass_percent": lecture.get("data").get("pass_percent"),
             "questions": quiz["contents"],
         }
