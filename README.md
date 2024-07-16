@@ -20,11 +20,24 @@
 Utility script to download Udemy courses, has support for DRM videos but requires the user to acquire the decryption key (for legal reasons).<br>
 Windows is the primary development OS, but I've made an effort to support Linux also (Mac untested).
 
+> [!CAUTION]
+> The ability to download captions automatically is currently broken due to changes in Udemy's API!
+
+> [!IMPORTANT]  
+> This tool will not work on encrypted courses without decryption keys being provided!
+>
+> Downloading courses is against Udemy's Terms of Service, I am NOT held responsible for your account getting suspended as a result from the use of this program!
+>
+> This program is WIP, the code is provided as-is and I am not held resposible for any legal issues resulting from the use of this program.
+
 # Requirements
 
 The following are a list of required third-party tools, you will need to ensure they are in your systems path and that typing their name in a terminal invokes them.
 
-_**Note**:_ _These are seperate requirements that are not installed with the pip command! You will need to download and install these manually!_
+> [!NOTE]  
+> These are seperate requirements that are not installed with the pip command!
+>
+> You will need to download and install these manually!
 
 -   [Python 3](https://python.org/)
 -   [ffmpeg](https://www.ffmpeg.org/) - This tool is also available in Linux package repositories.
@@ -34,8 +47,6 @@ _**Note**:_ _These are seperate requirements that are not installed with the pip
 -   [yt-dlp](https://github.com/yt-dlp/yt-dlp/) - This tool is also available in Linux package repositories, but can also be installed using pip if desired (`pip install yt-dlp`)
 
 # Usage
-
-_quick and dirty how-to_
 
 You will need to get a few things before you can use this program:
 
@@ -58,7 +69,10 @@ You will need to get a few things before you can use this program:
 
 ## Key ID and Key
 
-It is up to you to acquire the key and key ID. Please **DO NOT** ask me for help acquiring these, decrypting DRM protected content can be considered piracy. The tool required for this has already been discused in a GitHub issue.
+> [!IMPORTANT]  
+> For courses that are encrypted, It is up to you to acquire the decryption keys.
+>
+> Please **DO NOT** ask me for help acquiring these!
 
 -   Enter the key and key id in the `keyfile.json`
 -   ![keyfile example](https://i.imgur.com/e5aU0ng.png)
@@ -66,18 +80,21 @@ It is up to you to acquire the key and key ID. Please **DO NOT** ask me for help
 
 ## Cookies
 
+> [!TIP]
+> Cookies are not required for individually purchased courses.
+
 To download a course included in a subscription plan that you did not purchase individually, you will need to use cookies. You can also use cookies as an alternative to Bearer Tokens.
 
 The program can automatically extract them from your browser. You can specify what browser to extract cookies from with the `--browser` argument. Supported browsers are:
 
--   chrome
--   firefox
--   opera
--   edge
--   brave
--   chromium
--   vivaldi
--   safari
+-   `chrome`
+-   `firefox`
+-   `opera`
+-   `edge`
+-   `brave`
+-   `chromium`
+-   `vivaldi`
+-   `safari`
 
 ## Ready to go
 
@@ -86,7 +103,7 @@ You can now run the program, see the examples below. The course will download to
 # Advanced Usage
 
 ```
-usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_DOWNLOADS] [--disable-ipv6] [--skip-lectures] [--download-assets]
+usage: main.py [-h] -c COURSE_URL [-b BEARER_TOKEN] [-q QUALITY] [-l LANG] [-cd CONCURRENT_DOWNLOADS] [--skip-lectures] [--download-assets]
                [--download-captions] [--download-quizzes] [--keep-vtt] [--skip-hls] [--info] [--id-as-course-name] [-sc] [--save-to-file] [--load-from-file]
                [--log-level LOG_LEVEL] [--browser {chrome,firefox,opera,edge,brave,chromium,vivaldi,safari}] [--use-h265] [--h265-crf H265_CRF] [--h265-preset H265_PRESET]
                [--use-nvenc] [--out OUT] [--continue-lecture-numbers]
@@ -105,7 +122,6 @@ options:
   -l LANG, --lang LANG  The language to download for captions, specify 'all' to download all captions (Default is 'en')
   -cd CONCURRENT_DOWNLOADS, --concurrent-downloads CONCURRENT_DOWNLOADS
                         The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-30)
-  --disable-ipv6        If specified, ipv6 will be disabled in aria2
   --skip-lectures       If specified, lectures won't be downloaded
   --download-assets     If specified, lecture assets will be downloaded
   --download-captions   If specified, captions will be downloaded
@@ -186,16 +202,6 @@ options:
 -   Use continuous numbering (don't restart at 1 in every chapter):
     -   `python main.py -c <Course URL> --continue-lecture-numbers`
     -   `python main.py -c <Course URL> -n`
-
-If you encounter errors while downloading such as
-
-`errorCode=1 Network problem has occurred. cause:Unknown socket error 10051 (0x2743)`
-
-or
-
-`errorCode=1 Network problem has occurred. cause:A socket operation was attempted to an unreachable network.`
-
-Then try disabling ipv6 in aria2 using the `--disable-ipv6` option
 
 # Support
 
