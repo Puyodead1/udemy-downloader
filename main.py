@@ -9,8 +9,9 @@ import re
 import subprocess
 import sys
 import time
+from http.cookiejar import MozillaCookieJar
 from pathlib import Path
-from typing import IO
+from typing import IO, Union
 
 import browser_cookie3
 import demoji
@@ -191,7 +192,7 @@ def pre_run():
         "--browser",
         dest="browser",
         help="The browser to extract cookies from",
-        choices=["chrome", "firefox", "opera", "edge", "brave", "chromium", "vivaldi", "safari"],
+        choices=["chrome", "firefox", "opera", "edge", "brave", "chromium", "vivaldi", "safari", "file"],
     )
     parser.add_argument(
         "--use-h265",
@@ -374,6 +375,10 @@ class Udemy:
                 cj = browser_cookie3.chromium()
             elif browser == "vivaldi":
                 cj = browser_cookie3.vivaldi()
+            elif browser == "file":
+                # load netscape cookies from file
+                cj = MozillaCookieJar("cookies.txt")
+                cj.load()
 
     def _get_quiz(self, quiz_id):
         self.session._headers.update(
@@ -977,7 +982,9 @@ class Udemy:
         soup = BeautifulSoup(course_html, "lxml")
         data = soup.find("div", {"class": "ud-component--course-taking--app"})
         if not data:
-            logger.fatal("Unable to extract arguments from course page! Make sure you have a cookies.txt file!")
+            logger.fatal(
+                "Could not find course data. Possible causes are: Missing cookies.txt file, incorrect url (should end with /learn), not logged in to udemy in specified browser."
+            )
             self.session.terminate()
             sys.exit(1)
         data_args = data.attrs["data-module-args"]
@@ -1218,28 +1225,31 @@ def durationtoseconds(period):
         return None
 
 
-def mux_process(video_title, video_filepath, audio_filepath, output_path):
-    """
-    @author Jayapraveen
-    """
+def mux_process(
+    video_filepath: str,
+    audio_filepath: str,
+    video_title: str,
+    output_path: str,
+    audio_key: Union[str | None] = None,
+    video_key: Union[str | None] = None,
+):
     codec = "hevc_nvenc" if use_nvenc else "libx265"
     transcode = "-hwaccel cuda -hwaccel_output_format cuda" if use_nvenc else ""
+    audio_decryption_arg = f"-decryption_key {audio_key}" if audio_key is not None else ""
+    video_decryption_arg = f"-decryption_key {video_key}" if video_key is not None else ""
+
     if os.name == "nt":
         if use_h265:
-            command = 'ffmpeg {} -y -i "{}" -i "{}" -c:v {} -vtag hvc1 -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title="{}" "{}"'.format(
-                transcode, video_filepath, audio_filepath, codec, h265_crf, h265_preset, video_title, output_path
-            )
+            command = f'ffmpeg {transcode} -y {video_decryption_arg} -i "{video_filepath}" {audio_decryption_arg} -i "{audio_filepath}" -c:v {codec} -vtag hvc1 -crf {h265_crf} -preset {h265_preset} -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
         else:
-            command = 'ffmpeg -y -i "{}" -i "{}" -c:v copy -c:a copy -fflags +bitexact -map_metadata -1 -metadata title="{}" "{}"'.format(
+            command = f'ffmpeg -y {video_decryption_arg} -i "{video_filepath}" {audio_decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'.format(
                 video_filepath, audio_filepath, video_title, output_path
             )
     else:
         if use_h265:
-            command = 'nice -n 7 ffmpeg {} -y -i "{}" -i "{}" -c:v libx265 -vtag hvc1 -crf {} -preset {} -c:a copy -fflags +bitexact -map_metadata -1 -metadata title="{}" "{}"'.format(
-                transcode, video_filepath, audio_filepath, codec, h265_crf, h265_preset, video_title, output_path
-            )
+            command = f'nice -n 7 ffmpeg {transcode} -y {video_decryption_arg} -i "{video_filepath}" {audio_decryption_arg} -i "{audio_filepath}" -c:v {codec} -vtag hvc1 -crf {h265_crf} -preset {h265_preset} -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
         else:
-            command = 'nice -n 7 ffmpeg -y -i "{}" -i "{}" -c:v copy -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{}" "{}"'.format(
+            command = f'nice -n 7 ffmpeg -y {video_decryption_arg} -i "{video_filepath}" {audio_decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'.format(
                 video_filepath, audio_filepath, video_title, output_path
             )
 
@@ -1253,34 +1263,11 @@ def mux_process(video_title, video_filepath, audio_filepath, output_path):
     return ret_code
 
 
-def decrypt(kid, in_filepath, out_filepath):
-    try:
-        key = keys[kid.lower()]
-    except KeyError:
-        raise KeyError("Key not found")
-
-    if os.name == "nt":
-        command = f'shaka-packager --enable_raw_key_decryption --keys key_id={kid}:key={key} input="{in_filepath}",stream_selector="0",output="{out_filepath}"'
-    else:
-        command = f'nice -n 7 shaka-packager --enable_raw_key_decryption --keys key_id={kid}:key={key} input="{in_filepath}",stream_selector="0",output="{out_filepath}"'
-
-    process = subprocess.Popen(command, shell=True)
-    log_subprocess_output("SHAKA-STDOUT", process.stdout)
-    log_subprocess_output("SHAKA-STDERR", process.stderr)
-    ret_code = process.wait()
-    if ret_code != 0:
-        raise Exception("Decryption returned a non-zero exit code")
-
-    return ret_code
-
-
 def handle_segments(url, format_id, lecture_id, video_title, output_path, chapter_dir):
     os.chdir(os.path.join(chapter_dir))
 
     video_filepath_enc = lecture_id + ".encrypted.mp4"
     audio_filepath_enc = lecture_id + ".encrypted.m4a"
-    video_filepath_dec = lecture_id + ".decrypted.mp4"
-    audio_filepath_dec = lecture_id + ".decrypted.m4a"
     temp_output_path = os.path.join(chapter_dir, lecture_id + ".mp4")
 
     logger.info("> Downloading Lecture Tracks...")
@@ -1314,6 +1301,9 @@ def handle_segments(url, format_id, lecture_id, video_title, output_path, chapte
         logger.warning("Return code from the downloader was non-0 (error), skipping!")
         return
 
+    audio_kid = None
+    video_kid = None
+
     try:
         video_kid = extract_kid(video_filepath_enc)
         logger.info("KID for video file is: " + video_kid)
@@ -1328,21 +1318,42 @@ def handle_segments(url, format_id, lecture_id, video_title, output_path, chapte
         logger.exception(f"Error extracting audio kid")
         return
 
+    audio_key = None
+    video_key = None
+
+    if audio_kid is not None:
+        try:
+            audio_key = keys[audio_kid]
+        except KeyError:
+            logger.error(
+                f"Audio key not found for {audio_kid}, if you have the key then you probably didn't add them to the key file correctly."
+            )
+            return
+
+    if video_kid is not None:
+        try:
+            video_key = keys[video_kid]
+        except KeyError:
+            logger.error(
+                f"Video key not found for {audio_kid}, if you have the key then you probably didn't add them to the key file correctly."
+            )
+            return
+
     try:
-        logger.info("> Decrypting video, this might take a minute...")
-        ret_code = decrypt(video_kid, video_filepath_enc, video_filepath_dec)
-        if ret_code != 0:
-            logger.error("> Return code from the decrypter was non-0 (error), skipping!")
-            return
-        logger.info("> Decryption complete")
-        logger.info("> Decrypting audio, this might take a minute...")
-        decrypt(audio_kid, audio_filepath_enc, audio_filepath_dec)
-        if ret_code != 0:
-            logger.error("> Return code from the decrypter was non-0 (error), skipping!")
-            return
-        logger.info("> Decryption complete")
+        # logger.info("> Decrypting video, this might take a minute...")
+        # ret_code = decrypt(video_kid, video_filepath_enc, video_filepath_dec)
+        # if ret_code != 0:
+        #     logger.error("> Return code from the decrypter was non-0 (error), skipping!")
+        #     return
+        # logger.info("> Decryption complete")
+        # logger.info("> Decrypting audio, this might take a minute...")
+        # decrypt(audio_kid, audio_filepath_enc, audio_filepath_dec)
+        # if ret_code != 0:
+        #     logger.error("> Return code from the decrypter was non-0 (error), skipping!")
+        #     return
+        # logger.info("> Decryption complete")
         logger.info("> Merging video and audio, this might take a minute...")
-        mux_process(video_title, video_filepath_dec, audio_filepath_dec, temp_output_path)
+        mux_process(video_filepath_enc, audio_filepath_enc, video_title, temp_output_path, audio_key, video_key)
         if ret_code != 0:
             logger.error("> Return code from ffmpeg was non-0 (error), skipping!")
             return
@@ -1351,8 +1362,6 @@ def handle_segments(url, format_id, lecture_id, video_title, output_path, chapte
         logger.info("> Cleaning up temporary files...")
         os.remove(video_filepath_enc)
         os.remove(audio_filepath_enc)
-        os.remove(video_filepath_dec)
-        os.remove(audio_filepath_dec)
     except Exception:
         logger.exception(f"Error: ")
     finally:
@@ -1602,8 +1611,8 @@ def process_normal_quiz(quiz, lecture, chapter_dir):
     with open("quiz_template.html", "r") as f:
         html = f.read()
         quiz_data = {
-            "quiz_id":lecture["data"].get("id"),
-            "quiz_description":lecture["data"].get("description"),
+            "quiz_id": lecture["data"].get("id"),
+            "quiz_description": lecture["data"].get("description"),
             "quiz_title": lecture["data"].get("title"),
             "pass_percent": lecture.get("data").get("pass_percent"),
             "questions": quiz["contents"],
