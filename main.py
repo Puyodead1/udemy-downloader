@@ -923,60 +923,6 @@ class Udemy:
             results = webpage.get("results", [])
         return results
 
-    def _my_courses(self, portal_name):
-        results = []
-        try:
-            url = MY_COURSES_URL.format(portal_name=portal_name)
-            webpage = self.session._get(url).json()
-        except conn_error as error:
-            logger.fatal(f"Connection error: {error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        except (ValueError, Exception) as error:
-            logger.fatal(f"{error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        else:
-            results = webpage.get("results", [])
-        return results
-
-    def _subscribed_collection_courses(self, portal_name):
-        url = COLLECTION_URL.format(portal_name=portal_name)
-        courses_lists = []
-        try:
-            webpage = self.session._get(url).json()
-        except conn_error as error:
-            logger.fatal(f"Connection error: {error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        except (ValueError, Exception) as error:
-            logger.fatal(f"{error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        else:
-            results = webpage.get("results", [])
-            if results:
-                [courses_lists.extend(courses.get("courses", [])) for courses in results if courses.get("courses", [])]
-        return courses_lists
-
-    def _archived_courses(self, portal_name):
-        results = []
-        try:
-            url = MY_COURSES_URL.format(portal_name=portal_name)
-            url = f"{url}&is_archived=true"
-            webpage = self.session._get(url).json()
-        except conn_error as error:
-            logger.fatal(f"Connection error: {error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        except (ValueError, Exception) as error:
-            logger.fatal(f"{error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        else:
-            results = webpage.get("results", [])
-        return results
-
     def _extract_subscription_course_info(self, url):
         course_html = self.session._get(url).text
         soup = BeautifulSoup(course_html, "lxml")
