@@ -1188,16 +1188,12 @@ def mux_process(
         if use_h265:
             command = f'ffmpeg {transcode} -y {video_decryption_arg} -i "{video_filepath}" {audio_decryption_arg} -i "{audio_filepath}" -c:v {codec} -vtag hvc1 -crf {h265_crf} -preset {h265_preset} -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
         else:
-            command = f'ffmpeg -y {video_decryption_arg} -i "{video_filepath}" {audio_decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'.format(
-                video_filepath, audio_filepath, video_title, output_path
-            )
+            command = f'ffmpeg -y {video_decryption_arg} -i "{video_filepath}" {audio_decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
     else:
         if use_h265:
             command = f'nice -n 7 ffmpeg {transcode} -y {video_decryption_arg} -i "{video_filepath}" {audio_decryption_arg} -i "{audio_filepath}" -c:v {codec} -vtag hvc1 -crf {h265_crf} -preset {h265_preset} -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
         else:
-            command = f'nice -n 7 ffmpeg -y {video_decryption_arg} -i "{video_filepath}" {audio_decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'.format(
-                video_filepath, audio_filepath, video_title, output_path
-            )
+            command = f'nice -n 7 ffmpeg -y {video_decryption_arg} -i "{video_filepath}" {audio_decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
 
     process = subprocess.Popen(command, shell=True)
     log_subprocess_output("FFMPEG-STDOUT", process.stdout)
