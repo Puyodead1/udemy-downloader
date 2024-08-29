@@ -25,7 +25,7 @@ CURRICULUM_ITEMS_PARAMS = {
     "fields[quiz]": "title,object_index,type",
     "fields[practice]": "title,object_index",
     "fields[chapter]": "title,object_index",
-    "fields[asset]": "title,filename,asset_type,status,is_external,media_license_token,course_is_drmed,media_sources,captions,slides,slide_urls,download_urls,external_url,@min,status,delayed_asset_message,processing_errors,body",
+    "fields[asset]": "title,filename,asset_type,status,is_external,media_license_token,course_is_drmed,media_sources,captions,slides,slide_urls,download_urls,external_url,stream_urls,@min,status,delayed_asset_message,processing_errors,body",
     "caching_intent": True,
     "page_size": "200",
 }
