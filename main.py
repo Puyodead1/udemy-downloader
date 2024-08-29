@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import argparse
-import glob
 import json
 import logging
 import math
@@ -481,6 +480,14 @@ class Udemy:
                 )
         return _temp
 
+    def _extract_article(self, asset, id):
+        return [{
+            "type": "article",
+            "body": asset.get("body"),
+            "extension": "html",
+            "id": id,
+        }]
+
     def _extract_ppt(self, asset, lecture_counter):
         _temp = []
         download_urls = asset.get("download_urls")
@@ -813,7 +820,7 @@ class Udemy:
 
     def _extract_course_info_json(self, url, course_id):
         self.session._headers.update({"Referer": url})
-        url = COURSE_INFO_URL.format(portal_name=portal_name, course_id=course_id)
+        url = COURSE_URL.format(portal_name=portal_name, course_id=course_id)
         try:
             resp = self.session._get(url).json()
         except conn_error as error:
@@ -823,12 +830,12 @@ class Udemy:
         else:
             return resp
 
-    def _extract_course_json(self, url, course_id, portal_name):
+    def _extract_course_curriculum(self, url, course_id, portal_name):
         self.session._headers.update({"Referer": url})
-        url = COURSE_URL.format(portal_name=portal_name, course_id=course_id)
+        url = CURRICULUM_ITEMS_URL.format(portal_name=portal_name, course_id=course_id)
         page = 1
         try:
-            data = self.session._get(url).json()
+            data = self.session._get(url, CURRICULUM_ITEMS_PARAMS).json()
         except conn_error as error:
             logger.fatal(f"Connection error: {error}")
             time.sleep(0.8)
@@ -838,7 +845,7 @@ class Udemy:
             _count = data.get("count")
             est_page_count = math.ceil(_count / 100)  # 100 is the max results per page
             while _next:
-                logger.info(f"> Downloading course information.. (Page {page + 1}/{est_page_count})")
+                logger.info(f"> Downloading course curriculum.. (Page {page + 1}/{est_page_count})")
                 try:
                     resp = self.session._get(_next)
                     if not resp.ok:
@@ -987,19 +994,18 @@ class Udemy:
         if isinstance(asset, dict):
             asset_type = asset.get("asset_type").lower() or asset.get("assetType").lower()
             if asset_type == "article":
-                if isinstance(supp_assets, list) and len(supp_assets) > 0:
-                    retVal = self._extract_supplementary_assets(supp_assets, index)
+                retVal.extend(self._extract_article(asset, index))
             elif asset_type == "video":
                 if isinstance(supp_assets, list) and len(supp_assets) > 0:
-                    retVal = self._extract_supplementary_assets(supp_assets, index)
+                    retVal.extend(self._extract_supplementary_assets(supp_assets, index))
             elif asset_type == "e-book":
-                retVal = self._extract_ebook(asset, index)
+                retVal.extend(self._extract_ebook(asset, index))
             elif asset_type == "file":
-                retVal = self._extract_file(asset, index)
+                retVal.extend(self._extract_file(asset, index))
             elif asset_type == "presentation":
-                retVal = self._extract_ppt(asset, index)
+                retVal.extend(self._extract_ppt(asset, index))
             elif asset_type == "audio":
-                retVal = self._extract_audio(asset, index)
+                retVal.extend(self._extract_audio(asset, index))
             else:
                 logger.warning(f"Unknown asset type: {asset_type}")
 
@@ -1108,9 +1114,9 @@ class Session(object):
         self._headers["Authorization"] = "Bearer {}".format(bearer_token)
         self._headers["X-Udemy-Authorization"] = "Bearer {}".format(bearer_token)
 
-    def _get(self, url):
+    def _get(self, url, params = None):
         for i in range(10):
-            session = self._session.get(url, headers=self._headers, cookies=cj)
+            session = self._session.get(url, headers=self._headers, cookies=cj, params=params)
             if session.ok or session.status_code in [502, 503]:
                 return session
             if not session.ok:
@@ -1550,7 +1556,7 @@ def process_normal_quiz(quiz, lecture, chapter_dir):
     lecture_path = os.path.join(chapter_dir, lecture_file_name)
 
     logger.info(f"  > Processing quiz {lecture_index}")
-    with open("quiz_template.html", "r") as f:
+    with open("./templates/quiz_template.html", "r") as f:
         html = f.read()
         quiz_data = {
             "quiz_id": lecture["data"].get("id"),
@@ -1572,7 +1578,7 @@ def process_coding_assignment(quiz, lecture, chapter_dir):
 
     logger.info(f"  > Processing quiz {lecture_index} (coding assignment)")
 
-    with open("coding_assignment_template.html", "r") as f:
+    with open("./templates/coding_assignment_template.html", "r") as f:
         html = f.read()
         quiz_data = {
             "title": lecture_title,
@@ -1648,7 +1654,6 @@ def parse_new(udemy: Udemy, udemy_object: dict):
                             try:
                                 with open(lecture_path, encoding="utf8", mode="w") as f:
                                     f.write(html_content)
-                                    f.close()
                             except Exception:
                                 logger.exception("    > Failed to write html file")
                     else:
@@ -1673,20 +1678,19 @@ def parse_new(udemy: Udemy, udemy_object: dict):
                     download_url = asset.get("download_url")
 
                     if asset_type == "article":
-                        logger.warning(
-                            "If you're seeing this message, that means that you reached a secret area that I haven't finished! jk I haven't implemented handling for this asset type, please report this at https://github.com/Puyodead1/udemy-downloader/issues so I can add it. When reporting, please provide the following information: "
-                        )
-                        logger.warning("AssetType: Article; AssetData: ", asset)
-                        # html_content = lecture.get("html_content")
-                        # lecture_path = os.path.join(
-                        #     chapter_dir, "{}.html".format(sanitize(lecture_title)))
-                        # try:
-                        #     with open(lecture_path, 'w') as f:
-                        #         f.write(html_content)
-                        #         f.close()
-                        # except Exception as e:
-                        #     print("Failed to write html file: ", e)
-                        #     continue
+                        body = asset.get("body")
+                        lecture_path = os.path.join(
+                            chapter_dir, "{}.html".format(sanitize_filename(lecture_title)))
+                        try:
+                            with open("./templates/article_template.html", "r") as f:
+                                content = f.read()
+                                content = content.replace("__title_placeholder__", lecture_title)
+                                content = content.replace("__data_placeholder__", body)
+                                with open(lecture_path, encoding="utf8", mode="w") as f:
+                                    f.write(content)
+                        except Exception as e:
+                            print("Failed to write html file: ", e)
+                            continue
                     elif asset_type == "video":
                         logger.warning(
                             "If you're seeing this message, that means that you reached a secret area that I haven't finished! jk I haven't implemented handling for this asset type, please report this at https://github.com/Puyodead1/udemy-downloader/issues so I can add it. When reporting, please provide the following information: "
@@ -1727,7 +1731,6 @@ def parse_new(udemy: Udemy, udemy_object: dict):
                         if name.lower() not in file_data:
                             with open(filename, "a", encoding="utf-8", errors="ignore") as f:
                                 f.write(content)
-                                f.close()
 
 
 def _print_course_info(udemy: Udemy, udemy_object: dict):
@@ -1843,7 +1846,7 @@ def main():
             title = sanitize_filename(course_info.get("title"))
             course_title = course_info.get("published_title")
 
-    logger.info("> Fetching course content, this may take a minute...")
+    logger.info("> Fetching course curriculum, this may take a minute...")
     if load_from_file:
         course_json = json.loads(
             open(os.path.join(os.getcwd(), "saved", "course_content.json"), encoding="utf8", mode="r").read()
@@ -1852,15 +1855,14 @@ def main():
         course_title = course_json.get("published_title")
         portal_name = course_json.get("portal_name")
     else:
-        course_json = udemy._extract_course_json(course_url, course_id, portal_name)
+        course_json = udemy._extract_course_curriculum(course_url, course_id, portal_name)
         course_json["portal_name"] = portal_name
 
     if save_to_file:
         with open(os.path.join(os.getcwd(), "saved", "course_content.json"), encoding="utf8", mode="w") as f:
             f.write(json.dumps(course_json))
-            f.close()
 
-    logger.info("> Course content retrieved!")
+    logger.info("> Course curriculum retrieved!")
     course = course_json.get("results")
     resource = course_json.get("detail")
 
@@ -1999,7 +2001,6 @@ def main():
                 udemy_object.pop("bearer_token")
                 udemy_object["portal_name"] = portal_name
                 f.write(json.dumps(udemy_object))
-                f.close()
             logger.info("> Saved parsed data to json")
 
         if info:
