@@ -481,12 +481,14 @@ class Udemy:
         return _temp
 
     def _extract_article(self, asset, id):
-        return [{
-            "type": "article",
-            "body": asset.get("body"),
-            "extension": "html",
-            "id": id,
-        }]
+        return [
+            {
+                "type": "article",
+                "body": asset.get("body"),
+                "extension": "html",
+                "id": id,
+            }
+        ]
 
     def _extract_ppt(self, asset, lecture_counter):
         _temp = []
@@ -1114,7 +1116,7 @@ class Session(object):
         self._headers["Authorization"] = "Bearer {}".format(bearer_token)
         self._headers["X-Udemy-Authorization"] = "Bearer {}".format(bearer_token)
 
-    def _get(self, url, params = None):
+    def _get(self, url, params=None):
         for i in range(10):
             session = self._session.get(url, headers=self._headers, cookies=cj, params=params)
             if session.ok or session.status_code in [502, 503]:
@@ -1679,12 +1681,12 @@ def parse_new(udemy: Udemy, udemy_object: dict):
 
                     if asset_type == "article":
                         body = asset.get("body")
-                        lecture_path = os.path.join(
-                            chapter_dir, "{}.html".format(sanitize_filename(lecture_title)))
+                        # stip the 03d prefix
+                        lecture_path = os.path.join(chapter_dir, "{}.html".format(sanitize_filename(lecture_title)))
                         try:
                             with open("./templates/article_template.html", "r") as f:
                                 content = f.read()
-                                content = content.replace("__title_placeholder__", lecture_title)
+                                content = content.replace("__title_placeholder__", lecture_title[4:])
                                 content = content.replace("__data_placeholder__", body)
                                 with open(lecture_path, encoding="utf8", mode="w") as f:
                                     f.write(content)
