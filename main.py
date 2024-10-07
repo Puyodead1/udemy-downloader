@@ -1312,8 +1312,8 @@ def handle_segments(url, format_id, lecture_id, video_title, output_path, chapte
         logger.info("> Cleaning up temporary files...")
         os.remove(video_filepath_enc)
         os.remove(audio_filepath_enc)
-    except Exception:
-        logger.exception(f"Error: ")
+    except Exception as e:
+        logger.exception(f"Muxing error: {e}")
     finally:
         os.chdir(HOME_DIR)
         # if the url is a file url, we need to remove the file after we're done with it
