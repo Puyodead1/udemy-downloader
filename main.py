@@ -1702,7 +1702,7 @@ def parse_new(udemy: Udemy, udemy_object: dict):
                     elif asset_type == "external_link":
                         # write the external link to a shortcut file
                         file_path = os.path.join(chapter_dir, f"{filename}.url")
-                        file = open(file_path, "w")
+                        file = open(file_path, "w",  encoding="utf-8")
                         file.write("[InternetShortcut]\n")
                         file.write(f"URL={download_url}")
                         file.close()
