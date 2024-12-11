@@ -1,7 +1,4 @@
-import logging
-import os
-import time
-
+LOGGER_NAME = "udemy-downloader"
 HEADERS = {
     "Origin": "www.udemy.com",
     # "User-Agent":
@@ -31,13 +28,3 @@ CURRICULUM_ITEMS_PARAMS = {
 }
 
 COURSE_URL_PARAMS = {"fields[course]": "title", "use_remote_version": True, "caching_intent": True}
-
-HOME_DIR = os.getcwd()
-SAVED_DIR = os.path.join(os.getcwd(), "saved")
-KEY_FILE_PATH = os.path.join(os.getcwd(), "keyfile.json")
-COOKIE_FILE_PATH = os.path.join(os.getcwd(), "cookies.txt")
-LOG_DIR_PATH = os.path.join(os.getcwd(), "logs")
-LOG_FILE_PATH = os.path.join(os.getcwd(), "logs", f"{time.strftime('%Y-%m-%d-%I-%M-%S')}.log")
-LOG_FORMAT = "[%(asctime)s] [%(name)s] [%(funcName)s:%(lineno)d] %(levelname)s: %(message)s"
-LOG_DATE_FORMAT = "%I:%M:%S"
-LOG_LEVEL = logging.INFO
