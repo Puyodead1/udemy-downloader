@@ -1125,7 +1125,7 @@ class Udemy:
 
                 if clazz == "quiz":
                     # skip the quiz if we dont want to download it
-                    if not self.dl_quizzes:
+                    if not self.download_quizzes:
                         continue
                     self.process_quiz(lecture, chapter_dir)
                     continue
