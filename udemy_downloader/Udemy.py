@@ -2,6 +2,7 @@ import json
 import logging
 import math
 import os
+import random
 import re
 import subprocess
 import sys
@@ -16,6 +17,9 @@ import yt_dlp
 from bs4 import BeautifulSoup
 from coloredlogs import ColoredFormatter
 from pathvalidate import sanitize_filename
+from pywidevine.cdm import Cdm
+from pywidevine.device import Device
+from pywidevine.pssh import PSSH
 
 from udemy_downloader.constants import (
     COLLECTION_URL,
@@ -23,6 +27,8 @@ from udemy_downloader.constants import (
     COURSE_URL,
     CURRICULUM_ITEMS_PARAMS,
     CURRICULUM_ITEMS_URL,
+    LECTURE_URL,
+    LICENSE_URL,
     LOGGER_NAME,
     MY_COURSES_URL,
     QUIZ_URL,
@@ -34,9 +40,9 @@ from udemy_downloader.utils import (
     check_for_ffmpeg,
     deEmojify,
     download_aria,
-    extract_kid,
     log_subprocess_output,
-    parse_chapter_filter
+    parse_chapter_filter,
+    pssh_from_file,
 )
 from udemy_downloader.vtt_to_srt import convert
 
@@ -66,9 +72,10 @@ class Udemy:
         use_nvenc: bool,
         log_level_str: str,
         id_as_course_name: bool,
-        out: str,
+        out: Union[str, None],
         use_continuous_lecture_numbers: bool,
         chapter_filter_raw: Union[str, None] = None,
+        device: Union[str, None],
     ):
         self.keys: dict[str, str] = {}
         self.session: Union[Session, None] = None
@@ -108,6 +115,7 @@ class Udemy:
             self.logger.info("Chapter filter applied: %s", sorted(self.chapter_filter))
 
         self.home_dir = Path(os.getcwd())
+        self.devices_dir = self.home_dir / "devices"
         self.download_dir = self.home_dir / "downloads"
         self.saved_dir = self.home_dir / "saved"
         self.key_file_path = self.home_dir / "keyfile.json"
@@ -119,6 +127,17 @@ class Udemy:
 
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.saved_dir.mkdir(parents=True, exist_ok=True)
+        self.devices_dir.mkdir(parents=True, exist_ok=True)
+
+        self.init_logger()
+
+        if device:
+            self.device_path = self.devices_dir / f"{device}.wvd"
+            if not self.device_path.exists():
+                self.logger.error(f"Device file {self.device_path.relative_to(self.home_dir)} not found!")
+                sys.exit(1)
+            self.device = Device.load(self.device_path)
+            self.cdm = Cdm.from_device(self.device)
 
     def init_logger(self):
         # parse the log level string to a log level
@@ -669,7 +688,7 @@ class Udemy:
 
             _temp = _temp2
         except Exception:
-            logger.exception(f"Error fetching MPD streams")
+            self.logger.exception(f"Error fetching MPD streams")
 
         # We don't delete the mpd file yet because we can use it to download later
         return _temp
@@ -835,7 +854,7 @@ class Udemy:
         data = soup.find("div", {"class": "ud-component--course-taking--app"})
         if not data:
             self.logger.fatal(
-                "Could not find course data. Possible causes are: Missing cookies.txt file, incorrect url (should end with /learn), not logged in to udemy in specified browser."
+                "Could not find course data. Possible causes are: Missing cookies.txt file, incorrect url (should end with /learn), not logged in to Udemy in specified browser, or not logged into Udemy with the correct account."
             )
             self.session.terminate()
             sys.exit(1)
@@ -1456,7 +1475,13 @@ class Udemy:
                 self.logger.error("      > Missing sources for lecture", lecture)
 
     def handle_segments(
-        self, url: str, format_id, lecture_id: str, video_title: str, output_path: Path, chapter_dir: Path
+        self,
+        url: str,
+        format_id,
+        lecture_id: str,
+        video_title: str,
+        output_path: Path,
+        chapter_dir: Path,
     ):
         os.chdir(chapter_dir)
 
@@ -1495,42 +1520,64 @@ class Udemy:
             self.logger.warning("Return code from the downloader was non-0 (error), skipping!")
             return
 
-        audio_kid = None
-        video_kid = None
+        pssh_b64 = pssh_from_file(video_filepath_enc)
+        pssh = PSSH(pssh_b64)
 
-        try:
-            video_kid = extract_kid(video_filepath_enc)
-            self.logger.info("KID for video file is: " + video_kid)
-        except Exception:
-            self.logger.exception(f"Error extracting video kid")
+        kid = pssh.key_ids[0]
+
+        self.logger.info(f"KID is: {kid}")
+
+        key = None
+
+        if kid is not None:
+            try:
+                key = self.keys[kid.hex.replace("-", "")]
+            except KeyError:
+                pass
+
+        if not key and not self.device:
+            self.logger.error("No key found and no device is available to make a license request, skipping!")
             return
 
-        try:
-            audio_kid = extract_kid(audio_filepath_enc)
-            self.logger.info("KID for audio file is: " + audio_kid)
-        except Exception:
-            self.logger.exception(f"Error extracting audio kid")
-            return
-
-        audio_key = None
-        video_key = None
-
-        if audio_kid is not None:
+        if not key:
+            # request a media license token
+            url = LECTURE_URL.format(
+                portal_name=self.portal_name, course_id=self.course_id, lecture_id=lecture_id, rand=random.random()
+            )
+            self.logger.info(f"Requesting a media license token...")
             try:
-                audio_key = self.keys[audio_kid]
-            except KeyError:
-                self.logger.error(
-                    f"Audio key not found for {audio_kid}, if you have the key then you probably didn't add them to the key file correctly."
-                )
-                return
+                r = self.session._get(url)
+                r.raise_for_status()
+                media_license_token = r.json()["asset"]["media_license_token"]
 
-        if video_kid is not None:
-            try:
-                video_key = self.keys[video_kid]
-            except KeyError:
-                self.logger.error(
-                    f"Video key not found for {audio_kid}, if you have the key then you probably didn't add them to the key file correctly."
-                )
+                # try to make a license request
+                license_url = LICENSE_URL.format(portal_name=self.portal_name, auth_token=media_license_token)
+                session_id = self.cdm.open()
+                challenge = self.cdm.get_license_challenge(session_id, pssh, "STREAMING", False)
+
+                try:
+                    self.logger.debug(f"Making license request to {license_url}")
+                    r = self.session._post(license_url, challenge)
+                    if not r.ok:
+                        print(r.text)
+                    r.raise_for_status()
+                    self.cdm.parse_license(session_id, r.content)
+                    keys = self.cdm.get_keys(session_id, "CONTENT")
+                    # find key that matches kid
+                    key = next((k.key.hex() for k in keys if k.kid == kid), None)
+                    if not key:
+                        self.logger.error("Failed to get decryption key, skipping!")
+                        return
+
+                    self.keys[kid.hex.replace("-", "")] = key
+                    self.save_keys()
+
+                    self.logger.info(f"Got decryption key: {key}")
+                except Exception as e:
+                    self.logger.error(f"Failed to get media license token: {e}")
+                    return
+            except Exception as e:
+                self.logger.error(f"Failed to get license: {e}")
                 return
 
         try:
@@ -1547,9 +1594,7 @@ class Udemy:
             #     return
             # logger.info("> Decryption complete")
             self.logger.info("> Merging video and audio, this might take a minute...")
-            self.mux_process(
-                video_filepath_enc, audio_filepath_enc, video_title, temp_output_path, audio_key, video_key
-            )
+            self.mux_process(video_filepath_enc, audio_filepath_enc, video_title, temp_output_path, key)
             if ret_code != 0:
                 self.logger.error("> Return code from ffmpeg was non-0 (error), skipping!")
                 return
@@ -1561,7 +1606,7 @@ class Udemy:
         except Exception as e:
             self.logger.exception(f"Muxing error: {e}")
         finally:
-            os.chdir(self.home)
+            os.chdir(self.home_dir)
             # if the url is a file url, we need to remove the file after we're done with it
             if url.startswith("file://"):
                 try:
@@ -1575,25 +1620,24 @@ class Udemy:
         audio_filepath: str,
         video_title: str,
         output_path: str,
-        audio_key: Union[str | None] = None,
-        video_key: Union[str | None] = None,
+        key: Union[str | None] = None,
     ):
         codec = "hevc_nvenc" if self.use_nvenc else "libx265"
         transcode = "-hwaccel cuda -hwaccel_output_format cuda" if self.use_nvenc else ""
-        audio_decryption_arg = f"-decryption_key {audio_key}" if audio_key is not None else ""
-        video_decryption_arg = f"-decryption_key {video_key}" if video_key is not None else ""
+        decryption_arg = f"-decryption_key {key}" if key is not None else ""
 
         if os.name == "nt":
             if self.use_h265:
-                command = f'ffmpeg {transcode} -y {video_decryption_arg} -i "{video_filepath}" {audio_decryption_arg} -i "{audio_filepath}" -c:v {codec} -vtag hvc1 -crf {self.h265_crf} -preset {self.h265_preset} -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
+                command = f'ffmpeg {transcode} -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c:v {codec} -vtag hvc1 -crf {self.h265_crf} -preset {self.h265_preset} -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
             else:
-                command = f'ffmpeg -y {video_decryption_arg} -i "{video_filepath}" {audio_decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
+                command = f'ffmpeg -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
         else:
             if use_h265:
-                command = f'nice -n 7 ffmpeg {transcode} -y {video_decryption_arg} -i "{video_filepath}" {audio_decryption_arg} -i "{audio_filepath}" -c:v {codec} -vtag hvc1 -crf {h265_crf} -preset {h265_preset} -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
+                command = f'nice -n 7 ffmpeg {transcode} -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c:v {codec} -vtag hvc1 -crf {h265_crf} -preset {h265_preset} -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
             else:
-                command = f'nice -n 7 ffmpeg -y {video_decryption_arg} -i "{video_filepath}" {audio_decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
+                command = f'nice -n 7 ffmpeg -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
 
+        print(command)
         process = subprocess.Popen(command, shell=True)
         log_subprocess_output("FFMPEG-STDOUT", process.stdout)
         log_subprocess_output("FFMPEG-STDERR", process.stderr)
@@ -1681,3 +1725,15 @@ class Udemy:
             html = html.replace("__data_placeholder__", json.dumps(quiz_data))
             with lecture_path.open(mode="w") as f:
                 f.write(html)
+
+    def load_keys(self):
+        if self.key_file_path.exists():
+            with self.key_file_path.open("r") as keyfile:
+                self.keys = json.loads(keyfile.read())
+        else:
+            self.logger.warning("> Keyfile not found, you may not be able to decrypt DRM content.")
+
+    def save_keys(self):
+        self.logger.info("> Saving keys to keyfile...")
+        with self.key_file_path.open("w") as keyfile:
+            keyfile.write(json.dumps(self.keys))

@@ -132,3 +132,6 @@ temp/
 *.exe
 # Docker Compose output volume
 output/
+devices/
+downloads/
+logs/

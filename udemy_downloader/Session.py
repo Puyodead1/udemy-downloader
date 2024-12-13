@@ -14,6 +14,8 @@ class Session(object):
     def __init__(self, headers={}):
         self._headers = headers
         self._session = requests.sessions.Session()
+        self._session.headers.update(self._headers)
+        # self.cookiejar = CookieJar()
         # this is to bypass TLS fingerprinting
         self._session.mount(
             "https://",
@@ -28,20 +30,21 @@ class Session(object):
 
     def _get(self, url, params=None):
         for i in range(10):
-            session = self._session.get(url, headers=self._headers, cookies=self.cookiejar, params=params)
-            if session.ok or session.status_code in [502, 503]:
-                return session
-            if not session.ok:
+            r = self._session.get(url, params=params)
+            if not r.ok and r.status_code not in [502, 503]:
+                print(r.text)
                 logger.error("Failed request " + url)
-                logger.error(f"{session.status_code} {session.reason}, retrying (attempt {i} )...")
+                logger.error(f"{r.status_code} {r.reason}, retrying (attempt {i} )...")
                 time.sleep(0.8)
 
+            return r
+
     def _post(self, url, data, redirect=True):
-        session = self._session.post(url, data, headers=self._headers, allow_redirects=redirect, cookies=self.cookiejar)
-        if session.ok:
-            return session
-        if not session.ok:
-            raise Exception(f"{session.status_code} {session.reason}")
+        r = self._session.post(url, data, allow_redirects=redirect)
+        if not r.ok:
+            print(r.text)
+            raise Exception(f"{r.status_code} {r.reason}")
+        return r
 
     def set_cookiejar(self, cookiejar: CookieJar):
-        self.cookiejar = cookiejar
+        self._session.cookies = cookiejar

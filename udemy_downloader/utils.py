@@ -3,46 +3,25 @@ import codecs
 import logging
 import os
 import subprocess
+from pathlib import Path
 from typing import IO
 
 import demoji
 import requests
 from tqdm import tqdm
 
-from udemy_downloader import mp4parse, widevine_pssh_data_pb2
-
 logger = logging.getLogger(__name__)
 
 
-def extract_kid(mp4_file):
-    """
-    Parameters
-    ----------
-    mp4_file : str
-        MP4 file with a PSSH header
+def get_pssh(raw: bytes) -> str:
+    offset = raw.rfind(b"pssh")
+    return raw[offset - 4 : offset - 4 + raw[offset - 1]]
 
 
-    Returns
-    -------
-    String
-
-    """
-
-    boxes = mp4parse.F4VParser.parse(filename=mp4_file)
-    if not os.path.exists(mp4_file):
-        raise Exception("File does not exist")
-    for box in boxes:
-        if box.header.box_type == "moov":
-            pssh_box = next(x for x in box.pssh if x.system_id == "edef8ba979d64acea3c827dcd51d21ed")
-            hex = codecs.decode(pssh_box.payload, "hex")
-
-            pssh = widevine_pssh_data_pb2.WidevinePsshData()
-            pssh.ParseFromString(hex)
-            content_id = base64.b16encode(pssh.content_id)
-            return content_id.decode("utf-8").lower()
-
-    # No Moof or PSSH header found
-    return None
+def pssh_from_file(file_path: str) -> str:
+    data = Path(file_path).read_bytes()
+    pssh = get_pssh(data)
+    return base64.b64encode(pssh).decode()
 
 
 def deEmojify(inputStr: str):
