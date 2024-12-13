@@ -288,7 +288,7 @@ class Udemy:
             {
                 "Host": "{portal_name}.udemy.com".format(portal_name=self.portal_name),
                 "Referer": "https://{portal_name}.udemy.com/course/{course_name}/learn/quiz/{quiz_id}".format(
-                    portal_name=self.portal_name, course_name=self.course_name, quiz_id=quiz_id
+                    portal_name=self.portal_name, course_name=self.course_slug, quiz_id=quiz_id
                 ),
             }
         )
@@ -1191,7 +1191,8 @@ class Udemy:
                             # stip the 03d prefix
                             lecture_path = os.path.join(chapter_dir, "{}.html".format(sanitize_filename(lecture_title)))
                             try:
-                                with open("./templates/article_template.html", "r") as f:
+                                template_path = Path(os.path.dirname(__file__), "templates", "article_template")
+                                with open(template_path, "r") as f:
                                     content = f.read()
                                     content = content.replace("__title_placeholder__", lecture_title[4:])
                                     content = content.replace("__data_placeholder__", body)
@@ -1690,7 +1691,8 @@ class Udemy:
         lecture_path = chapter_dir / lecture_file_name
 
         self.logger.info(f"  > Processing quiz {lecture_index}")
-        with open("./templates/quiz_template.html", "r") as f:
+        template_path = Path(os.path.dirname(__file__), "templates", "quiz_template.html")
+        with open(template_path, "r") as f:
             html = f.read()
             quiz_data = {
                 "quiz_id": lecture["data"].get("id"),
@@ -1711,7 +1713,8 @@ class Udemy:
 
         self.logger.info(f"  > Processing quiz {lecture_index} (coding assignment)")
 
-        with open("./templates/coding_assignment_template.html", "r") as f:
+        template_path = Path(os.path.dirname(__file__), "templates", "coding_assignment_template.html")
+        with open(template_path, "r") as f:
             html = f.read()
             quiz_data = {
                 "title": lecture_title,
