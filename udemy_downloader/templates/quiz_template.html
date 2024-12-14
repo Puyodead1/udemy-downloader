@@ -148,7 +148,7 @@
                 }
             }
 
-            .question-lable {
+            .question-lablel {
                 display: flex;
                 align-items: center;
                 gap: 8px;
@@ -169,7 +169,7 @@
                 background-color: var(--success-background);
                 border: none;
                 color: #f4f5f7;
-                opacity: 0.8;
+                opacity: 1;
                 font-size: 18px;
                 flex-grow: 1;
                 padding: 8px 16px;
@@ -177,24 +177,42 @@
             }
 
             .button:hover {
-                opacity: 1;
+                opacity: 0.8;
             }
 
-            .explanation-btn {
+            .submit-button {
+                background-color: var(--success-background);
                 border: none;
-                color: var(--success);
-                background-color: transparent;
+                color: #f4f5f7;
+                opacity: 1;
+                font-size: 18px;
+                flex-grow: 1;
+                padding: 8px 16px;
+                border-radius: 8px;
             }
 
-            #submit-button:active::after {
+            .submit-button:hover {
+                opacity: 0.8;
+            }
+
+            .submit-button {
+                margin-top: 5px;
+            }
+
+            .submit-button:active::after {
                 background-color: #ef4444;
+            }
+
+            .submit-button:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
             }
 
             .single-question-container {
                 background-color: var(--primary-color);
                 display: flex;
                 flex-direction: column;
-                gap: 8px;
+                gap: 16px;
                 padding: 16px;
                 border-radius: 8px;
             }
@@ -238,11 +256,13 @@
 
             .correct-answer label {
                 border: 2px solid var(--success);
+                border-radius: 8px;
                 width: 100%;
             }
 
             .incorrect-answer label {
                 border: 2px solid var(--danger);
+                border-radius: 8px;
                 width: 100%;
             }
 
@@ -268,6 +288,20 @@
             #quiz-description {
                 line-height: 1.5;
                 padding: 2px 6px;
+            }
+
+            .feedback {
+                display: none;
+                padding: 20px;
+                border-radius: 10px;
+            }
+
+            .feedback-correct {
+                border: 1px var(--success) solid;
+            }
+
+            .feedback-incorrect {
+                border: 1px var(--danger) solid;
             }
         </style>
     </head>
@@ -318,11 +352,28 @@
                 // update quiz meta data
                 document.title = quizTitle;
                 quizTitleElement.innerHTML = quizTitle;
-                quizDescriptionElement.innerHTML = quizDescription;
+                if (quizDescription) {
+                    quizDescriptionElement.innerHTML = quizDescription;
+                } else {
+                    // prevents title from being uncentered
+                    quizDescriptionElement.style.display = "none";
+                    quizTitleElement.style.marginBottom = "0";
+                }
 
                 const passPercentElement = document.getElementById("pass-percent");
                 passPercentElement.innerHTML = passPercent + "%";
+
+                if (passPercent) {
+                    const passPercentElement = document.getElementById("pass-percent");
+                    passPercentElement.innerHTML = passPercent + "%";
+                } else {
+                    passPercentElement.style.display = "none";
+                    const scoreOfElement = document.getElementById("score-of");
+                    scoreOfElement.style.display = "none";
+                }
+
                 totalNumberOfQuestions = questionData.length;
+
                 // shuffle the questionData to randomize the order of the questions
                 for (let i = questionData.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
@@ -344,9 +395,8 @@
              * @return {Object} The formatted question object with the following properties:
              *   - id: The ID of the question.
              *   - question: The text of the question.
-             *   - answers: The array of answer options.
+             *   - answers: The array of answer options and feedbacks objects.
              *   - correctAnswer: The text of the correct answer.
-             *   - explanation: The explanation of the correct answer.
              */
             function formatSingleQuestionData(singleQuizData = null) {
                 const { prompt, correct_response, id } = singleQuizData;
@@ -354,12 +404,18 @@
                 const answers = prompt.answers;
                 const correctAnswer = correct_response[0];
                 const correctAnswerText = answers[correctAnswer.toLowerCase().charCodeAt(0) - 97];
+
+                // create a map of answer and feedback
+                const answersMap = prompt.answers.map((answer, idx) => ({
+                    answer: answer,
+                    feedback: prompt.feedbacks[idx],
+                }));
+
                 const questionObj = {
                     id: id,
                     question: questionText,
-                    answers: answers,
+                    answers: answersMap,
                     correctAnswer: correctAnswerText,
-                    explanation: prompt?.explanation || "",
                 };
                 return questionObj;
             }
@@ -373,7 +429,7 @@
              */
 
             const renderSingleQuestion = (singleQuestionData = {}, rootIndex = 1) => {
-                const { id, explanation, answers, correctAnswer, question } = singleQuestionData;
+                const { id, answers, correctAnswer, question } = singleQuestionData;
                 // shuffle the answers to randomize the order of the answers
                 for (let i = answers.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
@@ -384,9 +440,11 @@
                         const optionId = `${id}_${index}`;
 
                         return `
-        <div class="question-lable">
-          <input type="radio" id="${optionId}" name="${"answer"}" value="${option}" />
-          <label for="${optionId}">${option}</label>
+        <div class="question-lablel">
+          <input type="radio" id="${optionId}" name="${"answer"}" value="${option.answer}" data-feedback="${
+                            option.feedback
+                        }" onchange="handleSelect(id)" />
+          <label for="${optionId}">${option.answer}</label>
         </div>
       `;
                     })
@@ -398,14 +456,16 @@
         <form data-correct-answer="${correctAnswer}" data-question-id="${id}" class="single-question-container" onsubmit="submitButtonListener(event)">
           <div style="display: flex;justify-content: space-between;">
             <p style="font-weight: 600">Question ${rootIndex}:</p>
-            <button type="button" onclick="renderExplanation(event)" id="${`explanation-${id}`}" data-explanation="${explanation}" class="explanation-btn">View Explanation</button>
+          </div>
+          <div class="feedback" id="feedback-${id}">
+            <p id="feedback-text">Placeholder</p>
           </div>
           <p style="margin-bottom: 8px;line-height: 1.5">${question}</p>
           <div class="options-container">
             ${optionsHTML}
           </div>
-          <div style="display: flex; gap: 8px;">
-            <button type="submit" id="submit-button" class="button">Submit</button>
+          <div style="display: flex; gap: 8px;margin-top: 32px;">
+            <button type="submit" id="submit-button-${id}" class="submit-button" disabled="">Submit</button>
           </div>
         </form>
       `;
@@ -447,6 +507,8 @@
                 const { answer: userAnswer } = Object.fromEntries(formData.entries());
                 const correctAnswer = e.target.dataset.correctAnswer;
                 const questionId = e.target.dataset.questionId;
+                const feedback = selectedOption.dataset.feedback;
+
                 if (userAnswer == correctAnswer) {
                     correct.add(questionId);
                     incorrect.delete(questionId);
@@ -455,25 +517,35 @@
                     incorrect.add(e.target.dataset.questionId);
                     correct.delete(questionId);
                 }
+
                 updateScore();
 
-                const resultClass = isCorrect ? "correct-answer" : "incorrect-answer";
-
-                form.querySelectorAll(".question-lable").forEach((label) => {
+                form.querySelectorAll(".question-lablel").forEach((label) => {
                     label.classList.remove("correct-answer", "incorrect-answer");
                 });
-                selectedOption.closest(".question-lable").classList.add(resultClass);
+                selectedOption
+                    .closest(".question-lablel")
+                    .classList.add(isCorrect ? "correct-answer" : "incorrect-answer");
+
+                const feedbackElement = form.querySelector(".feedback");
+                const feedbackTextElement = form.querySelector("#feedback-text");
+
+                // remove the feedback-correct and feedback-incorrect classes
+                feedbackElement.classList.remove("feedback-correct", "feedback-incorrect");
+
+                if (feedback) {
+                    feedbackTextElement.innerHTML = feedback;
+                    feedbackElement.classList.add(isCorrect ? "feedback-correct" : "feedback-incorrect");
+                    feedbackElement.style.display = "flex";
+                } else {
+                    feedbackElement.style.display = "none";
+                }
             };
 
-            function renderExplanation(ev) {
-                modalTextElement.innerHTML = ev.target.dataset?.explanation || "no explanation found";
-                dialog.showModal();
-                dialog.addEventListener("click", (event) => {
-                    if (event.target === dialog) {
-                        dialog.close();
-                    }
-                });
-            }
+            const handleSelect = (id) => {
+                const submitButton = document.getElementById(`submit-button-${id.split("_")[0]}`);
+                submitButton.disabled = false;
+            };
         </script>
     </body>
 </html>
