@@ -1633,7 +1633,7 @@ class Udemy:
             else:
                 command = f'ffmpeg -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
         else:
-            if use_h265:
+            if self.use_h265:
                 command = f'nice -n 7 ffmpeg {transcode} -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c:v {codec} -vtag hvc1 -crf {h265_crf} -preset {h265_preset} -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
             else:
                 command = f'nice -n 7 ffmpeg -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
