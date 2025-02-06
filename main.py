@@ -60,6 +60,7 @@ use_nvenc = False
 browser = None
 cj = None
 use_continuous_lecture_numbers = False
+chapter_filter = None
 
 
 def deEmojify(inputStr: str):
@@ -74,9 +75,31 @@ def log_subprocess_output(prefix: str, pipe: IO[bytes]):
         pipe.flush()
 
 
+def parse_chapter_filter(chapter_str: str):
+    """
+    Given a string like "1,3-5,7,9-11", return a set of chapter numbers.
+    """
+    chapters = set()
+    for part in chapter_str.split(','):
+        if '-' in part:
+            try:
+                start, end = part.split('-')
+                start = int(start.strip())
+                end = int(end.strip())
+                chapters.update(range(start, end + 1))
+            except ValueError:
+                logger.error("Invalid range in --chapter argument: %s", part)
+        else:
+            try:
+                chapters.add(int(part.strip()))
+            except ValueError:
+                logger.error("Invalid chapter number in --chapter argument: %s", part)
+    return chapters
+
+
 # this is the first function that is called, we parse the arguments, setup the logger, and ensure that required directories exist
 def pre_run():
-    global dl_assets, dl_captions, dl_quizzes, skip_lectures, caption_locale, quality, bearer_token, course_name, keep_vtt, skip_hls, concurrent_downloads, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, LOG_LEVEL, use_h265, h265_crf, h265_preset, use_nvenc, browser, is_subscription_course, DOWNLOAD_DIR, use_continuous_lecture_numbers
+    global dl_assets, dl_captions, dl_quizzes, skip_lectures, caption_locale, quality, bearer_token, course_name, keep_vtt, skip_hls, concurrent_downloads, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, LOG_LEVEL, use_h265, h265_crf, h265_preset, use_nvenc, browser, is_subscription_course, DOWNLOAD_DIR, use_continuous_lecture_numbers, chapter_filter
 
     # make sure the logs directory exists
     if not os.path.exists(LOG_DIR_PATH):
@@ -233,6 +256,12 @@ def pre_run():
         action="store_true",
         help="Use continuous lecture numbering instead of per-chapter",
     )
+    parser.add_argument(
+        "--chapter",
+        dest="chapter_filter_raw",
+        type=str,
+        help="Download specific chapters. Use comma separated values and ranges (e.g., '1,3-5,7,9-11').",
+    )
     # parser.add_argument("-v", "--version", action="version", version="You are running version {version}".format(version=__version__))
 
     args = parser.parse_args()
@@ -339,6 +368,11 @@ def pre_run():
             keys = json.loads(keyfile.read())
     else:
         logger.warning("> Keyfile not found! You won't be able to decrypt any encrypted videos!")
+
+    # Process the chapter filter
+    if args.chapter_filter_raw:
+        chapter_filter = parse_chapter_filter(args.chapter_filter_raw)
+        logger.info("Chapter filter applied: %s", sorted(chapter_filter))
 
 
 class Udemy:
@@ -1596,6 +1630,12 @@ def parse_new(udemy: Udemy, udemy_object: dict):
         os.mkdir(course_dir)
 
     for chapter in udemy_object.get("chapters"):
+        current_chapter_index = int(chapter.get("chapter_index"))
+        # Skip chapters not in the filter if a filter is provided
+        if chapter_filter is not None and current_chapter_index not in chapter_filter:
+            logger.info("Skipping chapter %s as it is not in the specified filter", current_chapter_index)
+            continue
+
         chapter_title = chapter.get("chapter_title")
         chapter_index = chapter.get("chapter_index")
         chapter_dir = os.path.join(course_dir, chapter_title)
@@ -1744,6 +1784,11 @@ def _print_course_info(udemy: Udemy, udemy_object: dict):
 
     chapters = udemy_object.get("chapters")
     for chapter in chapters:
+        current_chapter_index = int(chapter.get("chapter_index"))
+        # Skip chapters not in the filter if a filter is provided
+        if chapter_filter is not None and current_chapter_index not in chapter_filter:
+            continue
+
         chapter_title = chapter.get("chapter_title")
         chapter_index = chapter.get("chapter_index")
         chapter_lecture_count = chapter.get("lecture_count")
