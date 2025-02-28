@@ -10,7 +10,6 @@
 
 # NOTE
 
--   **This tool will not work without decryption keys. Do not bother installing unless you already have keys or can obtain them!**
 -   If you ask about keys in the issues, your message will be deleted and you will be blocked.
 -   **Downloading courses is against Udemy's Terms of Service, I am NOT held responsible for your account getting suspended as a result from the use of this program!**
 -   This program is WIP, the code is provided as-is and I am not held resposible for any legal issues resulting from the use of this program.
@@ -19,9 +18,6 @@
 
 Utility script to download Udemy courses, has support for DRM videos but requires the user to acquire the decryption key (for legal reasons).<br>
 Windows is the primary development OS, but I've made an effort to support Linux also (Mac untested).
-
-> [!CAUTION]
-> The ability to download captions automatically is currently broken due to changes in Udemy's API!
 
 > [!IMPORTANT]  
 > This tool will not work on encrypted courses without decryption keys being provided!
