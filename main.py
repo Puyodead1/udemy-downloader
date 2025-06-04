@@ -80,10 +80,10 @@ def parse_chapter_filter(chapter_str: str):
     Given a string like "1,3-5,7,9-11", return a set of chapter numbers.
     """
     chapters = set()
-    for part in chapter_str.split(','):
-        if '-' in part:
+    for part in chapter_str.split(","):
+        if "-" in part:
             try:
-                start, end = part.split('-')
+                start, end = part.split("-")
                 start = int(start.strip())
                 end = int(end.strip())
                 chapters.update(range(start, end + 1))
@@ -752,7 +752,7 @@ class Udemy:
     def _extract_mpd(self, url):
         """extracts mpd streams"""
         asset_id_re = re.compile(r"assets/(?P<id>\d+)/")
-        _temp = []
+        _temp = {}
 
         # get temp folder
         temp_path = Path(Path.cwd(), "temp")
@@ -776,21 +776,47 @@ class Udemy:
                 {"quiet": True, "no_warnings": True, "allow_unplayable_formats": True, "enable_file_urls": True}
             )
             results = ytdl.extract_info(mpd_path.as_uri(), download=False, force_generic_extractor=True)
-            format_id = results.get("format_id")
-            extension = results.get("ext")
-            height = results.get("height")
-            width = results.get("width")
+            formats = results.get("formats", [])
+            best_audio = next(f for f in formats if (f["acodec"] != "none" and f["vcodec"] == "none"))
+            # filter formats to remove any audio only formats
+            formats = [f for f in formats if f["vcodec"] != "none" and f["acodec"] == "none"]
+            if not best_audio:
+                raise ValueError("No suitable audio format found in MPD")
+            audio_format_id = best_audio.get("format_id")
 
-            _temp.append(
-                {
-                    "type": "dash",
-                    "height": str(height),
-                    "width": str(width),
-                    "format_id": format_id.replace("+", ","),
-                    "extension": extension,
-                    "download_url": mpd_path.as_uri(),
-                }
-            )
+            for format in formats:
+                video_format_id = format.get("format_id")
+                extension = format.get("ext")
+                height = format.get("height")
+                width = format.get("width")
+                tbr = format.get("tbr", 0)
+
+                # add to dict based on height
+                if height not in _temp:
+                    _temp[height] = []
+
+                _temp[height].append(
+                    {
+                        "type": "dash",
+                        "height": str(height),
+                        "width": str(width),
+                        "format_id": f"{video_format_id},{audio_format_id}",
+                        "extension": extension,
+                        "download_url": mpd_path.as_uri(),
+                        "tbr": round(tbr),
+                    }
+                )
+            # for each resolution, use only the highest bitrate
+            _temp2 = []
+            for height, formats in _temp.items():
+                if formats:
+                    # sort by tbr and take the first one
+                    formats.sort(key=lambda x: x["tbr"], reverse=True)
+                    _temp2.append(formats[0])
+                else:
+                    del _temp[height]
+
+            _temp = _temp2
         except Exception:
             logger.exception(f"Error fetching MPD streams")
 
@@ -1479,7 +1505,9 @@ def process_lecture(lecture, lecture_path, chapter_dir):
             source = lecture_sources[-1]  # last index is the best quality
             if isinstance(quality, int):
                 source = min(lecture_sources, key=lambda x: abs(int(x.get("height")) - quality))
-            logger.info(f"      > Lecture '{lecture_title}' has DRM, attempting to download")
+            logger.info(
+                f"      > Lecture '{lecture_title}' has DRM, attempting to download. Selected quality: {source.get('height')}"
+            )
             handle_segments(
                 source.get("download_url"),
                 source.get("format_id"),
