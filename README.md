@@ -160,65 +160,65 @@ options:
 ```
 
 -   Passing a Bearer Token and Course ID as an argument
-    -   `python main.py -c <Course URL> -b <Bearer Token>`
-    -   `python main.py -c https://www.udemy.com/courses/myawesomecourse -b <Bearer Token>`
+    -   `python -m udemy_downloader <Course URL> -b <Bearer Token>`
+    -   `python -m udemy_downloader https://www.udemy.com/courses/myawesomecourse -b <Bearer Token>`
 -   Download a specific quality
-    -   `python main.py -c <Course URL> -q 720`
+    -   `python -m udemy_downloader <Course URL> -q 720`
 -   Download assets along with lectures
-    -   `python main.py -c <Course URL> --download-assets`
+    -   `python -m udemy_downloader <Course URL> --download-assets`
 -   Download assets and specify a quality
-    -   `python main.py -c <Course URL> -q 360 --download-assets`
+    -   `python -m udemy_downloader <Course URL> -q 360 --download-assets`
 -   Download captions (Defaults to English)
-    -   `python main.py -c <Course URL> --download-captions`
+    -   `python -m udemy_downloader <Course URL> --download-captions`
 -   Download captions with specific language
-    -   `python main.py -c <Course URL> --download-captions -l en` - English subtitles
-    -   `python main.py -c <Course URL> --download-captions -l es` - Spanish subtitles
-    -   `python main.py -c <Course URL> --download-captions -l it` - Italian subtitles
-    -   `python main.py -c <Course URL> --download-captions -l pl` - Polish Subtitles
-    -   `python main.py -c <Course URL> --download-captions -l all` - Downloads all subtitles
+    -   `python -m udemy_downloader <Course URL> --download-captions -l en` - English subtitles
+    -   `python -m udemy_downloader <Course URL> --download-captions -l es` - Spanish subtitles
+    -   `python -m udemy_downloader <Course URL> --download-captions -l it` - Italian subtitles
+    -   `python -m udemy_downloader <Course URL> --download-captions -l pl` - Polish Subtitles
+    -   `python -m udemy_downloader <Course URL> --download-captions -l all` - Downloads all subtitles
     -   etc
 -   Skip downloading lecture videos
-    -   `python main.py -c <Course URL> --skip-lectures --download-captions` - Downloads only captions
-    -   `python main.py -c <Course URL> --skip-lectures --download-assets` - Downloads only assets
+    -   `python -m udemy_downloader <Course URL> --skip-lectures --download-captions` - Downloads only captions
+    -   `python -m udemy_downloader <Course URL> --skip-lectures --download-assets` - Downloads only assets
 -   Keep .VTT caption files:
-    -   `python main.py -c <Course URL> --download-captions --keep-vtt`
+    -   `python -m udemy_downloader <Course URL> --download-captions --keep-vtt`
 -   Skip parsing HLS Streams (HLS streams usually contain 1080p quality for Non-DRM lectures):
-    -   `python main.py -c <Course URL> --skip-hls`
+    -   `python -m udemy_downloader <Course URL> --skip-hls`
 -   Print course information only:
-    -   `python main.py -c <Course URL> --info`
+    -   `python -m udemy_downloader <Course URL> --info`
 -   Specify max number of concurrent downloads:
-    -   `python main.py -c <Course URL> --concurrent-downloads 20`
-    -   `python main.py -c <Course URL> -cd 20`
+    -   `python -m udemy_downloader <Course URL> --concurrent-downloads 20`
+    -   `python -m udemy_downloader <Course URL> -cd 20`
 -   Cache course information:
-    -   `python main.py -c <Course URL> --save-to-file`
+    -   `python -m udemy_downloader <Course URL> --save-to-file`
 -   Load course cache:
-    -   `python main.py -c <Course URL> --load-from-file`
+    -   `python -m udemy_downloader <Course URL> --load-from-file`
 -   Change logging level:
-    -   `python main.py -c <Course URL> --log-level DEBUG`
-    -   `python main.py -c <Course URL> --log-level WARNING`
-    -   `python main.py -c <Course URL> --log-level INFO`
-    -   `python main.py -c <Course URL> --log-level CRITICAL`
+    -   `python -m udemy_downloader <Course URL> --log-level DEBUG`
+    -   `python -m udemy_downloader <Course URL> --log-level WARNING`
+    -   `python -m udemy_downloader <Course URL> --log-level INFO`
+    -   `python -m udemy_downloader <Course URL> --log-level CRITICAL`
 -   Use course ID as the course name:
-    -   `python main.py -c <Course URL> --id-as-course-name`
+    -   `python -m udemy_downloader <Course URL> --id-as-course-name`
 -   Encode in H.265:
-    -   `python main.py -c <Course URL> --use-h265`
+    -   `python -m udemy_downloader <Course URL> --use-h265`
 -   Encode in H.265 with custom CRF:
-    -   `python main.py -c <Course URL> --use-h265 -h265-crf 20`
+    -   `python -m udemy_downloader <Course URL> --use-h265 -h265-crf 20`
 -   Encode in H.265 with custom preset:
-    -   `python main.py -c <Course URL> --use-h265 --h265-preset faster`
+    -   `python -m udemy_downloader <Course URL> --use-h265 --h265-preset faster`
 -   Encode in H.265 using NVIDIA hardware transcoding:
-    -   `python main.py -c <Course URL> --use-h265 --use-nvenc`
+    -   `python -m udemy_downloader <Course URL> --use-h265 --use-nvenc`
 -   Use continuous numbering (don't restart at 1 in every chapter):
-    -   `python main.py -c <Course URL> --continue-lecture-numbers`
-    -   `python main.py -c <Course URL> -n`
+    -   `python -m udemy_downloader <Course URL> --continue-lecture-numbers`
+    -   `python -m udemy_downloader <Course URL> -n`
 -   Download specific chapters:
-    -   `python main.py -c <Course URL> --chapter "1,3,5"` - Downloads chapters 1, 3, and 5
-    -   `python main.py -c <Course URL> --chapter "1-5"` - Downloads chapters 1 through 5
-    -   `python main.py -c <Course URL> --chapter "1,3-5,7,9-11"` - Downloads chapters 1, 3 through 5, 7, and 9 through 11
+    -   `python -m udemy_downloader <Course URL> --chapter "1,3,5"` - Downloads chapters 1, 3, and 5
+    -   `python -m udemy_downloader <Course URL> --chapter "1-5"` - Downloads chapters 1 through 5
+    -   `python -m udemy_downloader <Course URL> --chapter "1,3-5,7,9-11"` - Downloads chapters 1, 3 through 5, 7, and 9 through 11
 -   Download specific chapters with quality:
-    -   `python main.py -c <Course URL> --chapter "1-3" -q 720`
+    -   `python -m udemy_downloader <Course URL> --chapter "1-3" -q 720`
 -   Download specific chapters with captions:
-    -   `python main.py -c <Course URL> --chapter "1,3" --download-captions`
+    -   `python -m udemy_downloader <Course URL> --chapter "1,3" --download-captions`
 
 # Support
 
