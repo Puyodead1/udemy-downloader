@@ -43,3 +43,6 @@ udl = "udemy_downloader.main:main"
 [tool.isort]
 line_length = 118
 extend_skip_glob = ["*_pb2.py", "*.pyi"]
+
+[tool.poetry.requires-plugins]
+poetry-plugin-export = ">=1.8"
