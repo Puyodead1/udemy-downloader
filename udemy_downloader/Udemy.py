@@ -21,13 +21,29 @@ from pywidevine.cdm import Cdm
 from pywidevine.device import Device
 from pywidevine.pssh import PSSH
 
-from udemy_downloader.constants import (COLLECTION_URL, COURSE_SEARCH, COURSE_URL, CURRICULUM_ITEMS_PARAMS,
-                                        CURRICULUM_ITEMS_URL, LECTURE_URL, LICENSE_URL, LOGGER_NAME, MY_COURSES_URL,
-                                        QUIZ_URL)
+from udemy_downloader.constants import (
+    COLLECTION_URL,
+    COURSE_SEARCH,
+    COURSE_URL,
+    CURRICULUM_ITEMS_PARAMS,
+    CURRICULUM_ITEMS_URL,
+    LECTURE_URL,
+    LICENSE_URL,
+    LOGGER_NAME,
+    MY_COURSES_URL,
+    QUIZ_URL,
+)
 from udemy_downloader.Session import Session
 from udemy_downloader.UdemyAuth import UdemyAuth
-from udemy_downloader.utils import (check_for_aria, check_for_ffmpeg, deEmojify, download_aria, log_subprocess_output,
-                                    parse_chapter_filter, pssh_from_file)
+from udemy_downloader.utils import (
+    check_for_aria,
+    check_for_ffmpeg,
+    deEmojify,
+    download_aria,
+    log_subprocess_output,
+    parse_chapter_filter,
+    pssh_from_file,
+)
 from udemy_downloader.vtt_to_srt import convert
 
 
@@ -1175,7 +1191,7 @@ class Udemy:
                             # stip the 03d prefix
                             lecture_path = os.path.join(chapter_dir, "{}.html".format(sanitize_filename(lecture_title)))
                             try:
-                                template_path = Path(os.path.dirname(__file__), "templates", "article_template")
+                                template_path = Path(os.path.dirname(__file__), "templates", "article_template.html")
                                 with open(template_path, "r") as f:
                                     content = f.read()
                                     content = content.replace("__title_placeholder__", lecture_title[4:])
@@ -1370,7 +1386,9 @@ class Udemy:
                 source = lecture_sources[-1]  # last index is the best quality
                 if isinstance(self.quality, int):
                     source = min(lecture_sources, key=lambda x: abs(int(x.get("height")) - self.quality))
-                self.logger.info(f"      > Lecture '{lecture_title}' has DRM, attempting to download. Selected quality: {source.get('height')}")
+                self.logger.info(
+                    f"      > Lecture '{lecture_title}' has DRM, attempting to download. Selected quality: {source.get('height')}"
+                )
                 self.handle_segments(
                     source.get("download_url"),
                     source.get("format_id"),
@@ -1437,8 +1455,11 @@ class Udemy:
                                         "copy",
                                         "-f",
                                         "mp4",
+                                        "-metadata",
+                                        "comment=Downloaded with Udemy-Downloader by Puyodead1 (https://github.com/Puyodead1/udemy-downloader)",
                                         tmp_file_path,
                                     ]
+                                    print(" ".join([str(x) for x in cmd]))
                                     process = subprocess.Popen(cmd)
                                     log_subprocess_output("FFMPEG-STDOUT", process.stdout)
                                     log_subprocess_output("FFMPEG-STDERR", process.stderr)
@@ -1613,14 +1634,14 @@ class Udemy:
 
         if os.name == "nt":
             if self.use_h265:
-                command = f'ffmpeg {transcode} -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c:v {codec} -vtag hvc1 -crf {self.h265_crf} -preset {self.h265_preset} -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
+                command = f'ffmpeg {transcode} -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c:v {codec} -vtag hvc1 -crf {self.h265_crf} -preset {self.h265_preset} -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" -metadata comment="Downloaded with Udemy-Downloader by Puyodead1 (https://github.com/Puyodead1/udemy-downloader)" "{output_path}"'
             else:
-                command = f'ffmpeg -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
+                command = f'ffmpeg -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" -metadata comment="Downloaded with Udemy-Downloader by Puyodead1 (https://github.com/Puyodead1/udemy-downloader)" "{output_path}"'
         else:
             if self.use_h265:
-                command = f'nice -n 7 ffmpeg {transcode} -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c:v {codec} -vtag hvc1 -crf {h265_crf} -preset {h265_preset} -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
+                command = f'nice -n 7 ffmpeg {transcode} -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c:v {codec} -vtag hvc1 -crf {h265_crf} -preset {h265_preset} -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" -metadata comment="Downloaded with Udemy-Downloader by Puyodead1 (https://github.com/Puyodead1/udemy-downloader)" "{output_path}"'
             else:
-                command = f'nice -n 7 ffmpeg -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" "{output_path}"'
+                command = f'nice -n 7 ffmpeg -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" -metadata comment="Downloaded with Udemy-Downloader by Puyodead1 (https://github.com/Puyodead1/udemy-downloader)" "{output_path}"'
 
         print(command)
         process = subprocess.Popen(command, shell=True)
