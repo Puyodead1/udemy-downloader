@@ -1570,6 +1570,8 @@ def process_lecture(lecture, lecture_path, chapter_dir):
                                     "copy",
                                     "-f",
                                     "mp4",
+                                    "-metadata",
+                                    'comment="Downloaded with Udemy-Downloader by Puyodead1 (https://github.com/Puyodead1/udemy-downloader)"',
                                     tmp_file_path,
                                 ]
                                 process = subprocess.Popen(cmd)
