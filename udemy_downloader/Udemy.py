@@ -21,29 +21,13 @@ from pywidevine.cdm import Cdm
 from pywidevine.device import Device
 from pywidevine.pssh import PSSH
 
-from udemy_downloader.constants import (
-    COLLECTION_URL,
-    COURSE_SEARCH,
-    COURSE_URL,
-    CURRICULUM_ITEMS_PARAMS,
-    CURRICULUM_ITEMS_URL,
-    LECTURE_URL,
-    LICENSE_URL,
-    LOGGER_NAME,
-    MY_COURSES_URL,
-    QUIZ_URL,
-)
+from udemy_downloader.constants import (COLLECTION_URL, COURSE_SEARCH, COURSE_URL, CURRICULUM_ITEMS_PARAMS,
+                                        CURRICULUM_ITEMS_URL, LECTURE_URL, LICENSE_URL, LOGGER_NAME, MY_COURSES_URL,
+                                        QUIZ_URL)
 from udemy_downloader.Session import Session
 from udemy_downloader.UdemyAuth import UdemyAuth
-from udemy_downloader.utils import (
-    check_for_aria,
-    check_for_ffmpeg,
-    deEmojify,
-    download_aria,
-    log_subprocess_output,
-    parse_chapter_filter,
-    pssh_from_file,
-)
+from udemy_downloader.utils import (check_for_aria, check_for_ffmpeg, deEmojify, download_aria, log_subprocess_output,
+                                    parse_chapter_filter, pssh_from_file)
 from udemy_downloader.vtt_to_srt import convert
 
 
@@ -75,7 +59,7 @@ class Udemy:
         out: Union[str, None],
         use_continuous_lecture_numbers: bool,
         chapter_filter_raw: Union[str, None] = None,
-        device: Union[str, None],
+        device: Union[str, None] = None,
     ):
         self.keys: dict[str, str] = {}
         self.session: Union[Session, None] = None
@@ -108,11 +92,6 @@ class Udemy:
         self.id_as_course_name = id_as_course_name
         self.out = out
         self.use_continuous_lecture_numbers = use_continuous_lecture_numbers
-        
-        # Process the chapter filter
-        if chapter_filter_raw:
-            self.chapter_filter = parse_chapter_filter(chapter_filter_raw)
-            self.logger.info("Chapter filter applied: %s", sorted(self.chapter_filter))
 
         self.home_dir = Path(os.getcwd())
         self.devices_dir = self.home_dir / "devices"
@@ -130,6 +109,11 @@ class Udemy:
         self.devices_dir.mkdir(parents=True, exist_ok=True)
 
         self.init_logger()
+
+        # Process the chapter filter
+        if chapter_filter_raw:
+            self.chapter_filter = parse_chapter_filter(chapter_filter_raw)
+            self.logger.info("Chapter filter applied: %s", sorted(self.chapter_filter))
 
         if device:
             self.device_path = self.devices_dir / f"{device}.wvd"
