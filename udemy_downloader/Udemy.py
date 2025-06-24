@@ -77,6 +77,7 @@ class Udemy:
         chapter_filter_raw: Union[str, None] = None,
         device: Union[str, None] = None,
     ):
+        self.chapter_filter = None
         self.keys: dict[str, str] = {}
         self.session: Union[Session, None] = None
         self.cj: CookieJar = None
