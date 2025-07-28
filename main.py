@@ -107,7 +107,12 @@ def pre_run():
 
     parser = argparse.ArgumentParser(description="Udemy Downloader")
     parser.add_argument(
-        "-c", "--course-url", dest="course_url", type=str, help="The URL of the course to download", required=True
+        "-c",
+        "--course-url",
+        dest="course_url",
+        type=str,
+        help="The URL of the course to download",
+        required=True,
     )
     parser.add_argument(
         "-b",
@@ -214,7 +219,17 @@ def pre_run():
         "--browser",
         dest="browser",
         help="The browser to extract cookies from",
-        choices=["chrome", "firefox", "opera", "edge", "brave", "chromium", "vivaldi", "safari", "file"],
+        choices=[
+            "chrome",
+            "firefox",
+            "opera",
+            "edge",
+            "brave",
+            "chromium",
+            "vivaldi",
+            "safari",
+            "file",
+        ],
     )
     parser.add_argument(
         "--use-h265",
@@ -382,8 +397,9 @@ class Udemy:
         self.session = None
         self.bearer_token = None
         self.auth = UdemyAuth(cache_session=False)
-        if not self.session:
-            self.session = self.auth.authenticate(bearer_token=bearer_token)
+        self.session = self.auth._session
+        # if not self.session:
+        #     self.session = self.auth.authenticate(bearer_token=bearer_token)
 
         if not self.session:
             if browser == None:
@@ -414,15 +430,15 @@ class Udemy:
                 cj.load()
 
     def _get_quiz(self, quiz_id):
-        self.session._headers.update(
-            {
-                "Host": "{portal_name}.udemy.com".format(portal_name=portal_name),
-                "Referer": "https://{portal_name}.udemy.com/course/{course_name}/learn/quiz/{quiz_id}".format(
-                    portal_name=portal_name, course_name=course_name, quiz_id=quiz_id
-                ),
-            }
-        )
-        url = QUIZ_URL.format(portal_name=portal_name, quiz_id=quiz_id)
+        # self.session._headers.update(
+        #     {
+        #         "Host": "{portal_name}.udemy.com".format(portal_name=portal_name),
+        #         "Referer": "https://{portal_name}.udemy.com/course/{course_name}/learn/quiz/{quiz_id}".format(
+        #             portal_name=portal_name, course_name=course_name, quiz_id=quiz_id
+        #         ),
+        #     }
+        # )
+        url = URLS.QUIZ.format(portal_name=portal_name, quiz_id=quiz_id)
         try:
             resp = self.session._get(url).json()
         except conn_error as error:
@@ -773,7 +789,12 @@ class Udemy:
                 f.write(r.content)
 
             ytdl = yt_dlp.YoutubeDL(
-                {"quiet": True, "no_warnings": True, "allow_unplayable_formats": True, "enable_file_urls": True}
+                {
+                    "quiet": True,
+                    "no_warnings": True,
+                    "allow_unplayable_formats": True,
+                    "enable_file_urls": True,
+                }
             )
             results = ytdl.extract_info(mpd_path.as_uri(), download=False, force_generic_extractor=True)
             formats = results.get("formats", [])
@@ -839,51 +860,19 @@ class Udemy:
         if obj:
             return obj.group("portal_name")
 
-    def _subscribed_courses(self, portal_name, course_name):
-        results = []
-        self.session._headers.update(
-            {
-                "Host": "{portal_name}.udemy.com".format(portal_name=portal_name),
-                "Referer": "https://{portal_name}.udemy.com/home/my-courses/search/?q={course_name}".format(
-                    portal_name=portal_name, course_name=course_name
-                ),
-            }
-        )
-        url = COURSE_SEARCH.format(portal_name=portal_name, course_name=course_name)
-        try:
-            webpage = self.session._get(url).content
-            webpage = webpage.decode("utf8", "ignore")
-            webpage = json.loads(webpage)
-        except conn_error as error:
-            logger.fatal(f"Connection error: {error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        except (ValueError, Exception) as error:
-            logger.fatal(f"{error} on {url}")
-            time.sleep(0.8)
-            sys.exit(1)
-        else:
-            results = webpage.get("results", [])
-        return results
+    def _handle_pagination(self, initial_url, initial_params=None):
+        """Helper function to handle paginated requests and return all results
 
-    def _extract_course_info_json(self, url, course_id):
-        self.session._headers.update({"Referer": url})
-        url = COURSE_URL.format(portal_name=portal_name, course_id=course_id)
-        try:
-            resp = self.session._get(url).json()
-        except conn_error as error:
-            logger.fatal(f"Connection error: {error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        else:
-            return resp
+        Args:
+            initial_url (str): The initial URL to fetch from
+            initial_params (dict, optional): Query parameters for the initial request. Defaults to None.
 
-    def _extract_course_curriculum(self, url, course_id, portal_name):
-        self.session._headers.update({"Referer": url})
-        url = CURRICULUM_ITEMS_URL.format(portal_name=portal_name, course_id=course_id)
+        Returns:
+            dict: Combined results from all pages
+        """
         page = 1
         try:
-            data = self.session._get(url, CURRICULUM_ITEMS_PARAMS).json()
+            data = self.session._get(initial_url, initial_params).json()
         except conn_error as error:
             logger.fatal(f"Connection error: {error}")
             time.sleep(0.8)
@@ -892,12 +881,13 @@ class Udemy:
             _next = data.get("next")
             _count = data.get("count")
             est_page_count = math.ceil(_count / 100)  # 100 is the max results per page
+
             while _next:
-                logger.info(f"> Downloading course curriculum.. (Page {page + 1}/{est_page_count})")
+                logger.info(f"> Downloading data page {page + 1}/{est_page_count}")
                 try:
                     resp = self.session._get(_next)
                     if not resp.ok:
-                        logger.error(f"Failed to fetch a page, will retry")
+                        logger.error(f"Failed to fetch page {page + 1}, retrying...")
                         continue
                     resp = resp.json()
                 except conn_error as error:
@@ -908,10 +898,48 @@ class Udemy:
                     _next = resp.get("next")
                     results = resp.get("results")
                     if results and isinstance(results, list):
-                        for d in resp["results"]:
-                            data["results"].append(d)
+                        for item in resp["results"]:
+                            data["results"].append(item)
                         page = page + 1
             return data
+
+    def _get_subscribed_courses(self, portal_name):
+        """
+        Fetches the list of courses the user is subscribed to.
+        """
+        url = URLS.MY_COURSES.format(portal_name=portal_name)
+        res = self._handle_pagination(url)
+        return res["results"] if res and isinstance(res, dict) else []
+
+    def _get_subscription_course_enrollments(self, portal_name):
+        """
+        Fetches the list of courses the user is subscribed to.
+        """
+        url = URLS.SUBSCRIPTION_COURSES.format(portal_name=portal_name)
+        res = self._handle_pagination(url)
+        return res["results"] if res and isinstance(res, dict) else []
+
+    def _get_courses(self, portal_name):
+        a = self._get_subscribed_courses(portal_name)
+        b = self._get_subscription_course_enrollments(portal_name)
+        return a + b
+
+    def _extract_course_info_json(self, url, course_id):
+        # self.session._headers.update({"Referer": url})
+        url = URLS.COURSE.format(portal_name=portal_name, course_id=course_id)
+        try:
+            resp = self.session._get(url).json()
+        except conn_error as error:
+            logger.fatal(f"Connection error: {error}")
+            time.sleep(0.8)
+            sys.exit(1)
+        else:
+            return resp
+
+    def _extract_course_curriculum(self, url, course_id, portal_name):
+        # self.session._headers.update({"Referer": url})
+        url = URLS.CURRICULUM_ITEMS.format(portal_name=portal_name, course_id=course_id)
+        return self._handle_pagination(url, CURRICULUM_ITEMS_PARAMS)
 
     def _extract_course(self, response, course_name):
         _temp = {}
@@ -924,25 +952,8 @@ class Udemy:
                     break
         return _temp
 
-    def _my_courses(self, portal_name):
-        results = []
-        try:
-            url = MY_COURSES_URL.format(portal_name=portal_name)
-            webpage = self.session._get(url).json()
-        except conn_error as error:
-            logger.fatal(f"Connection error: {error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        except (ValueError, Exception) as error:
-            logger.fatal(f"{error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        else:
-            results = webpage.get("results", [])
-        return results
-
     def _subscribed_collection_courses(self, portal_name):
-        url = COLLECTION_URL.format(portal_name=portal_name)
+        url = URLS.COLLECTION.format(portal_name=portal_name)
         courses_lists = []
         try:
             webpage = self.session._get(url).json()
@@ -963,7 +974,7 @@ class Udemy:
     def _archived_courses(self, portal_name):
         results = []
         try:
-            url = MY_COURSES_URL.format(portal_name=portal_name)
+            url = URLS.MY_COURSES.format(portal_name=portal_name)
             url = f"{url}&is_archived=true"
             webpage = self.session._get(url).json()
         except conn_error as error:
@@ -978,57 +989,45 @@ class Udemy:
             results = webpage.get("results", [])
         return results
 
-    def _extract_subscription_course_info(self, url):
-        course_html = self.session._get(url).text
-        soup = BeautifulSoup(course_html, "lxml")
-        data = soup.find("div", {"class": "ud-component--course-taking--app"})
-        if not data:
-            logger.fatal(
-                "Could not find course data. Possible causes are: Missing cookies.txt file, incorrect url (should end with /learn), not logged in to udemy in specified browser."
-            )
-            self.session.terminate()
-            sys.exit(1)
-        data_args = data.attrs["data-module-args"]
-        data_json = json.loads(data_args)
-        course_id = data_json.get("courseId", None)
-        return course_id
+    # def _extract_subscription_course_info(self, url):
+    #     course_html = self.session._get(url).text
+    #     soup = BeautifulSoup(course_html, "lxml")
+    #     data = soup.find("div", {"class": "ud-component--course-taking--app"})
+    #     if not data:
+    #         logger.fatal(
+    #             "Could not find course data. Possible causes are: Missing cookies.txt file, incorrect url (should end with /learn), not logged in to udemy in specified browser."
+    #         )
+    #         self.session.terminate()
+    #         sys.exit(1)
+    #     data_args = data.attrs["data-module-args"]
+    #     data_json = json.loads(data_args)
+    #     course_id = data_json.get("courseId", None)
+    #     return course_id
 
     def _extract_course_info(self, url):
         global portal_name
         portal_name, course_name = self.extract_course_name(url)
         course = {"portal_name": portal_name}
 
-        if not is_subscription_course:
-            results = self._subscribed_courses(portal_name=portal_name, course_name=course_name)
+        # get all the courses
+        results = self._get_courses(portal_name=portal_name)
+        # find the course that matches the url slug
+        course = self._extract_course(response=results, course_name=course_name)
+        if not course:
+            # try archived courses
+            results = self._archived_courses(portal_name=portal_name)
             course = self._extract_course(response=results, course_name=course_name)
-            if not course:
-                results = self._my_courses(portal_name=portal_name)
-                course = self._extract_course(response=results, course_name=course_name)
-            if not course:
-                results = self._subscribed_collection_courses(portal_name=portal_name)
-                course = self._extract_course(response=results, course_name=course_name)
-            if not course:
-                results = self._archived_courses(portal_name=portal_name)
-                course = self._extract_course(response=results, course_name=course_name)
 
-        if not course or is_subscription_course:
-            course_id = self._extract_subscription_course_info(url)
-            course = self._extract_course_info_json(url, course_id)
+        # if not course or is_subscription_course:
+        #     course_id = self._extract_subscription_course_info(url)
+        #     course = self._extract_course_info_json(url, course_id)
 
         if course:
             return course.get("id"), course
         if not course:
-            logger.fatal("Downloading course information, course id not found .. ")
-            logger.fatal(
-                "It seems either you are not enrolled or you have to visit the course atleast once while you are logged in.",
-            )
-            logger.info(
-                "Terminating Session...",
-            )
-            self.session.terminate()
-            logger.info(
-                "Session terminated.",
-            )
+            logger.fatal("Failed to find the course, are you enrolled?")
+            # self.session.terminate()
+
             sys.exit(1)
 
     def _parse_lecture(self, lecture: dict):
@@ -1151,8 +1150,8 @@ class Udemy:
 
 class Session(object):
     def __init__(self):
-        self._headers = HEADERS
         self._session = requests.sessions.Session()
+        self._session.headers.update(HEADERS)
         self._session.mount(
             "https://",
             SSLCiphers(
@@ -1160,30 +1159,41 @@ class Session(object):
             ),
         )
 
-    def _set_auth_headers(self, bearer_token=""):
-        self._headers["Authorization"] = "Bearer {}".format(bearer_token)
-        self._headers["X-Udemy-Authorization"] = "Bearer {}".format(bearer_token)
+    def visit(self, portal_name: str) -> bool:
+        """
+        makes a visit request to get the cloudflare bot cookies and shit
+        """
+        r = self._session.get(URLS.VISIT.format(portal_name=portal_name))
+        if r.ok:
+            logger.info("Visit request successful")
+            return True
+        logger.error(f"Visit request failed: {r.status_code} {r.reason}")
+        return False
+
+    # def _set_auth_headers(self, bearer_token=""):
+    #     self._headers["Authorization"] = "Bearer {}".format(bearer_token)
+    #     self._headers["X-Udemy-Authorization"] = "Bearer {}".format(bearer_token)
 
     def _get(self, url, params=None):
         for i in range(10):
-            session = self._session.get(url, headers=self._headers, cookies=cj, params=params)
-            if session.ok or session.status_code in [502, 503]:
-                return session
-            if not session.ok:
+            req = self._session.get(url, cookies=cj, params=params)
+            if req.ok or req.status_code in [502, 503]:
+                return req
+            if not req.ok:
                 logger.error("Failed request " + url)
-                logger.error(f"{session.status_code} {session.reason}, retrying (attempt {i} )...")
+                logger.error(f"{req.status_code} {req.reason}, retrying (attempt {i} )...")
                 time.sleep(0.8)
 
     def _post(self, url, data, redirect=True):
-        session = self._session.post(url, data, headers=self._headers, allow_redirects=redirect, cookies=cj)
-        if session.ok:
-            return session
-        if not session.ok:
-            raise Exception(f"{session.status_code} {session.reason}")
+        req = self._session.post(url, data, allow_redirects=redirect, cookies=cj)
+        if req.ok:
+            return req
+        if not req.ok:
+            raise Exception(f"{req.status_code} {req.reason}")
 
-    def terminate(self):
-        self._set_auth_headers()
-        return
+    # def terminate(self):
+    #     self._set_auth_headers()
+    #     return
 
 
 class UdemyAuth(object):
@@ -1193,12 +1203,12 @@ class UdemyAuth(object):
         self._cache = cache_session
         self._session = Session()
 
-    def authenticate(self, bearer_token=None):
-        if bearer_token:
-            self._session._set_auth_headers(bearer_token=bearer_token)
-            return self._session
-        else:
-            return None
+    # def authenticate(self, bearer_token=None):
+    #     if bearer_token:
+    #         self._session._set_auth_headers(bearer_token=bearer_token)
+    #         return self._session
+    #     else:
+    #         return None
 
 
 def durationtoseconds(period):
@@ -1351,7 +1361,14 @@ def handle_segments(url, format_id, lecture_id, video_title, output_path, chapte
         #     return
         # logger.info("> Decryption complete")
         logger.info("> Merging video and audio, this might take a minute...")
-        mux_process(video_filepath_enc, audio_filepath_enc, video_title, temp_output_path, audio_key, video_key)
+        mux_process(
+            video_filepath_enc,
+            audio_filepath_enc,
+            video_title,
+            temp_output_path,
+            audio_key,
+            video_key,
+        )
         if ret_code != 0:
             logger.error("> Return code from ffmpeg was non-0 (error), skipping!")
             return
@@ -1400,7 +1417,11 @@ def check_for_ffmpeg():
 
 def check_for_shaka():
     try:
-        subprocess.Popen(["shaka-packager", "-version"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL).wait()
+        subprocess.Popen(
+            ["shaka-packager", "-version"],
+            stderr=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+        ).wait()
         return True
     except FileNotFoundError:
         return False
@@ -1465,8 +1486,15 @@ def download_aria(url, file_dir, filename):
 
 
 def process_caption(caption, lecture_title, lecture_dir, tries=0):
-    filename = f"%s_%s.%s" % (sanitize_filename(lecture_title), caption.get("language"), caption.get("extension"))
-    filename_no_ext = f"%s_%s" % (sanitize_filename(lecture_title), caption.get("language"))
+    filename = f"%s_%s.%s" % (
+        sanitize_filename(lecture_title),
+        caption.get("language"),
+        caption.get("extension"),
+    )
+    filename_no_ext = f"%s_%s" % (
+        sanitize_filename(lecture_title),
+        caption.get("language"),
+    )
     filepath = os.path.join(lecture_dir, filename)
 
     if os.path.isfile(filepath):
@@ -1529,7 +1557,11 @@ def process_lecture(lecture, lecture_path, chapter_dir):
                 if isinstance(quality, int):
                     source = min(sources, key=lambda x: abs(int(x.get("height")) - quality))
                 try:
-                    logger.info("      ====== Selected quality: %s %s", source.get("type"), source.get("height"))
+                    logger.info(
+                        "      ====== Selected quality: %s %s",
+                        source.get("type"),
+                        source.get("height"),
+                    )
                     url = source.get("download_url")
                     source_type = source.get("type")
                     if source_type == "hls":
@@ -1663,7 +1695,10 @@ def parse_new(udemy: Udemy, udemy_object: dict):
         current_chapter_index = int(chapter.get("chapter_index"))
         # Skip chapters not in the filter if a filter is provided
         if chapter_filter is not None and current_chapter_index not in chapter_filter:
-            logger.info("Skipping chapter %s as it is not in the specified filter", current_chapter_index)
+            logger.info(
+                "Skipping chapter %s as it is not in the specified filter",
+                current_chapter_index,
+            )
             continue
 
         chapter_title = chapter.get("chapter_title")
@@ -1710,7 +1745,10 @@ def parse_new(udemy: Udemy, udemy_object: dict):
                         # if the html content is None or an empty string, skip it so we dont save empty html files
                         if parsed_lecture.get("html_content") != None and parsed_lecture.get("html_content") != "":
                             html_content = parsed_lecture.get("html_content").encode("utf8", "ignore").decode("utf8")
-                            lecture_path = os.path.join(chapter_dir, "{}.html".format(sanitize_filename(lecture_title)))
+                            lecture_path = os.path.join(
+                                chapter_dir,
+                                "{}.html".format(sanitize_filename(lecture_title)),
+                            )
                             try:
                                 with open(lecture_path, encoding="utf8", mode="w") as f:
                                     f.write(html_content)
@@ -1740,7 +1778,10 @@ def parse_new(udemy: Udemy, udemy_object: dict):
                     if asset_type == "article":
                         body = asset.get("body")
                         # stip the 03d prefix
-                        lecture_path = os.path.join(chapter_dir, "{}.html".format(sanitize_filename(lecture_title)))
+                        lecture_path = os.path.join(
+                            chapter_dir,
+                            "{}.html".format(sanitize_filename(lecture_title)),
+                        )
                         try:
                             with open("./templates/article_template.html", "r") as f:
                                 content = f.read()
@@ -1844,7 +1885,11 @@ def _print_course_info(udemy: Udemy, udemy_object: dict):
             if lecture_sources:
                 lecture_sources = sorted(lecture_sources, key=lambda x: int(x.get("height")), reverse=True)
             if lecture_video_sources:
-                lecture_video_sources = sorted(lecture_video_sources, key=lambda x: int(x.get("height")), reverse=True)
+                lecture_video_sources = sorted(
+                    lecture_video_sources,
+                    key=lambda x: int(x.get("height")),
+                    reverse=True,
+                )
 
             if lecture_is_encrypted and lecture_video_sources != None:
                 lecture_qualities = [
@@ -1902,6 +1947,24 @@ def main():
         bearer_token = os.getenv("UDEMY_BEARER")
 
     udemy = Udemy(bearer_token)
+    portal_name = udemy.extract_portal_name(course_url)
+    visit_status = udemy.session.visit(portal_name)
+    if not visit_status:
+        logger.fatal("> Visit request failed")
+        sys.exit(1)
+
+    if bearer_token:
+        udemy.session._session.headers.update(
+            {
+                "x-udemyandroid-skip-local-cache": "true",
+                "cache-control": "no-cache",
+                "x-udemy-bearer-token": bearer_token,
+                "authorization": f"Bearer {bearer_token}",
+            }
+        )
+    else:
+        logger.fatal("> use a bearer token")
+        sys.exit(1)
 
     logger.info("> Fetching course information, this may take a minute...")
     if not load_from_file:
@@ -1914,7 +1977,11 @@ def main():
     logger.info("> Fetching course curriculum, this may take a minute...")
     if load_from_file:
         course_json = json.loads(
-            open(os.path.join(os.getcwd(), "saved", "course_content.json"), encoding="utf8", mode="r").read()
+            open(
+                os.path.join(os.getcwd(), "saved", "course_content.json"),
+                encoding="utf8",
+                mode="r",
+            ).read()
         )
         title = course_json.get("title")
         course_title = course_json.get("published_title")
@@ -1924,7 +1991,11 @@ def main():
         course_json["portal_name"] = portal_name
 
     if save_to_file:
-        with open(os.path.join(os.getcwd(), "saved", "course_content.json"), encoding="utf8", mode="w") as f:
+        with open(
+            os.path.join(os.getcwd(), "saved", "course_content.json"),
+            encoding="utf8",
+            mode="w",
+        ) as f:
             f.write(json.dumps(course_json))
 
     logger.info("> Course curriculum retrieved!")
@@ -1933,7 +2004,11 @@ def main():
 
     if load_from_file:
         udemy_object = json.loads(
-            open(os.path.join(os.getcwd(), "saved", "_udemy.json"), encoding="utf8", mode="r").read()
+            open(
+                os.path.join(os.getcwd(), "saved", "_udemy.json"),
+                encoding="utf8",
+                mode="r",
+            ).read()
         )
         if info:
             _print_course_info(udemy, udemy_object)
@@ -1948,10 +2023,10 @@ def main():
         udemy_object["chapters"] = []
         chapter_index_counter = -1
 
-        if resource:
-            logger.info("> Terminating Session...")
-            udemy.session.terminate()
-            logger.info("> Session Terminated.")
+        # if resource:
+        #     logger.info("> Terminating Session...")
+        #     udemy.session.terminate()
+        #     logger.info("> Session Terminated.")
 
         if course:
             logger.info("> Processing course data, this may take a minute. ")
@@ -2061,7 +2136,11 @@ def main():
             )
 
         if save_to_file:
-            with open(os.path.join(os.getcwd(), "saved", "_udemy.json"), encoding="utf8", mode="w") as f:
+            with open(
+                os.path.join(os.getcwd(), "saved", "_udemy.json"),
+                encoding="utf8",
+                mode="w",
+            ) as f:
                 # remove "bearer_token" from the object before writing
                 udemy_object.pop("bearer_token")
                 udemy_object["portal_name"] = portal_name
