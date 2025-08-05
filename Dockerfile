@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     aria2 \
     unzip \
     xz-utils \
+    jq \
     && rm -rf /var/lib/apt/lists/*
 
 # Install FFmpeg from johnvansickle's builds (always latest stable version)
@@ -23,9 +24,11 @@ RUN wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.t
     && chmod +x /usr/local/bin/ffmpeg \
     && chmod +x /usr/local/bin/ffprobe
 
-# Install Shaka Packager
-RUN wget https://github.com/shaka-project/shaka-packager/releases/download/v3.2.0/packager-linux-x64 -O /usr/local/bin/shaka-packager
-RUN chmod +x /usr/local/bin/shaka-packager
+# Install Shaka Packager (latest version)
+RUN LATEST_TAG=$(curl -s https://api.github.com/repos/shaka-project/shaka-packager/releases/latest | jq -r .tag_name) && \
+    wget https://github.com/shaka-project/shaka-packager/releases/download/$LATEST_TAG/packager-linux-x64 -O /usr/local/bin/shaka-packager && \
+    chmod +x /usr/local/bin/shaka-packager && \
+    echo "Shaka Packager version $LATEST_TAG installed."
 
 # Copy the current directory contents into the container at /app
 COPY . /app
