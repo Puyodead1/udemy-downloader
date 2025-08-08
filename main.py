@@ -30,6 +30,7 @@ from utils import extract_kid
 from vtt_to_srt import convert
 
 DOWNLOAD_DIR = os.path.join(os.getcwd(), "out_dir")
+MAIN_SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
 
 retry = 3
 downloader = None
@@ -1642,7 +1643,8 @@ def process_normal_quiz(quiz, lecture, chapter_dir):
     lecture_path = os.path.join(chapter_dir, lecture_file_name)
 
     logger.info(f"  > Processing quiz {lecture_index}")
-    with open("./templates/quiz_template.html", "r") as f:
+    template_path = os.path.join(MAIN_SCRIPT_PATH, "templates", "quiz_template.html")
+    with open(template_path, "r") as f:
         html = f.read()
         quiz_data = {
             "quiz_id": lecture["data"].get("id"),
@@ -1664,7 +1666,8 @@ def process_coding_assignment(quiz, lecture, chapter_dir):
 
     logger.info(f"  > Processing quiz {lecture_index} (coding assignment)")
 
-    with open("./templates/coding_assignment_template.html", "r") as f:
+    template_path = os.path.join(MAIN_SCRIPT_PATH, "templates", "coding_assignment_template.html")
+    with open(template_path, "r") as f:
         html = f.read()
         quiz_data = {
             "title": lecture_title,
@@ -1783,7 +1786,8 @@ def parse_new(udemy: Udemy, udemy_object: dict):
                             "{}.html".format(sanitize_filename(lecture_title)),
                         )
                         try:
-                            with open("./templates/article_template.html", "r") as f:
+                            template_path = os.path.join(MAIN_SCRIPT_PATH, "templates", "article_template.html")
+                            with open(template_path, "r") as f:
                                 content = f.read()
                                 content = content.replace("__title_placeholder__", lecture_title[4:])
                                 content = content.replace("__data_placeholder__", body)
