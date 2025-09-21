@@ -11,6 +11,8 @@ import time
 from http.cookiejar import MozillaCookieJar
 from pathlib import Path
 from typing import IO, Union
+import surya
+# import cloudscraper
 
 import browser_cookie3
 import demoji
@@ -30,7 +32,8 @@ from utils import extract_kid
 from vtt_to_srt import convert
 
 DOWNLOAD_DIR = os.path.join(os.getcwd(), "out_dir")
-MAIN_SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
+# MAIN_SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
+MAIN_SCRIPT_PATH = r"D:\Dropbox\Ilu personal\programming\Projects\8 github\udemy downloader new\udemy-downloader_with_GUI"
 
 retry = 3
 downloader = None
@@ -100,7 +103,7 @@ def parse_chapter_filter(chapter_str: str):
 
 # this is the first function that is called, we parse the arguments, setup the logger, and ensure that required directories exist
 def pre_run():
-    global dl_assets, dl_captions, dl_quizzes, skip_lectures, caption_locale, quality, bearer_token, course_name, keep_vtt, skip_hls, concurrent_downloads, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, LOG_LEVEL, use_h265, h265_crf, h265_preset, use_nvenc, browser, is_subscription_course, DOWNLOAD_DIR, use_continuous_lecture_numbers, chapter_filter
+    global dl_assets, dl_captions, dl_quizzes, skip_lectures, caption_locale, quality, bearer_token, course_name, keep_vtt, skip_hls, concurrent_downloads, load_from_file, save_to_file, bearer_token, course_url, info, logger, keys, id_as_course_name, LOG_LEVEL, use_h265, h265_crf, h265_preset, use_nvenc, browser, is_subscription_course, DOWNLOAD_DIR, use_continuous_lecture_numbers, chapter_filter, SAVED_DIR
 
     # make sure the logs directory exists
     if not os.path.exists(LOG_DIR_PATH):
@@ -346,6 +349,7 @@ def pre_run():
         browser = args.browser
     if args.out:
         DOWNLOAD_DIR = os.path.abspath(args.out)
+        SAVED_DIR = os.path.join(DOWNLOAD_DIR, "downloader_files", "saved")
     if args.use_continuous_lecture_numbers:
         use_continuous_lecture_numbers = args.use_continuous_lecture_numbers
 
@@ -709,8 +713,7 @@ class Udemy:
         _temp = []
 
         # get temp folder
-        temp_path = Path(Path.cwd(), "temp")
-
+        temp_path = Path(DOWNLOAD_DIR, "downloader_files", "temp")
         # ensure the folder exists
         temp_path.mkdir(parents=True, exist_ok=True)
 
@@ -772,7 +775,7 @@ class Udemy:
         _temp = {}
 
         # get temp folder
-        temp_path = Path(Path.cwd(), "temp")
+        temp_path = Path(DOWNLOAD_DIR, "downloader_files", "temp")
 
         # ensure the folder exists
         temp_path.mkdir(parents=True, exist_ok=True)
