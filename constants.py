@@ -54,7 +54,7 @@ COURSE_URL_PARAMS = {
 }
 
 HOME_DIR = os.getcwd()
-SAVED_DIR = os.path.join(os.getcwd(), "saved")
+# SAVED_DIR = os.path.join(os.getcwd(), "saved")
 KEY_FILE_PATH = os.path.join(os.getcwd(), "keyfile.json")
 COOKIE_FILE_PATH = os.path.join(os.getcwd(), "cookies.txt")
 LOG_DIR_PATH = os.path.join(os.getcwd(), "logs")
