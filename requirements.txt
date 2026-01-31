@@ -17,3 +17,4 @@ pathvalidate
 coloredlogs
 browser_cookie3
 demoji
+curl_cffi==0.14.0

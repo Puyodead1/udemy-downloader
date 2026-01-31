@@ -16,6 +16,7 @@ import browser_cookie3
 import demoji
 import m3u8
 import requests
+from curl_cffi import requests as requests2
 import yt_dlp
 from bs4 import BeautifulSoup
 from coloredlogs import ColoredFormatter
@@ -881,6 +882,11 @@ class Udemy:
         else:
             _next = data.get("next")
             _count = data.get("count")
+
+            if _count is None:
+                logger.warning(f"API Response missing 'count'. Data: {data}")
+                return data.get("results", []) if "results" in data else []
+            
             est_page_count = math.ceil(_count / 100)  # 100 is the max results per page
 
             while _next:
@@ -1151,50 +1157,57 @@ class Udemy:
 
 class Session(object):
     def __init__(self):
-        self._session = requests.sessions.Session()
-        self._session.headers.update(HEADERS)
-        self._session.mount(
-            "https://",
-            SSLCiphers(
-                cipher_list="ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-SHA256:AES256-SH"
-            ),
-        )
+        self._session = requests2.Session(impersonate="chrome120")
+        headers = HEADERS.copy()
+        if 'User-Agent' in headers:
+            del headers['User-Agent']
+        self._session.headers.update(headers)
 
     def visit(self, portal_name: str) -> bool:
         """
-        makes a visit request to get the cloudflare bot cookies and shit
+        Visits the portal to initialize Cloudflare cookies
         """
-        r = self._session.get(URLS.VISIT.format(portal_name=portal_name))
-        if r.ok:
-            logger.info("Visit request successful")
-            return True
-        logger.error(f"Visit request failed: {r.status_code} {r.reason}")
-        return False
+        try:
+            url = URLS.VISIT.format(portal_name=portal_name)
+            logger.info(f"Visiting {url} to clear Cloudflare...")
+            
+            r = self._session.get(url)
+            
+            if "challenge-platform" in r.text or "<title>Just a moment...</title>" in r.text:
+                logger.error("Cloudflare Challenge triggered. Fingerprint failed.")
+                return False
+
+            if r.ok:
+                logger.info("Visit request successful")
+                return True
+            
+            logger.error(f"Visit request failed: {r.status_code}")
+            return False
+        except Exception as e:
+            logger.error(f"Request Exception: {e}")
+            return False
 
     # def _set_auth_headers(self, bearer_token=""):
     #     self._headers["Authorization"] = "Bearer {}".format(bearer_token)
     #     self._headers["X-Udemy-Authorization"] = "Bearer {}".format(bearer_token)
 
-    def _get(self, url, params=None):
-        for i in range(10):
-            req = self._session.get(url, cookies=cj, params=params)
-            if req.ok or req.status_code in [502, 503]:
-                return req
-            if not req.ok:
-                logger.error("Failed request " + url)
-                logger.error(f"{req.status_code} {req.reason}, retrying (attempt {i} )...")
-                time.sleep(0.8)
+    def _get(self, url, data=None, **kwargs):
+        if data:
+            kwargs['params'] = data
+        
+        # This fixes the "Operation timed out after 30002 milliseconds" error
+        if 'timeout' not in kwargs:
+            kwargs['timeout'] = 120 
+            
+        return self._session.get(url, **kwargs)
 
-    def _post(self, url, data, redirect=True):
-        req = self._session.post(url, data, allow_redirects=redirect, cookies=cj)
-        if req.ok:
-            return req
-        if not req.ok:
-            raise Exception(f"{req.status_code} {req.reason}")
+    def _post(self, url, data=None, **kwargs):
+        if data:
+            kwargs['data'] = data
+        return self._session.post(url, **kwargs)
 
-    # def terminate(self):
-    #     self._set_auth_headers()
-    #     return
+    def terminate(self):
+        self._session.close()
 
 
 class UdemyAuth(object):
