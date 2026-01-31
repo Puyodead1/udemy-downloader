@@ -1165,7 +1165,7 @@ class Session(object):
 
     def visit(self, portal_name: str) -> bool:
         """
-        Visits the portal to initialize Cloudflare cookies
+        makes a visit request to get the cloudflare bot cookies and shit
         """
         try:
             url = URLS.VISIT.format(portal_name=portal_name)
