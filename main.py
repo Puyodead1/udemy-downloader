@@ -1206,8 +1206,10 @@ class Session(object):
             return False
 
     def _set_auth_headers(self, bearer_token=""):
-        self._headers["Authorization"] = "Bearer {}".format(bearer_token)
-        self._headers["X-Udemy-Authorization"] = "Bearer {}".format(bearer_token)
+        self._session.headers["Authorization"] = "Bearer {}".format(bearer_token)
+        self._session.headers["X-Udemy-Authorization"] = "Bearer {}".format(
+            bearer_token
+        )
 
     def _get(self, url, data=None, **kwargs):
         if data:
