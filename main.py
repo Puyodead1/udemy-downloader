@@ -791,37 +791,18 @@ class Udemy:
 
     def _extract_mpd(self, url):
         """extracts mpd streams"""
-        asset_id_re = re.compile(r"assets/(?P<id>\d+)/")
         _temp = {}
 
-        # get temp folder
-        temp_path = Path(Path.cwd(), "temp")
-
-        # ensure the folder exists
-        temp_path.mkdir(parents=True, exist_ok=True)
-
-        # # extract the asset id from the url
-        asset_id = asset_id_re.search(url).group("id")
-
-        # download the mpd and save it to the temp file
-        mpd_path = Path(temp_path, f"index_{asset_id}.mpd")
-
         try:
-            with open(mpd_path, "wb") as f:
-                r = self.session._get(url)
-                r.raise_for_status()
-                f.write(r.content)
-
             ytdl = yt_dlp.YoutubeDL(
                 {
                     "quiet": True,
                     "no_warnings": True,
                     "allow_unplayable_formats": True,
-                    "enable_file_urls": True,
                 }
             )
             results = ytdl.extract_info(
-                mpd_path.as_uri(), download=False, force_generic_extractor=True
+                url, download=False, force_generic_extractor=True
             )
             formats = results.get("formats", [])
             best_audio = next(
@@ -853,7 +834,7 @@ class Udemy:
                         "width": str(width),
                         "format_id": f"{video_format_id},{audio_format_id}",
                         "extension": extension,
-                        "download_url": mpd_path.as_uri(),
+                        "download_url": url,
                         "tbr": round(tbr),
                     }
                 )
@@ -1341,7 +1322,6 @@ def handle_segments(url, format_id, lecture_id, video_title, output_path, chapte
     logger.info("> Downloading Lecture Tracks...")
     args = [
         "yt-dlp",
-        "--enable-file-urls",
         "--force-generic-extractor",
         "--allow-unplayable-formats",
         "--concurrent-fragments",
