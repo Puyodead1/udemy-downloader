@@ -405,7 +405,6 @@ class Udemy:
             if self.bearer_token:
                 self.session = self.auth.authenticate(bearer_token=self.bearer_token)
             else:
-
                 if browser == None:
                     logger.error(
                         "No bearer token was provided, and no browser for cookie extraction was specified."
@@ -1560,7 +1559,7 @@ def process_caption(caption, lecture_title, lecture_dir, tries=0):
                 return
             else:
                 logger.error(
-                    f"    > Error downloading caption: {e}. Will retry {3-tries} more times."
+                    f"    > Error downloading caption: {e}. Will retry {3 - tries} more times."
                 )
                 process_caption(caption, lecture_title, lecture_dir, tries + 1)
         if caption.get("extension") == "vtt":
@@ -1713,17 +1712,18 @@ def process_normal_quiz(quiz, lecture, chapter_dir):
 
     logger.info(f"  > Processing quiz {lecture_index}")
     template_path = os.path.join(MAIN_SCRIPT_PATH, "templates", "quiz_template.html")
-    with open(template_path, "r") as f:
+    with open(template_path, "r", encoding="utf-8") as f:
         html = f.read()
         quiz_data = {
-            "quiz_id": lecture["data"].get("id"),
-            "quiz_description": lecture["data"].get("description"),
-            "quiz_title": lecture["data"].get("title"),
-            "pass_percent": lecture.get("data").get("pass_percent"),
-            "questions": quiz["contents"],
+            "id": lecture["data"].get("id"),
+            "title": lecture["data"].get("title"),
+            "description": lecture["data"].get("description"),
+            "pass_score": lecture.get("data").get("pass_percent"),
+            "assessments": quiz["contents"],
         }
-        html = html.replace("__data_placeholder__", json.dumps(quiz_data))
-        with open(lecture_path, "w") as f:
+        html = html.replace("%%TITLE%%", lecture["data"].get("title"))
+        html = html.replace("%%QUIZ_JSON%%", json.dumps(quiz_data))
+        with open(lecture_path, "w", encoding="utf-8") as f:
             f.write(html)
 
 
