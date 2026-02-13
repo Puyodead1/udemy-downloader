@@ -451,14 +451,7 @@ class Udemy:
         #     }
         # )
         url = URLS.QUIZ.format(portal_name=portal_name, quiz_id=quiz_id)
-        try:
-            resp = self.session._get(url).json()
-        except conn_error as error:
-            logger.fatal(f"[-] Connection error: {error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        else:
-            return resp.get("results")
+        return self._handle_pagination(url, None).get("results")
 
     def _get_elem_value_or_none(self, elem, key):
         return elem[key] if elem and key in elem else "(None)"
