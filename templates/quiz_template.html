@@ -307,35 +307,43 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.85);
+    background: rgba(0, 0, 0, 0.9);
     z-index: 2000;
-    display: none;
+    display: flex;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(5px);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
 }
 .image-modal-overlay.show {
-    display: flex;
-    animation: fadeIn 0.2s ease-out;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
 }
 .image-modal-content {
     position: relative;
     max-width: 90vw;
     max-height: 90vh;
-    background: #1a2332;
-    padding: 10px;
+    background: transparent;
+    padding: 0;
     border-radius: 8px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
+    transform: scale(0.95);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.image-modal-overlay.show .image-modal-content {
+    transform: scale(1);
 }
 .image-modal-img {
     display: block;
     max-width: 100%;
-    max-height: calc(90vh - 40px);
+    max-height: 90vh;
     object-fit: contain;
     border-radius: 4px;
-    /* Portrait mode hint: ensure it doesn't get too wide if naturally portrait */
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 }
 .image-modal-close {
     position: absolute;
@@ -346,15 +354,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
     cursor: pointer;
     background: none;
     border: none;
-    padding: 5px;
+    padding: 10px;
+    opacity: 0.8;
+    transition: opacity 0.2s;
 }
 .image-modal-close:hover {
+    opacity: 1;
     color: #ef4444;
+}
+.image-caption {
+    text-align: center;
+    margin-top: 12px;
+    color: #9ca3af;
+    font-size: 13px;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.3s ease 0.1s;
+}
+.image-modal-overlay.show .image-caption {
+    opacity: 1;
+    transform: translateY(0);
 }
 /* Make images in content clickable */
 .question-text img, .explanation-body img {
     cursor: zoom-in;
-    transition: transform 0.2s;
+    transition: transform 0.2s ease;
+    will-change: transform;
 }
 .question-text img:hover, .explanation-body img:hover {
     transform: scale(1.02);
@@ -535,7 +560,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
     <div class="image-modal-content" onclick="event.stopPropagation()">
         <button class="image-modal-close" onclick="closeImageModal()">×</button>
         <img id="imageModalImg" class="image-modal-img" src="" alt="Enlarged Image">
-        <div style="text-align:center; margin-top:8px; color:#9ca3af; font-size:12px;">Portrait View</div> 
+        <div class="image-caption">Image View</div> 
     </div>
 </div>
 
