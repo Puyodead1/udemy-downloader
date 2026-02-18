@@ -1288,6 +1288,9 @@ function checkCorrect(qi) {
 // ── Render Question ─────────────────────────────────────────
 
 function renderQuestion() {
+  // Clear any text selection from previous question
+  if (window.getSelection) {window.getSelection().removeAllRanges();} else if (document.selection) {document.selection.empty();}
+
   var q = questions[currentQ];
   var prompt = q.prompt;
   var isMulti = q._isMulti;
