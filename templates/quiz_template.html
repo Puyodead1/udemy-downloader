@@ -578,6 +578,7 @@ var examFinished = false;
 var mode = "exam";
 var selectedMode = "exam";
 var STORAGE_KEY = "attempts_" + DATA.title.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 60);
+var PROGRESS_KEY = "progress_v5_" + DATA.title.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 60);
 
 function shuffle(arr) {
   var a = arr.slice();
@@ -602,6 +603,69 @@ function formatDescription(html) {
   // Matches "- text<br>" or "- text$"
   return html.replace(/(?:^|<br>)\s*-\s+(.*?)(?=<br>|$)/g, "<li>$1</li>")
              .replace(/((?:<li>.*?<\/li>\s*)+)/g, "<ul>$1</ul>");
+}
+
+function getShuffleState() {
+  if (!questions || questions.length === 0) return null;
+  // Save order of questions (indices) + order of answers for each question
+  return {
+    qOrder: questions.map(function(q){ return q._origIdx; }),
+    aOrders: questions.map(function(q){ 
+       // Store the permuted order of answers (by original letter) to reconstruct exact state
+       return q._shuffledAnswers.map(function(a){ return a.origLetter; });
+    })
+  };
+}
+
+function restoreShuffleState(shuffledState) {
+  if (!shuffledState || !shuffledState.qOrder) return false;
+  
+  // Re-construct questions array in saved order
+  var reordered = [];
+  
+  for (var i = 0; i < shuffledState.qOrder.length; i++) {
+    var origIdx = shuffledState.qOrder[i];
+    var rawQ = DATA.assessments[origIdx];
+    if (!rawQ) return false; // Data mismatch
+    
+    // We need to clone it similar to initQuestions
+    var q = Object.assign({}, rawQ, {_origIdx: origIdx});
+    reordered.push(q);
+  }
+  
+  questions = reordered;
+  
+  // Now restore answers for each question
+  questions.forEach(function(q, idx) {
+    var prompt = q.prompt;
+    var isMulti = q.assessment_type === "multi-select" || q.correct_response.length > 1;
+    q._isMulti = isMulti;
+    
+    var rawAnswers = prompt.answers.map(function(ans, i) { return {text: ans, origLetter: String.fromCharCode(97 + i)}; });
+    
+    // Restore answer permutation
+    var savedOrder = shuffledState.aOrders[idx];
+    
+    if (savedOrder && savedOrder.length === rawAnswers.length) {
+       // Reorder rawAnswers based on savedOrder
+       var newAns = [];
+       savedOrder.forEach(function(letter) {
+         var match = rawAnswers.find(function(a){ return a.origLetter === letter; });
+         if (match) newAns.push(match);
+       });
+       // Fallback if match failed for some reason?
+       if (newAns.length !== rawAnswers.length) newAns = rawAnswers; // Should not happen
+       q._shuffledAnswers = newAns;
+    } else {
+       // Fallback
+       q._shuffledAnswers = rawAnswers; 
+    }
+    
+    // Re-calc correct mapped
+    q._correctMapped = q.correct_response.map(function(cr) { return q._shuffledAnswers.findIndex(function(s) { return s.origLetter === cr; }); });
+  });
+  
+  return true;
 }
 
 // ── Helper: Format Answer ──────────────────────────────────
@@ -648,24 +712,11 @@ function syntaxHighlight(json) {
 }
 
 function highlightGeneric(text) {
-    // 1. Strings (double and single quoted)
-    // 2. Comments (// and #)
-    // 3. Keywords
-    // 4. Numbers
+    // Highlights strings, comments, keywords, numbers, and AWS ARNs
     
     // HTML Escape first
     text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    
-    // Comments: // ... or # ...
-    // We must handle strings first to avoid replacing inside strings, but simple regex is hard.
-    // Let's do a simple pass: Tokenize by likely boundaries?
-    // Actually, simple regex replacement order matters. Strings first, then comments? 
-    // But comment markers can be inside strings.
-    // A robust way is to match ALL tokens in one regex.
-    
-    // 5. ARNs and AWS patterns (e.g. arn:aws:..., aws:RequestedRegion) - treat as string/key
-    // Match arn:... or aws:... until end of word or path
-    
+
     const re = /("(?:\\.|[^\\"])*"\s*:)|("(?:\\.|[^\\"])*"|'(?:\\.|[^\\'])*')|(\/\/.*$|#.*$|\/\*[\s\S]*?\*\/)|(\b(?:arn|aws):[\w\-:/*.]+\b)|(\b(?:def|class|function|var|let|const|if|else|return|void|int|public|private|static|import|from|try|catch|while|for|switch|case|break|continue|new|this|true|false|null)\b)|(\b\d+(?:\.\d+)?\b)/gm;
     
     return text.replace(re, function(match, keyPair, string, comment, aws, keyword, number) {
@@ -733,11 +784,7 @@ function exitViewAll() {
           document.getElementById("viewAllBtn").classList.remove("hidden");
           document.getElementById("exitBtn").classList.remove("hidden");
           document.getElementById("modeBadge").classList.remove("hidden");
-          // If we are in review mode (history), endExamBtn/liveScore might be relevant or not?
-          // Usually history view has endExamBtn hidden? Actually loadAttempt determines this.
-          // But generally, if we exit View All, we want to restore header state.
-          // Since we track 'examFinished', we know we are in post-exam state.
-          // What about liveScore? In history/review it's shown.
+
           if (mode === "review") {
              document.getElementById("liveScore").classList.remove("hidden");
           }
@@ -795,7 +842,6 @@ function createQuestionElement(index, forceShowAnswer) {
       var ans = q._shuffledAnswers[idx];
       var div = document.createElement("div");
       
-      // Safety: userAnswers[index] might be undefined in some edge cases? Init logic ensures it isn't.
       var uAns = userAnswers[index] || [];
       var isSelected = uAns.indexOf(idx) >= 0;
       var isCorrectAnswer = q._correctMapped.indexOf(idx) >= 0;
@@ -836,11 +882,11 @@ function createQuestionElement(index, forceShowAnswer) {
           } else {
             userAnswers[index] = [idx];
           }
-          // Only re-render if it's the current question view (not view all)
+          // Re-render
           if (!forceShowAnswer) {
              div.classList.add("just-selected");
              setTimeout(function(){ div.classList.remove("just-selected"); }, 300);
-             renderQuestion(); // This is the old monolithic render, acceptable for click interaction
+             renderQuestion();
           }
         };
       }
@@ -1030,13 +1076,105 @@ function renderAttempts() {
   section.innerHTML = html;
 }
 
+// ── Auto-Save / Restore Logic ───────────────────────────────
+
+function saveProgress() {
+  if (examFinished) return; // Only stop saving if exam is actually finished
+  
+  var state = {
+    currentQ: currentQ,
+    userAnswers: userAnswers,
+    flagged: flagged,
+    checked: checked,
+    seconds: seconds,
+    mode: mode, 
+    timestamp: new Date().getTime(),
+    shuffle: getShuffleState()
+  };
+  try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(state)); } catch(e) { console.error("Save failed", e); }
+}
+
+function clearProgress() {
+  try { localStorage.removeItem(PROGRESS_KEY); } catch(e) {}
+}
+
+function checkProgress() {
+  try {
+    var saved = JSON.parse(localStorage.getItem(PROGRESS_KEY));
+    if (saved && saved.userAnswers && saved.userAnswers.length === questions.length) {
+       var dateStr = new Date(saved.timestamp).toLocaleString();
+       showModal("💾", "Resume Exam?", "Found a saved session from " + dateStr + ".<br>Would you like to resume where you left off?", "Resume", function() {
+           if (restoreSession(saved)) {
+             closeModal();
+           } else {
+             alert("Could not restore session (data mismatch). Starting fresh.");
+             clearProgress();
+             closeModal();
+             initQuestions();
+           }
+       }, function() {
+           clearProgress();
+           closeModal();
+           initQuestions(); 
+       });
+       return true;
+    }
+  } catch(e) { console.error("Check progress failed", e); }
+  return false;
+}
+
+function restoreSession(saved) {
+  // 1. Restore Shuffle First
+  if (!restoreShuffleState(saved.shuffle)) {
+     console.error("Failed to restore shuffle state");
+     return false;
+  }
+
+  // 2. Restore state
+  currentQ = saved.currentQ;
+  userAnswers = saved.userAnswers;
+  flagged = saved.flagged;
+  checked = saved.checked || checked; // Fallback to existing (empty) if missing
+  seconds = saved.seconds;
+  mode = saved.mode || "exam";
+  selectedMode = mode;
+  
+  // Set up UI
+  document.getElementById("startScreen").classList.add("hidden");
+  document.getElementById("infoPanel").classList.add("hidden");
+  document.getElementById("quizScreen").classList.remove("hidden");
+  
+  document.getElementById("modeBadge").textContent = (mode === "exam" ? "Exam" : "Review");
+  document.getElementById("modeBadge").className = "mode-badge " + mode;
+  document.getElementById("modeBadge").classList.remove("hidden");
+
+  document.getElementById("exitBtn").classList.remove("hidden");
+  document.getElementById("endExamBtn").classList.remove("hidden");
+  document.getElementById("viewAllBtn").classList.add("hidden");
+
+  if (mode === "review") {
+     document.getElementById("checkRow").classList.remove("hidden");
+     document.getElementById("liveScore").classList.remove("hidden");
+  } else {
+     document.getElementById("checkRow").classList.add("hidden");
+     document.getElementById("liveScore").classList.add("hidden");
+  }
+
+  buildGrid();
+  activeFilter = "all";
+  activeSection = "all";
+  buildNavFilters();
+  renderQuestion();
+  updateLiveScore();
+  updateNavSummary();
+  startTimer();
+  
+  return true;
+}
+
 // ── Init ────────────────────────────────────────────────────
 
 function getPassPercent() {
-  // Logic: 
-  // If pass_score is provided and > 100, assuming it's a scaled score (e.g. 720/1000) -> 72%
-  // If pass_score is <= 100, assume it's the percentage.
-  // Default to 72% if missing.
   if (DATA.pass_score) {
     if (DATA.pass_score > 100) return Math.round(DATA.pass_score / 10);
     return DATA.pass_score;
@@ -1049,10 +1187,16 @@ function init() {
   document.getElementById("headerTitle").textContent = DATA.title;
   document.getElementById("examCount").textContent = DATA.assessments.length + " Questions";
   
-  // Initial shuffle for fresh start
+  document.getElementById("examCount").textContent = DATA.assessments.length + " Questions";
+  
+  // Initial shuffle for fresh start (default)
   initQuestions();
-  renderAttempts();
-  renderQuickStats();
+  
+  // Check for save
+  if (!checkProgress()) {
+      renderAttempts();
+      renderQuickStats();
+  }
 }
 
 function renderQuickStats() {
@@ -1166,7 +1310,7 @@ function startExam() {
   document.getElementById("quizScreen").classList.remove("hidden");
   
   // Show/Hide buttons
-  document.getElementById("exitBtn").classList.remove("hidden"); // Exit button always useful?
+  document.getElementById("exitBtn").classList.remove("hidden");
   document.getElementById("endExamBtn").classList.remove("hidden");
   document.getElementById("viewAllBtn").classList.add("hidden");
 
@@ -1174,7 +1318,6 @@ function startExam() {
     document.getElementById("checkRow").classList.remove("hidden");
     document.getElementById("liveScore").classList.remove("hidden");
     document.getElementById("exitBtn").classList.remove("hidden"); 
-    // document.getElementById("viewAllBtn").classList.remove("hidden"); // Removed: User wants it only after finish
     updateLiveScore();
   } else {
     document.getElementById("checkRow").classList.add("hidden");
@@ -1186,6 +1329,7 @@ function startExam() {
   activeSection = "all";
   buildNavFilters();
   renderQuestion();
+  saveProgress();
   startTimer();
 }
 
@@ -1326,17 +1470,12 @@ function renderQuestion() {
        qTextField.innerHTML = formatDescription(qTextField.innerHTML);
   }
   
-  // 0. Coalesce adjacent <p><code>...</code></p> blocks into <pre>...</pre>
-  // Udemy often renders code blocks as separate paragraphs, causing "striped" styling.
   var children = Array.from(qTextField.children);
   var currentBlock = [];
   
   function processBlock(nodes) {
       if (nodes.length === 0) return;
       
-      // If it's a single line but looks like a standalone code block (starts with { or [), convert to pre
-      // If it's just a variable name in a P, maybe keep it? 
-      // User complaint was "background on every line", which implies multi-line.
       if (nodes.length === 1 && nodes[0].textContent.trim().length < 50 && !nodes[0].textContent.trim().match(/[{[]/)) {
           return; 
       }
@@ -1373,13 +1512,9 @@ function renderQuestion() {
   // Auto-highlight code blocks in question
   var codeBlocks = qTextField.querySelectorAll("pre, code");
   codeBlocks.forEach(function(block) {
-      // Skip code elements that are inside pre (avoid double highlight)
-      if (block.tagName === 'CODE' && block.closest('pre')) return;
-
       var txt = block.textContent;
       try {
          var trimmed = txt.trim();
-         // Only attempt JSON parse if it's a PRE block (likely full JSON)
          if (block.tagName === 'PRE' && (trimmed.startsWith("{") || trimmed.startsWith("["))) {
              var obj = JSON.parse(trimmed);
              var pretty = JSON.stringify(obj, null, 2);
@@ -1459,6 +1594,7 @@ function renderQuestion() {
           div.classList.add("just-selected");
           setTimeout(function(){ div.classList.remove("just-selected"); }, 300);
           renderQuestion();
+          saveProgress();
         };
       }
       container.appendChild(div);
@@ -1491,25 +1627,6 @@ function renderQuestion() {
     checkBtn.disabled = userAnswers[currentQ].length === 0 || isChecked;
     checkBtn.textContent = isChecked ? "✓ Checked" : "Check Answer";
   }
-
-  // REPLACED MONOLITHIC RENDERING WITH REUSABLE COMPONENT
-  // Clear old dynamic content
-  var content = document.getElementById("quizContent");
-  
-  // We need to preserve the static layout structure of quizContent 
-  // (progress row, check row, nav, etc.) and only inject the QUESTION parts.
-  // Actually, createQuestionElement creates the whole block.
-  // But our existing HTML structure has specific divs for qNumber, qType, etc.
-  // So we should map the values from createQuestionElement or just implement logic here?
-  // 
-  // DRY Refactor: We kept the OLD renderQuestion logic below for now, but really we should
-  // use the helpers to populate the existing divs if we want to maintain the exact same DOM structure for the single view,
-  // OR we replce the inner content of a container.
-  // The existing single-view structure is quite specific (separate divs for header, answers, etc spread out).
-  // createQuestionElement creates a self-contained div.
-  // 
-  // Let's stick to the existing manipulation for single view to avoid breaking layout,
-  // but use the helpers for code processing.
 
   // Explanation
   var expl = document.getElementById("explanation");
@@ -1547,6 +1664,7 @@ function checkAnswer() {
   checked[currentQ] = true;
   updateLiveScore();
   renderQuestion();
+  saveProgress();
 }
 
 function navigate(dir) {
@@ -1556,6 +1674,7 @@ function navigate(dir) {
   }
   currentQ = Math.max(0, Math.min(questions.length - 1, currentQ + dir));
   renderQuestion();
+  saveProgress();
   window.scrollTo({top: 0, behavior: "smooth"});
 }
 
@@ -1587,6 +1706,7 @@ function endExam() {
 
   clearInterval(timerInterval);
   examFinished = true;
+  clearProgress(); // Clear save on finish
   showScore();
 }
 
@@ -1640,11 +1760,10 @@ function showScore() {
   var passGoal = getPassPercent();
   var pass = pct >= passGoal;
 
-  // Save attempt with FULL SNAPSHOT (expensive but needed for review)
+  // Save attempt
   var now = new Date();
   var dateStr = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0") + " " + String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
   
-  // Create snapshot of questions (so we know which answer was which if we reload)
   var snapshot = questions.map(function(q) {
      return {
          prompt: q.prompt, 
@@ -1668,7 +1787,7 @@ function showScore() {
     time: document.getElementById("timer").textContent, // capture final timer value
     answers: userAnswers,
     flagged: flagged,
-    snapshot: snapshot // heavy data!
+    snapshot: snapshot
   });
 
   document.getElementById("quizScreen").classList.add("hidden");
