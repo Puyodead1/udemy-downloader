@@ -300,6 +300,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 
 /* 2. Syntax Highlighting Colors */
 
+/* View All Screen */
+#viewAllContainer {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px;
+}
+.view-all-header {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 24px 0;
+}
+
 /* JSON Keys (e.g., "Version":) -> Cyan/Blue */
 .highlight-key {
     color: #79c0ff !important; 
@@ -337,12 +349,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 </head>
 <body>
 
+</div>
+
 <div class="header">
   <h1 id="headerTitle"></h1>
   <div class="header-right">
     <span class="mode-badge hidden" id="modeBadge"></span>
     <span class="live-score hidden" id="liveScore"></span>
     <span class="timer" id="timer">00:00:00</span>
+    <button class="btn btn-ghost hidden" id="viewAllBtn" onclick="viewAllQuestions()">View All</button>
     <button class="btn btn-ghost hidden" id="exitBtn" onclick="exitReview()">Exit</button>
     <button class="btn btn-danger hidden" id="endExamBtn" onclick="endExam()">End Exam</button>
   </div>
@@ -437,10 +452,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
       <div class="section-breakdown" id="sectionBreakdown"></div>
       <div style="margin-top:32px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
         <button class="btn btn-primary" onclick="reviewFromScore()">Review All Answers</button>
+        <button class="btn btn-outline" onclick="viewAllQuestions()">View All Questions</button>
         <button class="btn btn-outline" onclick="retakeExam()">Retake Exam</button>
         <button class="btn btn-ghost" onclick="goBackToStart()">Back to Start</button>
       </div>
     </div>
+  </div>
+
+  <!-- View All Screen -->
+  <div id="viewAllScreen" class="hidden">
+    <div class="view-all-header" style="margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;">
+        <h2 style="font-size:20px;">All Questions & Answers</h2>
+        <button class="btn btn-ghost" onclick="exitViewAll()">← Back</button>
+    </div>
+    <div id="viewAllContainer"></div>
+    <div style="text-align:center;margin-top:32px;"><button class="btn btn-ghost" onclick="exitViewAll()">← Back</button></div>
   </div>
 </div>
 
@@ -561,6 +587,258 @@ function highlightGeneric(text) {
     });
 }
 
+// ── View All Questions ──────────────────────────────────────
+
+var previousScreen = "startScreen"; // Track where we came from
+
+function viewAllQuestions() {
+  // Determine current screen
+  if (!document.getElementById("scoreScreen").classList.contains("hidden")) {
+      previousScreen = "scoreScreen";
+  } else if (!document.getElementById("quizScreen").classList.contains("hidden")) {
+      previousScreen = "quizScreen";
+  } else if (!document.getElementById("startScreen").classList.contains("hidden")) {
+       previousScreen = "startScreen"; // Should not happen usually
+  }
+
+  document.getElementById("startScreen").classList.add("hidden");
+  document.getElementById("infoPanel").classList.add("hidden");
+  document.getElementById("quizScreen").classList.add("hidden");
+  document.getElementById("scoreScreen").classList.add("hidden");
+  document.getElementById("viewAllScreen").classList.remove("hidden");
+  
+  // Hide main header elements
+  document.getElementById("viewAllBtn").classList.add("hidden");
+  document.getElementById("exitBtn").classList.add("hidden");
+  document.getElementById("endExamBtn").classList.add("hidden");
+  document.getElementById("timer").classList.add("hidden");
+  document.getElementById("modeBadge").classList.add("hidden");
+  document.getElementById("liveScore").classList.add("hidden");
+
+  var container = document.getElementById("viewAllContainer");
+  container.innerHTML = "";
+  
+  for (var i = 0; i < questions.length; i++) {
+    var qDiv = createQuestionElement(i, true);
+    qDiv.style.marginBottom = "48px";
+    qDiv.style.borderBottom = "1px solid #3e4143";
+    qDiv.style.paddingBottom = "32px";
+    container.appendChild(qDiv);
+  }
+}
+
+function exitViewAll() {
+  document.getElementById("viewAllScreen").classList.add("hidden");
+  
+  // Restore previous screen
+  if (previousScreen === "quizScreen") {
+      document.getElementById("quizScreen").classList.remove("hidden");
+      document.getElementById("timer").classList.remove("hidden");
+      
+      if (mode === "review" || examFinished) {
+          document.getElementById("viewAllBtn").classList.remove("hidden");
+          document.getElementById("exitBtn").classList.remove("hidden");
+          document.getElementById("modeBadge").classList.remove("hidden");
+          if (!examFinished) {
+              document.getElementById("endExamBtn").classList.remove("hidden");
+              document.getElementById("liveScore").classList.remove("hidden");
+          }
+      }
+  } else if (previousScreen === "scoreScreen") {
+      document.getElementById("scoreScreen").classList.remove("hidden");
+       document.getElementById("timer").classList.remove("hidden");
+  } else {
+      // Fallback
+      document.getElementById("startScreen").classList.remove("hidden");
+  }
+}
+
+// ── Helper: Create Question Element (DRY) ──────────────────
+
+function createQuestionElement(index, forceShowAnswer) {
+  var q = questions[index];
+  var prompt = q.prompt;
+  var isMulti = q._isMulti;
+  var isChecked = checked[index];
+  var showAnswer = forceShowAnswer || examFinished || (mode === "review" && isChecked);
+  
+  var wrapper = document.createElement("div");
+  
+  // Header
+  var header = document.createElement("div");
+  header.className = "question-header";
+  header.innerHTML = '<span class="q-number">Question ' + (index + 1) + ' of ' + questions.length + '</span>' +
+                     '<span class="q-section" style="' + (q.section ? '' : 'display:none') + '">' + (q.section || "") + '</span>';
+  wrapper.appendChild(header);
+  
+  // Type
+  var typeEl = document.createElement("div");
+  typeEl.className = "q-type";
+  typeEl.innerHTML = isMulti ? "☑ Select " + q.correct_response.length + " answers" : "◉ Select one answer";
+  wrapper.appendChild(typeEl);
+  
+  // Text
+  var textEl = document.createElement("div");
+  textEl.className = "question-text";
+  textEl.innerHTML = prompt.question || "";
+  if(textEl.innerHTML.includes("- ")) {
+       textEl.innerHTML = formatDescription(textEl.innerHTML);
+  }
+  processCodeBlocks(textEl); // Extracted helper
+  highlightCode(textEl);     // Extracted helper
+  wrapper.appendChild(textEl);
+  
+  // Answers
+  var answersContainer = document.createElement("div");
+  answersContainer.className = "answers";
+  
+  for (var j = 0; j < q._shuffledAnswers.length; j++) {
+    (function(idx) {
+      var ans = q._shuffledAnswers[idx];
+      var div = document.createElement("div");
+      
+      // Safety: userAnswers[index] might be undefined in some edge cases? Init logic ensures it isn't.
+      var uAns = userAnswers[index] || [];
+      var isSelected = uAns.indexOf(idx) >= 0;
+      var isCorrectAnswer = q._correctMapped.indexOf(idx) >= 0;
+
+      div.className = "answer";
+      if (isSelected) div.classList.add("selected");
+      if (showAnswer) {
+        div.classList.add("locked");
+        if (isCorrectAnswer && isSelected) div.classList.add("correct");
+        else if (isCorrectAnswer && !isSelected) div.classList.add("missed");
+        else if (isSelected && !isCorrectAnswer) div.classList.add("incorrect");
+      }
+
+      var indicatorClass = isMulti ? "answer-indicator checkbox" : "answer-indicator";
+      var checkmark = isMulti ? "✓" : "";
+
+      var innerHtml = '<div class="' + indicatorClass + '"><div class="dot">' + checkmark + '</div></div>';
+      innerHtml += '<div class="answer-text">' + formatAnswer(ans.text) + '</div>';
+
+      if (showAnswer) {
+        if (isSelected && isCorrectAnswer) {
+          innerHtml += '<span class="answer-tag tag-correct">✓ Your Answer (Correct)</span>';
+        } else if (isSelected && !isCorrectAnswer) {
+          innerHtml += '<span class="answer-tag tag-wrong">✗ Your Answer (Wrong)</span>';
+        } else if (isCorrectAnswer && !isSelected) {
+          innerHtml += '<span class="answer-tag tag-missed">✓ Correct Answer</span>';
+        }
+      }
+
+      div.innerHTML = innerHtml;
+
+      if (!showAnswer) {
+        div.onclick = function() {
+          if (isMulti) {
+            var pos = userAnswers[index].indexOf(idx);
+            if (pos >= 0) userAnswers[index].splice(pos, 1);
+            else userAnswers[index].push(idx);
+          } else {
+            userAnswers[index] = [idx];
+          }
+          // Only re-render if it's the current question view (not view all)
+          if (!forceShowAnswer) {
+             div.classList.add("just-selected");
+             setTimeout(function(){ div.classList.remove("just-selected"); }, 300);
+             renderQuestion(); // This is the old monolithic render, acceptable for click interaction
+          }
+        };
+      }
+      
+      // Highlight answer code
+      var ansCodes = div.querySelectorAll(".answer-text code");
+      ansCodes.forEach(function(c) {
+          if (!c.querySelector("span[class^='highlight-']")) {
+             c.innerHTML = highlightGeneric(c.textContent);
+          }
+      });
+      
+      answersContainer.appendChild(div);
+    })(j);
+  }
+  wrapper.appendChild(answersContainer);
+  
+  // Explanation
+  if (showAnswer && prompt.explanation) {
+    var expl = document.createElement("div");
+    expl.className = "explanation show";
+    expl.innerHTML = '<h3>💡 Explanation</h3><div class="explanation-body">' + prompt.explanation + '</div>';
+    var links = expl.querySelectorAll("a");
+    for (var li = 0; li < links.length; li++) { links[li].setAttribute("target", "_blank"); links[li].setAttribute("rel", "noopener"); }
+    wrapper.appendChild(expl);
+  }
+  
+  return wrapper;
+}
+/*extracted*/
+function processCodeBlocks(root) {
+  var children = Array.from(root.children);
+  var currentBlock = [];
+  
+  function processBlock(nodes) {
+      if (nodes.length === 0) return;
+      if (nodes.length === 1 && nodes[0].textContent.trim().length < 50 && !nodes[0].textContent.trim().match(/[{[]/)) { return; }
+
+      var first = nodes[0];
+      var pre = document.createElement("pre");
+      var combinedText = nodes.map(function(n) { return n.textContent; }).join("\n").replace(/\u00A0/g, " ");
+      pre.textContent = combinedText;
+      
+      first.parentNode.insertBefore(pre, first);
+      nodes.forEach(function(n) { n.remove(); });
+  }
+
+  children.forEach(function(child) {
+      var isCodeP = false;
+      if (child.tagName === "P") {
+          var code = child.querySelector("code");
+          if (code && child.textContent.trim() === code.textContent.trim()) {
+              isCodeP = true;
+          }
+      }
+
+      if (isCodeP) {
+          currentBlock.push(child);
+      } else {
+          processBlock(currentBlock);
+          currentBlock = [];
+      }
+  });
+  processBlock(currentBlock);
+}
+
+function highlightCode(root) {
+  var codeBlocks = root.querySelectorAll("pre, code");
+  codeBlocks.forEach(function(block) {
+      if (block.tagName === 'CODE' && block.closest('pre')) return;
+
+      var txt = block.textContent;
+      try {
+         var trimmed = txt.trim();
+         if (block.tagName === 'PRE' && (trimmed.startsWith("{") || trimmed.startsWith("["))) {
+             var obj = JSON.parse(trimmed);
+             var pretty = JSON.stringify(obj, null, 2);
+             block.innerHTML = '<code>' + syntaxHighlight(pretty) + '</code>';
+         } else {
+             if (block.tagName === 'PRE') {
+                block.innerHTML = '<code>' + highlightGeneric(txt) + '</code>';
+             } else {
+                block.innerHTML = highlightGeneric(txt);
+             }
+         }
+      } catch(e) {
+         if (block.tagName === 'PRE') {
+            block.innerHTML = '<code>' + highlightGeneric(txt) + '</code>';
+         } else {
+            block.innerHTML = highlightGeneric(txt);
+         }
+      }
+      block.style.textDecoration = "none";
+  });
+}
+
 // ── localStorage Attempts ──────────────────────────────────
 
 function getAttempts() {
@@ -581,7 +859,7 @@ function clearAttempts() {
   renderAttempts();
 }
 
-function loadAttempt(idx) {
+function loadAttempt(idx, viewAll) {
   var attempts = getAttempts();
   var att = attempts[idx];
   
@@ -598,11 +876,17 @@ function loadAttempt(idx) {
   flagged = att.flagged || new Array(questions.length).fill(false);
   checked = new Array(questions.length).fill(true);
     
+  if (viewAll) {
+      viewAllQuestions();
+      return;
+  }
+
   document.getElementById("startScreen").classList.add("hidden");
   document.getElementById("scoreScreen").classList.add("hidden");
   document.getElementById("quizScreen").classList.remove("hidden");
     
   document.getElementById("exitBtn").classList.remove("hidden");
+  document.getElementById("viewAllBtn").classList.remove("hidden");
   document.getElementById("endExamBtn").classList.add("hidden");
   document.getElementById("checkRow").classList.add("hidden");
   document.getElementById("modeBadge").textContent = "History";
@@ -635,13 +919,13 @@ function renderAttempts() {
     var rowClass = canReview ? "clickable" : "legacy";
     var title = canReview ? "Click to review attempt" : "Legacy attempt (score only)";
     
-    html += '<tr class="' + rowClass + '" onclick="loadAttempt(' + i + ')" title="' + title + '">';
+    html += '<tr class="' + rowClass + '" onclick="if(!event.target.closest(\'button\')) loadAttempt(' + i + ')" title="' + title + '">';
     html += '<td>' + a.date + '</td>';
     html += '<td><span class="attempt-mode ' + a.mode + '">' + a.mode + '</span></td>';
     html += '<td>' + a.correct + '/' + a.total + '</td>';
     html += '<td><span class="attempt-score ' + pClass + '">' + a.pct + '%</span></td>';
     html += '<td>' + a.time + '</td>';
-    html += '<td>' + (canReview ? '<span style="font-size:14px">👁️</span>' : '<span style="opacity:0.3">🚫</span>') + '</td>';
+    html += '<td>' + (canReview ? '<button class="btn btn-ghost" style="padding:2px 8px;font-size:12px;" onclick="loadAttempt(' + i + ', true)">View All</button> <span style="font-size:14px">👁️</span>' : '<span style="opacity:0.3">🚫</span>') + '</td>';
     html += '</tr>';
   }
   html += '</tbody></table>';
@@ -744,6 +1028,7 @@ function exitReview() {
     document.getElementById("quizScreen").classList.add("hidden");
     document.getElementById("startScreen").classList.remove("hidden");
     document.getElementById("exitBtn").classList.add("hidden");
+    document.getElementById("viewAllBtn").classList.add("hidden");
     document.getElementById("navFilters").innerHTML = "";
     document.getElementById("navSummary").innerHTML = "";
     activeFilter = "all";
@@ -785,11 +1070,13 @@ function startExam() {
   // Show/Hide buttons
   document.getElementById("exitBtn").classList.remove("hidden"); // Exit button always useful?
   document.getElementById("endExamBtn").classList.remove("hidden");
+  document.getElementById("viewAllBtn").classList.add("hidden");
 
   if (mode === "review") {
     document.getElementById("checkRow").classList.remove("hidden");
     document.getElementById("liveScore").classList.remove("hidden");
     document.getElementById("exitBtn").classList.remove("hidden"); 
+    document.getElementById("viewAllBtn").classList.remove("hidden");
     updateLiveScore();
   } else {
     document.getElementById("checkRow").classList.add("hidden");
@@ -1104,6 +1391,25 @@ function renderQuestion() {
     checkBtn.textContent = isChecked ? "✓ Checked" : "Check Answer";
   }
 
+  // REPLACED MONOLITHIC RENDERING WITH REUSABLE COMPONENT
+  // Clear old dynamic content
+  var content = document.getElementById("quizContent");
+  
+  // We need to preserve the static layout structure of quizContent 
+  // (progress row, check row, nav, etc.) and only inject the QUESTION parts.
+  // Actually, createQuestionElement creates the whole block.
+  // But our existing HTML structure has specific divs for qNumber, qType, etc.
+  // So we should map the values from createQuestionElement or just implement logic here?
+  // 
+  // DRY Refactor: We kept the OLD renderQuestion logic below for now, but really we should
+  // use the helpers to populate the existing divs if we want to maintain the exact same DOM structure for the single view,
+  // OR we replce the inner content of a container.
+  // The existing single-view structure is quite specific (separate divs for header, answers, etc spread out).
+  // createQuestionElement creates a self-contained div.
+  // 
+  // Let's stick to the existing manipulation for single view to avoid breaking layout,
+  // but use the helpers for code processing.
+
   // Explanation
   var expl = document.getElementById("explanation");
   var explBody = document.getElementById("explanationBody");
@@ -1269,6 +1575,7 @@ function showScore() {
   document.getElementById("endExamBtn").classList.add("hidden");
   document.getElementById("liveScore").classList.add("hidden");
   document.getElementById("exitBtn").classList.add("hidden");
+  document.getElementById("viewAllBtn").classList.add("hidden");
 
   document.getElementById("scorePct").textContent = pct + "%";
   document.getElementById("scoreStatus").textContent = pass ? "PASSED" : "NOT PASSED";
@@ -1489,6 +1796,7 @@ function reviewFromScore() {
   document.getElementById("quizScreen").classList.remove("hidden");
   document.getElementById("checkRow").classList.add("hidden");
   document.getElementById("exitBtn").classList.remove("hidden");
+  document.getElementById("viewAllBtn").classList.remove("hidden");
   activeFilter = "all";
   activeSection = "all";
   buildNavFilters();
@@ -1503,6 +1811,7 @@ function retakeExam() {
   document.getElementById("endExamBtn").classList.add("hidden");
   document.getElementById("modeBadge").classList.add("hidden");
   document.getElementById("liveScore").classList.add("hidden");
+  document.getElementById("viewAllBtn").classList.add("hidden");
   document.getElementById("timer").textContent = "00:00:00";
   document.getElementById("timer").className = "timer";
   document.getElementById("navFilters").innerHTML = "";
