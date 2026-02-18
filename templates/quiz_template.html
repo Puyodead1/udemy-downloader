@@ -729,13 +729,17 @@ function exitViewAll() {
       document.getElementById("quizScreen").classList.remove("hidden");
       document.getElementById("timer").classList.remove("hidden");
       
-      if (mode === "review" || examFinished) {
+      if (examFinished) {
           document.getElementById("viewAllBtn").classList.remove("hidden");
           document.getElementById("exitBtn").classList.remove("hidden");
           document.getElementById("modeBadge").classList.remove("hidden");
-          if (!examFinished) {
-              document.getElementById("endExamBtn").classList.remove("hidden");
-              document.getElementById("liveScore").classList.remove("hidden");
+          // If we are in review mode (history), endExamBtn/liveScore might be relevant or not?
+          // Usually history view has endExamBtn hidden? Actually loadAttempt determines this.
+          // But generally, if we exit View All, we want to restore header state.
+          // Since we track 'examFinished', we know we are in post-exam state.
+          // What about liveScore? In history/review it's shown.
+          if (mode === "review") {
+             document.getElementById("liveScore").classList.remove("hidden");
           }
       }
   } else if (previousScreen === "scoreScreen") {
@@ -1170,7 +1174,7 @@ function startExam() {
     document.getElementById("checkRow").classList.remove("hidden");
     document.getElementById("liveScore").classList.remove("hidden");
     document.getElementById("exitBtn").classList.remove("hidden"); 
-    document.getElementById("viewAllBtn").classList.remove("hidden");
+    // document.getElementById("viewAllBtn").classList.remove("hidden"); // Removed: User wants it only after finish
     updateLiveScore();
   } else {
     document.getElementById("checkRow").classList.add("hidden");
