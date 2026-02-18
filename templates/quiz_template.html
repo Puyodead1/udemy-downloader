@@ -300,6 +300,66 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 
 /* 2. Syntax Highlighting Colors */
 
+/* Image Modal (Lightbox) */
+.image-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+}
+.image-modal-overlay.show {
+    display: flex;
+    animation: fadeIn 0.2s ease-out;
+}
+.image-modal-content {
+    position: relative;
+    max-width: 90vw;
+    max-height: 90vh;
+    background: #1a2332;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+.image-modal-img {
+    display: block;
+    max-width: 100%;
+    max-height: calc(90vh - 40px);
+    object-fit: contain;
+    border-radius: 4px;
+    /* Portrait mode hint: ensure it doesn't get too wide if naturally portrait */
+}
+.image-modal-close {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    color: white;
+    font-size: 30px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 5px;
+}
+.image-modal-close:hover {
+    color: #ef4444;
+}
+/* Make images in content clickable */
+.question-text img, .explanation-body img {
+    cursor: zoom-in;
+    transition: transform 0.2s;
+}
+.question-text img:hover, .explanation-body img:hover {
+    transform: scale(1.02);
+}
+
 /* View All Screen */
 #viewAllContainer {
     max-width: 900px;
@@ -468,6 +528,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
     <div id="viewAllContainer"></div>
     <div style="text-align:center;margin-top:32px;"><button class="btn btn-ghost" onclick="exitViewAll()">← Back</button></div>
   </div>
+</div>
+
+<!-- Image Lightbox Modal -->
+<div id="imageModal" class="image-modal-overlay" onclick="closeImageModal()">
+    <div class="image-modal-content" onclick="event.stopPropagation()">
+        <button class="image-modal-close" onclick="closeImageModal()">×</button>
+        <img id="imageModalImg" class="image-modal-img" src="" alt="Enlarged Image">
+        <div style="text-align:center; margin-top:8px; color:#9ca3af; font-size:12px;">Portrait View</div> 
+    </div>
 </div>
 
 <script id="quiz-data-script" type="application/json">%%QUIZ_JSON%%</script>
@@ -1896,7 +1965,37 @@ document.addEventListener("keydown", function(e) {
   }
   
   // Escape: close dropdowns
-  else if (key === "Escape") { closeAllDropdowns(); }
+  else if (key === "Escape") { 
+      closeAllDropdowns(); 
+      closeImageModal();
+  }
+});
+
+// ── Image Lightbox Logic ────────────────────────────────────
+
+function openImageModal(src) {
+    var modal = document.getElementById("imageModal");
+    var img = document.getElementById("imageModalImg");
+    img.src = src;
+    modal.classList.add("show");
+    document.body.style.overflow = "hidden"; // Prevent background scrolling
+}
+
+function closeImageModal() {
+    var modal = document.getElementById("imageModal");
+    modal.classList.remove("show");
+    document.body.style.overflow = "";
+    setTimeout(function(){ document.getElementById("imageModalImg").src = ""; }, 200);
+}
+
+// Global click delegation for images
+document.addEventListener("click", function(e) {
+    if (e.target.tagName === "IMG") {
+        // Check if inside question text or explanation
+        if (e.target.closest(".question-text") || e.target.closest(".explanation-body")) {
+            openImageModal(e.target.src);
+        }
+    }
 });
 
 init();
