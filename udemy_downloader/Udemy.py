@@ -1797,6 +1797,8 @@ class Udemy:
                     self.save_keys()
 
                     self.logger.info(f"Got decryption key: {key}")
+
+                    self.cdm.close(session_id)
                 except Exception as e:
                     self.logger.error(f"Failed to get media license token: {e}")
                     return
