@@ -5,23 +5,43 @@ import os
 import subprocess
 from pathlib import Path
 from typing import IO
-
+from udemy_downloader.mp4parse import F4VParser
+from udemy_downloader import widevine_pssh_data_pb2
 import demoji
 import requests
 from tqdm import tqdm
+from pywidevine.pssh import PSSH
 
 logger = logging.getLogger(__name__)
 
 
-def get_pssh(raw: bytes) -> str:
-    offset = raw.rfind(b"pssh")
-    return raw[offset - 4 : offset - 4 + raw[offset - 1]]
+def extract_pssh(mp4_file):
+    """
+    Parameters
+    ----------
+    mp4_file : str
+        MP4 file with a PSSH header
 
 
-def pssh_from_file(file_path: str) -> str:
-    data = Path(file_path).read_bytes()
-    pssh = get_pssh(data)
-    return base64.b64encode(pssh).decode()
+    Returns
+    -------
+    PSSH
+
+    """
+
+    boxes = F4VParser.parse(filename=mp4_file)
+    if not os.path.exists(mp4_file):
+        raise Exception("File does not exist")
+    for box in boxes:
+        if box.header.box_type == "moov" and box.pssh:
+            pssh_box = next(
+                x for x in box.pssh if x.system_id == "edef8ba979d64acea3c827dcd51d21ed"
+            )
+            pssh_raw = codecs.decode(pssh_box.payload, "hex")
+            return PSSH(pssh_raw)
+
+    # No Moof or PSSH header found
+    return None
 
 
 def deEmojify(inputStr: str):
@@ -51,7 +71,12 @@ def durationtoseconds(period):
         # logger.debug("Total time: " + str(day) + " days " + str(hour) + " hours " +
         #       str(minute) + " minutes and " + str(second) + " seconds")
         total_time = float(
-            str((day * 24 * 60 * 60) + (hour * 60 * 60) + (minute * 60) + (int(second.split(".")[0])))
+            str(
+                (day * 24 * 60 * 60)
+                + (hour * 60 * 60)
+                + (minute * 60)
+                + (int(second.split(".")[0]))
+            )
             + "."
             + str(int(second.split(".")[-1]))
         )
@@ -64,7 +89,9 @@ def durationtoseconds(period):
 
 def check_for_aria():
     try:
-        subprocess.Popen(["aria2c", "-v"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
+        subprocess.Popen(
+            ["aria2c", "-v"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        ).wait()
         return True
     except FileNotFoundError:
         return False
@@ -77,7 +104,9 @@ def check_for_aria():
 
 def check_for_ffmpeg():
     try:
-        subprocess.Popen(["ffmpeg"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL).wait()
+        subprocess.Popen(
+            ["ffmpeg"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
+        ).wait()
         return True
     except FileNotFoundError:
         return False
@@ -91,13 +120,24 @@ def check_for_ffmpeg():
 def check_for_ffmpeg():
     try:
         # Run ffmpeg and capture its output
-        result = subprocess.run(["ffmpeg", "-version"], stderr=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+        result = subprocess.run(
+            ["ffmpeg", "-version"],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
         # Parse the first line of the output to extract the version
-        first_line = result.stdout.splitlines()[0] if result.stdout else result.stderr.splitlines()[0]
+        first_line = (
+            result.stdout.splitlines()[0]
+            if result.stdout
+            else result.stderr.splitlines()[0]
+        )
         if "ffmpeg version" in first_line:
             return True, first_line
         else:
-            logger.warning("FFmpeg is installed but version information could not be extracted.")
+            logger.warning(
+                "FFmpeg is installed but version information could not be extracted."
+            )
             return True, None
     except FileNotFoundError:
         return False, None
@@ -120,7 +160,9 @@ def download(url, path, filename):
     if first_byte >= file_size:
         return file_size
     header = {"Range": "bytes=%s-%s" % (first_byte, file_size)}
-    pbar = tqdm(total=file_size, initial=first_byte, unit="B", unit_scale=True, desc=filename)
+    pbar = tqdm(
+        total=file_size, initial=first_byte, unit="B", unit_scale=True, desc=filename
+    )
     res = requests.get(url, headers=header, stream=True)
     res.raise_for_status()
     with open(path, encoding="utf8", mode="ab") as f:
