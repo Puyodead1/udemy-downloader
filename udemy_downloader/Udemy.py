@@ -84,12 +84,35 @@ class Udemy:
         self.auth = UdemyAuth()
         self.parsed_data = {}
 
+        self.home_dir = Path(os.getcwd())
+        self.devices_dir = self.home_dir / "devices"
+        self.download_dir = self.home_dir / "downloads"
+        self.saved_dir = self.home_dir / "saved"
+        self.key_file_path = self.home_dir / "keyfile.json"
+        self.cookies_path = self.home_dir / "cookies.txt"
+        self.log_dir = self.home_dir / "logs"
+        self.log_file_path = self.log_dir / f"{time.strftime('%Y-%m-%d-%I-%M-%S')}.log"
+        self.log_format = "[%(asctime)s] [%(name)s] [%(funcName)s:%(lineno)d] %(levelname)s: %(message)s"
+        self.log_date_format = "%I:%M:%S"
+        self.log_level_str = log_level_str
+
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.saved_dir.mkdir(parents=True, exist_ok=True)
+        self.devices_dir.mkdir(parents=True, exist_ok=True)
+
+        self.init_logger()
+
         self.bearer_token = bearer_token
         self.browser = browser
         self.is_subscription_course = is_subscription_course
         self.skip_hls = skip_hls
         self.download_assets = download_assets
         self.lang = lang
+        if not lang and download_captions:
+            self.logger.warning(
+                "You have requested captions be downloaded but have not specified a language, defaulting to English (en)."
+            )
+            self.lang = "en"
         self.download_captions = download_captions
         self.download_quizzes = download_quizzes
         self.skip_lectures = skip_lectures
@@ -104,27 +127,9 @@ class Udemy:
         self.h265_crf = h265_crf
         self.h265_preset = h265_preset
         self.use_nvenc = use_nvenc
-        self.log_level_str = log_level_str
         self.id_as_course_name = id_as_course_name
         self.out = out
         self.use_continuous_lecture_numbers = use_continuous_lecture_numbers
-
-        self.home_dir = Path(os.getcwd())
-        self.devices_dir = self.home_dir / "devices"
-        self.download_dir = self.home_dir / "downloads"
-        self.saved_dir = self.home_dir / "saved"
-        self.key_file_path = self.home_dir / "keyfile.json"
-        self.cookies_path = self.home_dir / "cookies.txt"
-        self.log_dir = self.home_dir / "logs"
-        self.log_file_path = self.log_dir / f"{time.strftime('%Y-%m-%d-%I-%M-%S')}.log"
-        self.log_format = "[%(asctime)s] [%(name)s] [%(funcName)s:%(lineno)d] %(levelname)s: %(message)s"
-        self.log_date_format = "%I:%M:%S"
-
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-        self.saved_dir.mkdir(parents=True, exist_ok=True)
-        self.devices_dir.mkdir(parents=True, exist_ok=True)
-
-        self.init_logger()
 
         # Process the chapter filter
         if chapter_filter_raw:
