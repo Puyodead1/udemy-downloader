@@ -491,6 +491,34 @@ class Udemy:
 
         return resp
 
+    def _get_practice(self, practice_id, course_id):
+        url = URLS.PRACTICE.format(portal_name=portal_name, practice_id=practice_id, course_id=course_id)
+        return self.session._get(url).json()
+
+    def _get_practice_components(self, practice_id, course_id, component_type="instruction"):
+        url = URLS.PRACTICE_COMPONENTS.format(portal_name=portal_name, practice_id=practice_id, course_id=course_id, component_type=component_type)
+        return self._handle_pagination(url, None).get("results")
+
+    def _get_practice_questions(self, practice_id, course_id):
+        url = URLS.PRACTICE_QUESTIONS.format(portal_name=portal_name, practice_id=practice_id, course_id=course_id)
+        return self._handle_pagination(url, None).get("results")
+
+    def _get_practice_with_info(self, practice_id, course_id):
+        practice_json = self._get_practice(practice_id, course_id)
+        instructions_json = self._get_practice_components(practice_id, course_id, "instruction")
+        solutions_json = self._get_practice_components(practice_id, course_id, "solution")
+        questions_json = self._get_practice_questions(practice_id, course_id)
+        
+        resp = {"_class": practice_json.get("_class")}
+        resp["description"] = practice_json.get("description")
+        resp["estimated_duration"] = practice_json.get("estimated_duration")
+        
+        resp["instructions"] = instructions_json
+        resp["solutions"] = solutions_json
+        resp["questions"] = questions_json
+        
+        return resp
+
     def _extract_supplementary_assets(self, supp_assets, lecture_counter):
         _temp = []
         for entry in supp_assets:
@@ -1747,6 +1775,77 @@ def process_coding_assignment(quiz, lecture, chapter_dir):
             f.write(html)
 
 
+def process_practice(udemy: Udemy, lecture, chapter_dir, course_id):
+    practice = udemy._get_practice_with_info(lecture.get("id"), course_id)
+    
+    lecture_title = lecture.get("lecture_title")
+    lecture_index = lecture.get("lecture_index")
+    lecture_counter = lecture.get("index")
+    lecture_file_name = sanitize_filename(lecture_title + ".html")
+    lecture_path = os.path.join(chapter_dir, lecture_file_name)
+
+    logger.info(f"  > Processing practice {lecture_index}")
+
+    all_components = practice.get("instructions", []) + practice.get("solutions", [])
+    for component in all_components:
+        asset = component.get("asset")
+        if asset:
+            original_title = asset.get("title")
+            filename = "{0:03d} {1}".format(lecture_counter, original_title) if lecture_counter else original_title
+            component["asset"]["title"] = filename
+    
+    if dl_assets:
+        for component in all_components:
+            asset = component.get("asset")
+            if asset:
+                asset_id = asset.get("id")
+                asset_type = (asset.get("asset_type") or "").lower()
+                filename = asset.get("title")
+                try:
+                    if asset_type == "video": # Video assets use different api
+                        video_url = URLS.PRACTICE_VIDEO_ASSET.format(portal_name=portal_name, asset_id=asset_id)
+                        video_resp = udemy.session._get(video_url).json()
+                        media_sources = video_resp.get("media_sources")
+                        if media_sources and isinstance(media_sources, list):
+                            mp4_sources = [s for s in media_sources if s.get("type") == "video/mp4" and s.get("src")]
+                            if mp4_sources:
+                                mp4_sources.sort(key=lambda x: int(x.get("label", "0")), reverse=True)
+                                download_url = mp4_sources[0].get("src")
+                                if not filename.lower().endswith(".mp4"):
+                                    filename = filename + ".mp4"
+                                ret_code = download_aria(download_url, chapter_dir, filename)
+                                logger.debug(f"      > Download return: {ret_code}")
+                            else:
+                                logger.warning(f"    > No MP4 sources found for practice video asset {asset_id}")
+                        else:
+                            logger.warning(f"    > No media sources found for practice video asset {asset_id}")
+                    else:
+                        url = URLS.PRACTICE_SUPPLEMENTARY_ASSET.format(portal_name=portal_name, practice_id=lecture.get("id"), asset_id=asset_id)  # regular assets
+                        asset_resp = udemy.session._get(url).json()
+                        download_urls = asset_resp.get("download_urls")
+                        if download_urls and download_urls.get("File"):
+                            download_url = download_urls.get("File")[0].get("file")
+                            ret_code = download_aria(download_url, chapter_dir, filename)
+                            logger.debug(f"      > Download return: {ret_code}")
+                except Exception:
+                    logger.exception("    > Error downloading practice asset")
+
+    template_path = os.path.join(MAIN_SCRIPT_PATH, "templates", "assignment_template.html")
+    with open(template_path, "r", encoding="utf-8") as f:
+        html = f.read()
+        practice_data = {
+            "title": lecture_title,
+            "description": practice.get("description"),
+            "estimated_duration": practice.get("estimated_duration"),
+            "instructions": practice.get("instructions"),
+            "solutions": practice.get("solutions"),
+            "questions": practice.get("questions"),
+        }
+        html = html.replace("__data_placeholder__", json.dumps(practice_data))
+        with open(lecture_path, "w", encoding="utf-8") as f:
+            f.write(html)
+
+
 def parse_new(udemy: Udemy, udemy_object: dict):
     total_chapters = udemy_object.get("total_chapters")
     total_lectures = udemy_object.get("total_lectures")
@@ -1789,6 +1888,11 @@ def parse_new(udemy: Udemy, udemy_object: dict):
                 if not dl_quizzes:
                     continue
                 process_quiz(udemy, lecture, chapter_dir)
+                continue
+            elif clazz == "practice":
+                if not dl_quizzes:
+                    continue
+                process_practice(udemy, lecture, chapter_dir, udemy_object.get("course_id"))
                 continue
 
             index = lecture.get("index")  # this is lecture_counter
@@ -2224,7 +2328,7 @@ def main():
                         )
                     else:
                         logger.debug("Lecture: ID is None, skipping")
-                elif clazz == "quiz":
+                elif clazz == "quiz" or clazz == "practice":
                     lecture_counter += 1
                     lecture_id = entry.get("id")
                     if len(udemy_object["chapters"]) == 0:
