@@ -1747,6 +1747,149 @@ def process_coding_assignment(quiz, lecture, chapter_dir):
             f.write(html)
 
 
+def process_role_play(udemy: Udemy, lecture, chapter_dir):
+    lecture_title = lecture.get("lecture_title")
+    lecture_index = lecture.get("lecture_index")
+    lecture_file_name = sanitize_filename(lecture_title + ".html")
+    lecture_path = os.path.join(chapter_dir, lecture_file_name)
+
+    logger.info(f"  > Processing role play {lecture_index}")
+
+    global portal_name
+    url = URLS.ROLE_PLAY.format(portal_name=portal_name, course_name="None", role_play_id=lecture.get("id"))
+    
+    # inject access_token cookie if there's bearer token
+    cookies_obj = None
+    if hasattr(udemy.session, "_session") and hasattr(udemy.session._session, "cookies"):
+        cookies_obj = udemy.session._session.cookies
+    elif hasattr(udemy.session, "cookies"):
+        cookies_obj = udemy.session.cookies
+        
+    bearer = udemy.bearer_token
+    if bearer and cookies_obj is not None:
+        if not cookies_obj.get("access_token" ):
+            cookies_obj.set("access_token", bearer, domain="www.udemy.com")
+
+    if hasattr(udemy.session, "_get"):
+        resp = udemy.session._get(url)
+    else:
+        resp = udemy.session.get(url)
+            
+    html_content = resp.text
+
+    # extract combined Next.js
+    combined_json = ""
+    matches = re.findall(r'__next_f.*?\.push\(\[(\d+),\s*("(?:[^"\\]|\\.)*")\]\)', html_content, re.DOTALL)
+    
+    for type_id, m in matches:
+        content_str = json.loads(m)
+        if isinstance(content_str, str):
+            combined_json += content_str
+
+    if not combined_json:
+        combined_json = html_content
+
+    # search for the role-play data obj
+    role_play_data = None
+
+    def find_rp(d):
+        if isinstance(d, dict):
+            if "scenario" in d and ("aiCharacter" in d or "learnerRole" in d or "meeting" in d):
+                return d
+            for v in d.values():
+                res = find_rp(v)
+                if res:
+                    return res
+        elif isinstance(d, list):
+            for item in d:
+                res = find_rp(item)
+                if res:
+                    return res
+        return None
+
+    for line in combined_json.split('\n'):
+        if not line.strip():
+            continue
+        parts = line.split(':', 1)
+        if len(parts) == 2:
+            try:
+                data = json.loads(parts[1])
+                found = find_rp(data)
+                if found:
+                    role_play_data = found
+                    break
+            except Exception:
+                pass
+
+    # edgecase handling as sometimes it references data
+    def resolve_refs(data):
+        if isinstance(data, dict):
+            for k in list(data.keys()):
+                data[k] = resolve_refs(data[k])
+        elif isinstance(data, list):
+            for i in range(len(data)):
+                data[i] = resolve_refs(data[i])
+        elif isinstance(data, str) and data.startswith('$') and len(data) > 1:
+            chunk_id = data[1:]
+            idx = combined_json.find(f"{chunk_id}:T")
+            if idx != -1:
+                comma_idx = combined_json.find(',', idx)
+                if comma_idx != -1:
+                    try:
+                        len_hex = combined_json[idx + len(chunk_id) + 2 : comma_idx]
+                        byte_len = int(len_hex, 16)
+                        start_idx =  comma_idx + 1
+                        encoded = combined_json.encode('utf-8')
+                        start_bytes = len(combined_json[:start_idx].encode('utf-8'))
+                        return encoded[start_bytes : start_bytes + byte_len].decode('utf-8')
+                    except Exception:
+                        pass
+            else:
+                idx = combined_json.find(f"\n{chunk_id}:\"")
+                if idx == -1 and combined_json.startswith(f"{chunk_id}:\""):
+                    idx = 0
+                else:
+                    idx += 1 if idx != -1 else 0
+                
+                if idx != 0 or combined_json.startswith(f"{chunk_id}:\""):
+                    end_idx = combined_json.find('\n', idx)
+                    if end_idx == -1: 
+                        end_idx = len(combined_json)
+                    try:
+                        return json.loads(combined_json[idx + len(chunk_id) + 1 : end_idx])
+                    except Exception:
+                        pass
+        return data
+
+    if not role_play_data:
+        logger.warning(f"  > Could not extract role play for {lecture_index}.")
+        return
+
+    role_play_data = resolve_refs(role_play_data)
+    
+    clean_data = {
+        "title": lecture_title,
+        "scenario": role_play_data.get("scenario", ""),
+        "learnerRole": role_play_data.get("learnerRole", ""),
+        "meeting": {
+            "title": role_play_data.get("meeting", {}).get("title", ""),
+            "goalsList": role_play_data.get("meeting", {}).get("goalsList", [])
+        },
+        "aiCharacter": {
+            "name": role_play_data.get("aiCharacter", {}).get("name", ""),
+            "role": role_play_data.get("aiCharacter", {}).get("role", ""),
+            "details": role_play_data.get("aiCharacter", {}).get("details", "")
+        }
+    }
+
+    template_path = os.path.join(MAIN_SCRIPT_PATH, "templates", "role_play_template.html")
+    with open(template_path, "r", encoding="utf-8") as f:
+        html = f.read()
+        html = html.replace("__data_placeholder__", json.dumps(clean_data))
+        with open(lecture_path, "w", encoding="utf-8") as f:
+            f.write(html)
+
+
 def parse_new(udemy: Udemy, udemy_object: dict):
     total_chapters = udemy_object.get("total_chapters")
     total_lectures = udemy_object.get("total_lectures")
@@ -1789,6 +1932,12 @@ def parse_new(udemy: Udemy, udemy_object: dict):
                 if not dl_quizzes:
                     continue
                 process_quiz(udemy, lecture, chapter_dir)
+                continue
+            
+            if clazz == "role-play":
+                if not dl_quizzes:
+                    continue
+                process_role_play(udemy, lecture, chapter_dir)
                 continue
 
             index = lecture.get("index")  # this is lecture_counter
@@ -2224,7 +2373,7 @@ def main():
                         )
                     else:
                         logger.debug("Lecture: ID is None, skipping")
-                elif clazz == "quiz":
+                elif clazz == "quiz" or clazz == "role-play":
                     lecture_counter += 1
                     lecture_id = entry.get("id")
                     if len(udemy_object["chapters"]) == 0:
@@ -2265,7 +2414,7 @@ def main():
                             }
                         )
                     else:
-                        logger.debug("Quiz: ID is None, skipping")
+                        logger.debug(f"{clazz.capitalize()}: ID is None, skipping")
 
                 udemy_object["chapters"][chapter_index_counter]["lectures"] = lectures
                 udemy_object["chapters"][chapter_index_counter]["lecture_count"] = len(
