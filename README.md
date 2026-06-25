@@ -8,6 +8,11 @@
 ![GitHub Repo stars](https://img.shields.io/github/stars/Puyodead1/udemy-downloader?style=for-the-badge)
 ![GitHub](https://img.shields.io/github/license/Puyodead1/udemy-downloader?style=for-the-badge)
 
+> [!IMPORTANT]  
+> At the moment I am not actively maintaining this project.
+> 
+> I still merge PRs, fix minor bugs that are found, and handle minor issues but otherwise, this project relies on pull requests.
+
 # NOTE
 
 -   **This tool will not work without decryption keys. Do not bother installing unless you already have keys or can obtain them!**

@@ -36,6 +36,7 @@ class URLS:
     PRACTICE_QUESTIONS = "https://{portal_name}.udemy.com/api-2.0/practices/{practice_id}/questions/?fields[practice_question]=body,answer&course_id={course_id}"
     PRACTICE_SUPPLEMENTARY_ASSET = "https://{portal_name}.udemy.com/api-2.0/practices/{practice_id}/supplementary-assets/{asset_id}/?fields[asset]=download_urls"
     PRACTICE_VIDEO_ASSET = "https://{portal_name}.udemy.com/api-2.0/assets/{asset_id}/?fields[asset]=@min,status,delayed_asset_message,processing_errors,time_estimation,media_license_token,media_sources,thumbnail_url,captions,thumbnail_sprite,created"
+    ROLE_PLAY = "https://{portal_name}.udemy.com/course/{course_name}/learn/role-play/{role_play_id}/?udfrontends=true&cteMode=standalone"
     VISIT = "https://{portal_name}.udemy.com/api-2.0/visits/current/?fields%5Bvisit%5D=@default,visitor,country&locale=en_US"
     # URL form encoded, email
     CODE_GENERATION = "https://www.udemy.com/api-2.0/auth/code-generation/login/4.0/"
