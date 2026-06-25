@@ -31,6 +31,7 @@ class URLS:
     MY_COURSES = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,title,published_title&ordering=-last_accessed,-access_time&page=1&page_size=10000"
     COLLECTION = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses-collections/?collection_has_courses=True&course_limit=20&fields[course]=last_accessed_time,title,published_title&fields[user_has_subscribed_courses_collection]=@all&page=1&page_size=1000"
     QUIZ = "https://{portal_name}.udemy.com/api-2.0/quizzes/{quiz_id}/assessments/?page_size=250&fields[assessment]=id,assessment_type,prompt,correct_response,section,question_plain,related_lectures"
+    ROLE_PLAY = "https://{portal_name}.udemy.com/course/{course_name}/learn/role-play/{role_play_id}/?udfrontends=true&cteMode=standalone"
     VISIT = "https://{portal_name}.udemy.com/api-2.0/visits/current/?fields%5Bvisit%5D=@default,visitor,country&locale=en_US"
     # URL form encoded, email
     CODE_GENERATION = "https://www.udemy.com/api-2.0/auth/code-generation/login/4.0/"
