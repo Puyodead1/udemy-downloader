@@ -31,6 +31,11 @@ class URLS:
     MY_COURSES = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,title,published_title&ordering=-last_accessed,-access_time&page=1&page_size=10000"
     COLLECTION = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses-collections/?collection_has_courses=True&course_limit=20&fields[course]=last_accessed_time,title,published_title&fields[user_has_subscribed_courses_collection]=@all&page=1&page_size=1000"
     QUIZ = "https://{portal_name}.udemy.com/api-2.0/quizzes/{quiz_id}/assessments/?page_size=250&fields[assessment]=id,assessment_type,prompt,correct_response,section,question_plain,related_lectures"
+    PRACTICE = "https://{portal_name}.udemy.com/api-2.0/practices/{practice_id}/?fields[practice]=is_free,estimated_duration,description,num_submissions&course_id={course_id}"
+    PRACTICE_COMPONENTS = "https://{portal_name}.udemy.com/api-2.0/practices/{practice_id}/components/?type={component_type}&fields[practice_component]=body,asset,display_type&fields[asset]=asset_type,title,external_url&course_id={course_id}"
+    PRACTICE_QUESTIONS = "https://{portal_name}.udemy.com/api-2.0/practices/{practice_id}/questions/?fields[practice_question]=body,answer&course_id={course_id}"
+    PRACTICE_SUPPLEMENTARY_ASSET = "https://{portal_name}.udemy.com/api-2.0/practices/{practice_id}/supplementary-assets/{asset_id}/?fields[asset]=download_urls"
+    PRACTICE_VIDEO_ASSET = "https://{portal_name}.udemy.com/api-2.0/assets/{asset_id}/?fields[asset]=@min,status,delayed_asset_message,processing_errors,time_estimation,media_license_token,media_sources,thumbnail_url,captions,thumbnail_sprite,created"
     ROLE_PLAY = "https://{portal_name}.udemy.com/course/{course_name}/learn/role-play/{role_play_id}/?udfrontends=true&cteMode=standalone"
     VISIT = "https://{portal_name}.udemy.com/api-2.0/visits/current/?fields%5Bvisit%5D=@default,visitor,country&locale=en_US"
     # URL form encoded, email
