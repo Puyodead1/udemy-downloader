@@ -1360,9 +1360,6 @@ def handle_segments(url, format_id, lecture_id, video_title, output_path, chapte
         logger.exception(f"Error extracting audio kid")
         return
 
-    audio_key = None
-    video_key = None
-
     if audio_kid is not None:
         try:
             audio_key = keys[audio_kid]
