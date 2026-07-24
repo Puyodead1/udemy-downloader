@@ -459,6 +459,9 @@ class Udemy:
     def _get_quiz_with_info(self, quiz_id):
         resp = {"_class": None, "_type": None, "contents": None}
         quiz_json = self._get_quiz(quiz_id)
+        if not quiz_json:
+            return None
+
         is_only_one = len(quiz_json) == 1 and quiz_json[0]["_class"] == "assessment"
         is_coding_assignment = quiz_json[0]["assessment_type"] == "coding-problem"
 
@@ -1716,6 +1719,12 @@ def process_lecture(lecture, lecture_path, chapter_dir):
 
 def process_quiz(udemy: Udemy, lecture, chapter_dir):
     quiz = udemy._get_quiz_with_info(lecture.get("id"))
+    if not quiz:
+        logger.warning(
+            f"  > Quiz {lecture.get('lecture_index')} returned no data, skipping..."
+        )
+        return
+
     if quiz["_type"] == "coding-problem":
         process_coding_assignment(quiz, lecture, chapter_dir)
     else:  # Normal quiz
