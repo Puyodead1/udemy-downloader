@@ -8,7 +8,6 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
-requests = "^2.34.2"
 webvtt-py = "^0.6.0"
 pysrt = "^1.1.2"
 m3u8 = "^6.0.0"
@@ -20,6 +19,8 @@ coloredlogs = "^15.0.1"
 browser-cookie3 = "^0.20.1"
 demoji = "^1.1.0"
 pywidevine = "^1.9.0"
+curl-cffi = "^0.17.0"
+python-dotenv = "^1.2.4"
 
 
 [tool.poetry.group.dev.dependencies]

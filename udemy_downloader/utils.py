@@ -1,5 +1,7 @@
+import json
 import logging
 import os
+import re
 import struct
 import subprocess
 from typing import IO
@@ -73,6 +75,88 @@ def extract_pssh(mp4_file):
         offset += box_size
 
     # No Widevine PSSH box found
+    return None
+
+
+def _find_role_play(data):
+    """Depth-first search for the object that describes the role play"""
+    if isinstance(data, dict):
+        if "scenario" in data and ("aiCharacter" in data or "learnerRole" in data or "meeting" in data):
+            return data
+        children = data.values()
+    elif isinstance(data, list):
+        children = data
+    else:
+        return None
+    for child in children:
+        found = _find_role_play(child)
+        if found:
+            return found
+    return None
+
+
+def _resolve_flight_refs(data, payload: str):
+    """Replace "$<id>" references in Next.js flight data with the chunk they point to"""
+    if isinstance(data, dict):
+        return {key: _resolve_flight_refs(value, payload) for key, value in data.items()}
+    if isinstance(data, list):
+        return [_resolve_flight_refs(item, payload) for item in data]
+    if not (isinstance(data, str) and data.startswith("$") and len(data) > 1):
+        return data
+
+    chunk_id = data[1:]
+    # text chunks look like "<id>:T<hex byte length>,<text>"
+    idx = payload.find(f"{chunk_id}:T")
+    if idx != -1:
+        comma_idx = payload.find(",", idx)
+        if comma_idx != -1:
+            try:
+                byte_len = int(payload[idx + len(chunk_id) + 2 : comma_idx], 16)
+                start_bytes = len(payload[: comma_idx + 1].encode("utf-8"))
+                return payload.encode("utf-8")[start_bytes : start_bytes + byte_len].decode("utf-8")
+            except ValueError:
+                pass
+        return data
+
+    # json chunks look like "<id>:<json>" on their own line
+    prefix = f'{chunk_id}:"'
+    if payload.startswith(prefix):
+        idx = 0
+    else:
+        idx = payload.find(f"\n{prefix}")
+        if idx == -1:
+            return data
+        idx += 1
+    end_idx = payload.find("\n", idx)
+    if end_idx == -1:
+        end_idx = len(payload)
+    try:
+        return json.loads(payload[idx + len(chunk_id) + 1 : end_idx])
+    except ValueError:
+        return data
+
+
+def extract_role_play(page_html: str):
+    """Extract the role play data from a role play page's Next.js payload, or None if it isn't there"""
+    # the page streams its data as self.__next_f.push([<type>, "<chunk>"]) calls
+    payload = ""
+    for _, chunk in re.findall(r'__next_f.*?\.push\(\[(\d+),\s*("(?:[^"\\]|\\.)*")\]\)', page_html, re.DOTALL):
+        content = json.loads(chunk)
+        if isinstance(content, str):
+            payload += content
+    if not payload:
+        payload = page_html
+
+    for line in payload.split("\n"):
+        parts = line.split(":", 1)
+        if len(parts) != 2:
+            continue
+        try:
+            found = _find_role_play(json.loads(parts[1]))
+        except ValueError:
+            continue
+        if found:
+            return _resolve_flight_refs(found, payload)
     return None
 
 

@@ -1,7 +1,10 @@
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 from udemy_downloader.Udemy import Udemy
 from udemy_downloader.utils import parse_chapter_filter
@@ -37,6 +40,9 @@ def chapter_filter(value: str):
 
 
 def main():
+    # allow UDEMY_BEARER to be set in a .env file
+    load_dotenv()
+
     parser = argparse.ArgumentParser(description="Udemy Downloader")
     parser.add_argument("course_url", type=course_url, help="The URL of the course to download")
     parser.add_argument(
@@ -44,7 +50,8 @@ def main():
         "--bearer",
         dest="bearer_token",
         type=str,
-        help="The Bearer token to use",
+        default=os.getenv("UDEMY_BEARER"),
+        help="The Bearer token to use (Default is the UDEMY_BEARER environment variable)",
     )
     parser.add_argument(
         "-q",
@@ -90,7 +97,7 @@ def main():
         "--download-quizzes",
         dest="download_quizzes",
         action="store_true",
-        help="If specified, quizzes will be downloaded",
+        help="If specified, quizzes, practice assignments and role plays will be downloaded",
     )
     parser.add_argument(
         "--keep-vtt",
@@ -228,6 +235,7 @@ def main():
     # Get the keys
     udemy.load_keys()
 
+    udemy.visit()
     udemy.update_auth()
 
     udemy.get_course_info()

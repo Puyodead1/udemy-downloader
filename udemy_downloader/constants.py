@@ -1,20 +1,37 @@
+import base64
+
 LOGGER_NAME = "udemy-downloader"
+
+# requests are made as the Udemy android app
+CLIENT_SECRET = "f2lgDUDxjFiOlVHUpwQNFUfCQPyMO0tJQMaud53PF01UKueW8enYjeEYoyVeP0bb2XVEDkJ5GLJaVTfM5QgMVz6yyXyydZdA5QhzgvG9UmCPUYaCrIVf7VpmiilfbLJc"
+CLIENT_ID = "TH96Ov3Ebo3OtgoSH5mOYzYolcowM3ycedWQDDce"
+BASIC_AUTH = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode("utf-8")).decode("utf-8")
 HEADERS = {
-    "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "en-US",
-    "Referer": "https://www.udemy.com",
-    "X-Requested-With": "XMLHttpRequest",
-    "DNT": "1",
-    "Connection": "keep-alive",
+    "User-Agent": "okhttp/4.12.0 UdemyAndroid 9.51.2(594) (phone)",
+    "Accept-Encoding": "gzip",
+    "x-mobile-visit-enabled": "true",
+    "x-udemy-client-secret": CLIENT_SECRET,
+    "authorization": "Basic {}".format(BASIC_AUTH),
+    "x-udemy-client-id": CLIENT_ID,
+    "accept-language": "en_US",
+    "x-version-name": "9.51.2",
+    "x-client-name": "Udemy-Android",
 }
-CURRICULUM_ITEMS_URL = (
-    "https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/subscriber-curriculum-items/?caching_intent=False"
-)
+
+VISIT_URL = "https://{portal_name}.udemy.com/api-2.0/visits/current/?fields%5Bvisit%5D=@default,visitor,country&locale=en_US"
+CURRICULUM_ITEMS_URL = "https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/subscriber-curriculum-items/"
 COURSE_URL = "https://{portal_name}.udemy.com/api-2.0/courses/{course_id}/"
 COURSE_SEARCH = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,title,published_title&page=1&page_size=500&search={course_name}"
 MY_COURSES_URL = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses?fields[course]=id,url,title,published_title&ordering=-last_accessed,-access_time&page=1&page_size=10000"
+SUBSCRIPTION_COURSES_URL = "https://{portal_name}.udemy.com/api-2.0/users/me/subscription-course-enrollments?fields%5Buser%5D=title%2Cimage_100x100&fields%5Bcourse%5D=title%2Cheadline%2Curl%2Ccompletion_ratio%2Cnum_published_lectures%2Cimage_480x270%2Cimage_240x135%2Cfavorite_time%2Carchive_time%2Cis_taking_disabled%2Cfeatures%2Cvisible_instructors%2Clast_accessed_time%2Csort_order%2Cis_user_subscribed%2Cis_in_user_subscription%2Cis_wishlisted%2Cpublished_title%2Cavailable_features%2Cnum_published_practice_tests%2Cnum_coding_exercises%2Cnum_published_quizzes%2Cnum_of_published_curriculum_objects%2Cprimary_category%2Clocale%2Ccourse_has_labels%2Cis_gen_ai_policy_opted_in%2Cavailable_features&ordering=-last_accessed%2C-enrolled&page=1&page_size=50&locale=en_US"
 COLLECTION_URL = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses-collections/?collection_has_courses=True&course_limit=20&fields[course]=last_accessed_time,title,published_title&fields[user_has_subscribed_courses_collection]=@all&page=1&page_size=1000"
-QUIZ_URL = "https://{portal_name}.udemy.com/api-2.0/quizzes/{quiz_id}/assessments/?version=1&page_size=250&fields[assessment]=id,assessment_type,prompt,correct_response,section,question_plain,related_lectures"
+QUIZ_URL = "https://{portal_name}.udemy.com/api-2.0/quizzes/{quiz_id}/assessments/?page_size=250&fields[assessment]=id,assessment_type,prompt,correct_response,section,question_plain,related_lectures"
+PRACTICE_URL = "https://{portal_name}.udemy.com/api-2.0/practices/{practice_id}/?fields[practice]=is_free,estimated_duration,description,num_submissions&course_id={course_id}"
+PRACTICE_COMPONENTS_URL = "https://{portal_name}.udemy.com/api-2.0/practices/{practice_id}/components/?type={component_type}&fields[practice_component]=body,asset,display_type&fields[asset]=asset_type,title,external_url&course_id={course_id}"
+PRACTICE_QUESTIONS_URL = "https://{portal_name}.udemy.com/api-2.0/practices/{practice_id}/questions/?fields[practice_question]=body,answer&course_id={course_id}"
+PRACTICE_SUPPLEMENTARY_ASSET_URL = "https://{portal_name}.udemy.com/api-2.0/practices/{practice_id}/supplementary-assets/{asset_id}/?fields[asset]=download_urls"
+PRACTICE_VIDEO_ASSET_URL = "https://{portal_name}.udemy.com/api-2.0/assets/{asset_id}/?fields[asset]=@min,status,delayed_asset_message,processing_errors,time_estimation,media_license_token,media_sources,thumbnail_url,captions,thumbnail_sprite,created"
+ROLE_PLAY_URL = "https://{portal_name}.udemy.com/course/{course_name}/learn/role-play/{role_play_id}/?udfrontends=true&cteMode=standalone"
 LECTURE_URL = "https://{portal_name}.udemy.com/api-2.0/users/me/subscribed-courses/{course_id}/lectures/{lecture_id}/?fields[lecture]=asset,description,download_url,is_free,last_watched_second&fields[asset]=asset_type,length,media_license_token,course_is_drmed,media_sources,captions,thumbnail_sprite,slides,slide_urls,download_urls,external_url&q={rand}"
 LICENSE_URL = (
     "https://{portal_name}.udemy.com/media-license-server/validate-auth-token?drm_type=widevine&auth_token={auth_token}"
@@ -25,7 +42,7 @@ CURRICULUM_ITEMS_PARAMS = {
     "fields[quiz]": "title,object_index,type",
     "fields[practice]": "title,object_index",
     "fields[chapter]": "title,object_index",
-    "fields[asset]": "title,filename,asset_type,status,is_external,course_is_drmed,media_sources,captions,slides,slide_urls,download_urls,external_url,stream_urls,@min,status,delayed_asset_message,processing_errors,body",
+    "fields[asset]": "title,filename,asset_type,status,is_external,media_license_token,course_is_drmed,media_sources,captions,slides,slide_urls,download_urls,external_url,stream_urls,@min,status,delayed_asset_message,processing_errors,body",
     "caching_intent": True,
     "page_size": "200",
 }

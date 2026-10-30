@@ -1,12 +1,14 @@
 services:
   udemy-downloader:
-    image: udemy-downloader:latest
+    container_name: udemy-downloader
     build:
       context: .
       dockerfile: Dockerfile
     volumes:
       - ./output:/app/out_dir:rw
-      - ./keyfile.json:/app/keyfile.json:ro
+      # writable so keys fetched with --device are saved
+      - ./keyfile.json:/app/keyfile.json:rw
+      - ./devices:/app/devices:ro
     env_file:
       - .env
-    command: python main.py -c $COURSE_URL
+    command: $COURSE_URL -o /app/out_dir

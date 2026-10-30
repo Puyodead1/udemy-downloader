@@ -8,7 +8,14 @@
 ![GitHub Repo stars](https://img.shields.io/github/stars/Puyodead1/udemy-downloader?style=for-the-badge)
 ![GitHub](https://img.shields.io/github/license/Puyodead1/udemy-downloader?style=for-the-badge)
 
+> [!IMPORTANT]  
+> At the moment I am not actively maintaining this project.
+> 
+> I still merge PRs, fix minor bugs that are found, and handle minor issues but otherwise, this project relies on pull requests.
+
 # NOTE
+
+-   **This tool will not work without decryption keys. Do not bother installing unless you already have keys or can obtain them!**
 
 -   If you ask about keys in the issues, your message will be deleted and you will be blocked.
 -   **Downloading courses is against Udemy's Terms of Service, I am NOT held responsible for your account getting suspended as a result from the use of this program!**
@@ -39,7 +46,6 @@ The following are a list of required third-party tools, you will need to ensure 
 -   [ffmpeg](https://www.ffmpeg.org/) - This tool is also available in Linux package repositories.
     -   NOTE: It is recommended to use a custom build from the yt-dlp team that contains various patches for issues when used alongside yt-dlp, however it is not required. Latest builds can be found [here](https://github.com/yt-dlp/FFmpeg-Builds/releases/tag/latest)
 -   [aria2/aria2c](https://github.com/aria2/aria2/) - This tool is also available in Linux package repositories
--   [shaka-packager](https://github.com/shaka-project/shaka-packager/releases/latest)
 -   [yt-dlp](https://github.com/yt-dlp/yt-dlp/) - This tool is also available in Linux package repositories, but can also be installed using pip if desired (`pip install yt-dlp`)
 
 # Usage

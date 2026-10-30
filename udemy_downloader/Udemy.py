@@ -1,3 +1,4 @@
+import html
 import json
 import logging
 import math
@@ -13,10 +14,10 @@ from typing import Union
 
 import browser_cookie3
 import m3u8
-import requests
 import yt_dlp
 from bs4 import BeautifulSoup
 from coloredlogs import ColoredFormatter
+from curl_cffi import requests
 from pathvalidate import sanitize_filename
 from pywidevine.cdm import Cdm
 from pywidevine.device import Device
@@ -31,7 +32,14 @@ from udemy_downloader.constants import (
     LICENSE_URL,
     LOGGER_NAME,
     MY_COURSES_URL,
+    PRACTICE_COMPONENTS_URL,
+    PRACTICE_QUESTIONS_URL,
+    PRACTICE_SUPPLEMENTARY_ASSET_URL,
+    PRACTICE_URL,
+    PRACTICE_VIDEO_ASSET_URL,
     QUIZ_URL,
+    ROLE_PLAY_URL,
+    SUBSCRIPTION_COURSES_URL,
 )
 from udemy_downloader.Session import Session
 from udemy_downloader.UdemyAuth import UdemyAuth
@@ -41,6 +49,7 @@ from udemy_downloader.utils import (
     deEmojify,
     download_aria,
     log_subprocess_output,
+    extract_role_play,
     parse_chapter_filter,
     extract_pssh,
 )
@@ -225,6 +234,14 @@ class Udemy:
         else:
             self.logger.warning("Failed to extract FFmpeg version.")
 
+    def visit(self):
+        portal_name, _ = self.extract_course_name(self.course_url)
+        if not self.auth._session.visit(portal_name):
+            self.logger.fatal(
+                "> Visit request failed, Udemy's Cloudflare protection may be blocking requests. Try again later."
+            )
+            sys.exit(1)
+
     def update_auth(self):
         if not self.session:
             self.session = self.auth.update_token(self.bearer_token)
@@ -246,12 +263,21 @@ class Udemy:
             if self.browser == "file":
                 # load netscape cookies from file
                 self.cj = MozillaCookieJar(self.cookies_path)
-                self.cj.load()
+                # exported cookie files mark session cookies with expiry 0, which python treats as expired,
+                # so load everything and only drop cookies that really have expired
+                self.cj.load(ignore_discard=True, ignore_expires=True)
+                now = time.time()
+                for cookie in list(self.cj):
+                    if cookie.expires and cookie.expires < now:
+                        self.cj.clear(cookie.domain, cookie.path, cookie.name)
             else:
                 # argparse limits browser to names browser_cookie3 provides a loader for
-                self.cj = getattr(browser_cookie3, self.browser)()
+                self.cj = getattr(browser_cookie3, self.browser)(domain_name="udemy.com")
 
             self.session.set_cookiejar(self.cj)
+
+        # the app's basic auth header is replaced by the bearer token (X-Udemy-Authorization) or cookies
+        self.session._headers.pop("authorization", None)
 
     def get_course_info(self):
         self.logger.info("> Fetching course information, this may take a minute...")
@@ -329,18 +355,33 @@ class Udemy:
         self.course_title = self.parsed_data.get("course_title")
 
     def _get_quiz(self, quiz_id: str):
-        self.session._headers.update(
-            {
-                "Host": "{portal_name}.udemy.com".format(portal_name=self.portal_name),
-                "Referer": "https://{portal_name}.udemy.com/course/{course_name}/learn/quiz/{quiz_id}".format(
-                    portal_name=self.portal_name,
-                    course_name=self.course_slug,
-                    quiz_id=quiz_id,
-                ),
-            }
-        )
         url = QUIZ_URL.format(portal_name=self.portal_name, quiz_id=quiz_id)
-        return self._get_json(url).get("results")
+        return self._get_all_pages(url).get("results", [])
+
+    def _get_practice_with_info(self, practice_id: str):
+        def url_for(template, **kwargs):
+            return template.format(
+                portal_name=self.portal_name,
+                practice_id=practice_id,
+                course_id=self.course_id,
+                **kwargs,
+            )
+
+        practice = self._get_json(url_for(PRACTICE_URL))
+        return {
+            "_class": practice.get("_class"),
+            "description": practice.get("description"),
+            "estimated_duration": practice.get("estimated_duration"),
+            "instructions": self._get_all_pages(
+                url_for(PRACTICE_COMPONENTS_URL, component_type="instruction")
+            ).get("results", []),
+            "solutions": self._get_all_pages(
+                url_for(PRACTICE_COMPONENTS_URL, component_type="solution")
+            ).get("results", []),
+            "questions": self._get_all_pages(url_for(PRACTICE_QUESTIONS_URL)).get(
+                "results", []
+            ),
+        }
 
     def _get_elem_value_or_none(self, elem, key):
         return elem[key] if elem and key in elem else "(None)"
@@ -649,7 +690,7 @@ class Udemy:
         """GET a url and decode the json body, exiting if the request or decoding fails"""
         try:
             r = self.session._get(url, params)
-        except requests.RequestException as error:
+        except requests.exceptions.RequestException as error:
             self.logger.fatal(
                 f"Couldn't reach Udemy: {error}. Check your internet connection and try again."
             )
@@ -680,42 +721,37 @@ class Udemy:
             )
         return data
 
-    def _subscribed_courses(self, portal_name: str, course_name: str):
-        self.session._headers.update(
-            {
-                "Host": "{portal_name}.udemy.com".format(portal_name=portal_name),
-                "Referer": "https://{portal_name}.udemy.com/home/my-courses/search/?q={course_name}".format(
-                    portal_name=portal_name, course_name=course_name
-                ),
-            }
-        )
-        url = COURSE_SEARCH.format(portal_name=portal_name, course_name=course_name)
-        return self._get_json(url).get("results", [])
-
-    def _extract_course_info_json(self, portal_name: str, course_id: str, url: str):
-        self.session._headers.update({"Referer": url})
-        url = COURSE_URL.format(portal_name=portal_name, course_id=course_id)
-        return self._get_json(url)
-
-    def extract_course_content(self, portal_name: str, course_id: str, url: str):
-        self.session._headers.update({"Referer": url})
-        url = CURRICULUM_ITEMS_URL.format(portal_name=portal_name, course_id=course_id)
-        page = 1
-        data = self._get_json(url, CURRICULUM_ITEMS_PARAMS)
+    def _get_all_pages(self, url: str, params=None, description: str = "data"):
+        """GET a paginated api url and return the first page with every page's results combined"""
+        data = self._get_json(url, params)
+        if not isinstance(data, dict):
+            return {"results": []}
+        data.setdefault("results", [])
         _next = data.get("next")
-        _count = data.get("count") or 0
-        est_page_count = math.ceil(_count / 100)  # 100 is the max results per page
+        page_size = len(data["results"]) or 1
+        est_page_count = math.ceil((data.get("count") or 0) / page_size)
+        page = 1
         while _next:
-            self.logger.info(
-                f"> Downloading course curriculum.. (Page {page + 1}/{est_page_count})"
-            )
+            page += 1
+            self.logger.info(f"> Downloading {description}.. (Page {page}/{est_page_count})")
             resp = self._get_json(_next)
             _next = resp.get("next")
             results = resp.get("results")
             if results and isinstance(results, list):
                 data["results"].extend(results)
-                page = page + 1
         return data
+
+    def _subscribed_courses(self, portal_name: str, course_name: str):
+        url = COURSE_SEARCH.format(portal_name=portal_name, course_name=course_name)
+        return self._get_json(url).get("results", [])
+
+    def _extract_course_info_json(self, portal_name: str, course_id: str, url: str):
+        url = COURSE_URL.format(portal_name=portal_name, course_id=course_id)
+        return self._get_json(url)
+
+    def extract_course_content(self, portal_name: str, course_id: str, url: str):
+        url = CURRICULUM_ITEMS_URL.format(portal_name=portal_name, course_id=course_id)
+        return self._get_all_pages(url, CURRICULUM_ITEMS_PARAMS, "course curriculum")
 
     def _extract_course(self, response, course_name: str):
         _temp = {}
@@ -730,7 +766,14 @@ class Udemy:
 
     def _my_courses(self, portal_name):
         url = MY_COURSES_URL.format(portal_name=portal_name)
-        return self._get_json(url).get("results", [])
+        return self._get_all_pages(url, description="your courses").get("results", [])
+
+    def _subscription_course_enrollments(self, portal_name):
+        # courses from a subscription plan (e.g. Personal Plan) are listed separately
+        url = SUBSCRIPTION_COURSES_URL.format(portal_name=portal_name)
+        return self._get_all_pages(url, description="subscription courses").get(
+            "results", []
+        )
 
     def _subscribed_collection_courses(self, portal_name: str):
         url = COLLECTION_URL.format(portal_name=portal_name)
@@ -771,6 +814,9 @@ class Udemy:
             course = self._extract_course(response=results, course_name=course_name)
             if not course:
                 results = self._my_courses(portal_name=portal_name)
+                course = self._extract_course(response=results, course_name=course_name)
+            if not course:
+                results = self._subscription_course_enrollments(portal_name=portal_name)
                 course = self._extract_course(response=results, course_name=course_name)
             if not course:
                 results = self._subscribed_collection_courses(portal_name=portal_name)
@@ -1068,11 +1114,31 @@ class Udemy:
             for lecture in chapter.get("lectures"):
                 clazz = lecture.get("_class")
 
-                if clazz == "quiz":
-                    # skip the quiz if we dont want to download it
+                if clazz in ("quiz", "practice", "role-play"):
+                    # quizzes, practices and role plays are only saved with --download-quizzes
                     if not self.download_quizzes:
                         continue
-                    self.process_quiz(lecture, chapter_dir)
+                    lecture_title = lecture.get("lecture_title")
+                    if (chapter_dir / sanitize_filename(lecture_title + ".html")).is_file():
+                        self.logger.info(
+                            f"      > {clazz.capitalize()} '{lecture_title}' is already downloaded, skipping..."
+                        )
+                        self.summary["already_present"] += 1
+                        continue
+                    try:
+                        if clazz == "quiz":
+                            ok = self.process_quiz(lecture, chapter_dir) is not False
+                        elif clazz == "practice":
+                            ok = self.process_practice(lecture, chapter_dir) is not False
+                        else:
+                            ok = self.process_role_play(lecture, chapter_dir)
+                    except Exception:
+                        self.logger.exception(f"    > Error processing {clazz}")
+                        ok = False
+                    if ok:
+                        self.summary["downloaded"] += 1
+                    else:
+                        self.summary["failed"].append(f"{lecture_title} ({clazz})")
                     continue
 
                 index = lecture.get("index")  # this is lecture_counter
@@ -1317,7 +1383,7 @@ class Udemy:
                             }
                         )
                         chapter_index_counter += 1
-                elif clazz in ("lecture", "quiz"):
+                elif clazz in ("lecture", "quiz", "practice", "role-play"):
                     lecture_counter += 1
                     lecture_id = entry.get("id")
                     if len(self.parsed_data["chapters"]) == 0:
@@ -1809,18 +1875,19 @@ class Udemy:
         template_path = Path(
             os.path.dirname(__file__), "templates", "quiz_template.html"
         )
-        with open(template_path, "r") as f:
-            html = f.read()
-            quiz_data = {
-                "quiz_id": lecture["data"].get("id"),
-                "quiz_description": lecture["data"].get("description"),
-                "quiz_title": lecture["data"].get("title"),
-                "pass_percent": lecture.get("data").get("pass_percent"),
-                "questions": quiz["contents"],
-            }
-            html = html.replace("__data_placeholder__", json.dumps(quiz_data))
-            with lecture_path.open(mode="w") as f:
-                f.write(html)
+        with open(template_path, "r", encoding="utf8") as f:
+            page = f.read()
+        quiz_data = {
+            "id": lecture["data"].get("id"),
+            "title": lecture["data"].get("title"),
+            "description": lecture["data"].get("description"),
+            "pass_score": lecture["data"].get("pass_percent"),
+            "assessments": quiz["contents"],
+        }
+        page = page.replace("%%TITLE%%", html.escape(lecture["data"].get("title") or ""))
+        page = page.replace("%%QUIZ_JSON%%", self._json_for_script(quiz_data))
+        with lecture_path.open(mode="w", encoding="utf8") as f:
+            f.write(page)
 
     def process_coding_assignment(self, quiz, lecture, chapter_dir: Path):
         lecture_title = lecture.get("lecture_title")
@@ -1830,12 +1897,9 @@ class Udemy:
 
         self.logger.info(f"  > Processing quiz {lecture_index} (coding assignment)")
 
-        template_path = Path(
-            os.path.dirname(__file__), "templates", "coding_assignment_template.html"
-        )
-        with open(template_path, "r") as f:
-            html = f.read()
-            quiz_data = {
+        self._write_template(
+            "coding_assignment_template.html",
+            {
                 "title": lecture_title,
                 "hasInstructions": quiz["hasInstructions"],
                 "hasTests": quiz["hasTests"],
@@ -1843,10 +1907,145 @@ class Udemy:
                 "instructions": quiz["contents"]["instructions"],
                 "tests": quiz["contents"]["tests"],
                 "solutions": quiz["contents"]["solutions"],
-            }
-            html = html.replace("__data_placeholder__", json.dumps(quiz_data))
-            with lecture_path.open(mode="w") as f:
-                f.write(html)
+            },
+            lecture_path,
+        )
+
+    @staticmethod
+    def _json_for_script(data):
+        # escape "</" so a value containing "</script>" can't end the script tag early
+        return json.dumps(data).replace("</", "<\\/")
+
+    def _write_template(self, template_name: str, data, lecture_path: Path):
+        template_path = Path(os.path.dirname(__file__), "templates", template_name)
+        page = template_path.read_text(encoding="utf8")
+        page = page.replace("__data_placeholder__", self._json_for_script(data))
+        lecture_path.write_text(page, encoding="utf8")
+
+    def process_practice(self, lecture, chapter_dir: Path):
+        practice = self._get_practice_with_info(lecture.get("id"))
+
+        lecture_title = lecture.get("lecture_title")
+        lecture_counter = lecture.get("index")
+        lecture_path = chapter_dir / sanitize_filename(lecture_title + ".html")
+
+        self.logger.info(f"  > Processing practice {lecture.get('lecture_index')}")
+
+        components = practice.get("instructions", []) + practice.get("solutions", [])
+        for component in components:
+            asset = component.get("asset")
+            if asset and lecture_counter:
+                asset["title"] = "{0:03d} {1}".format(lecture_counter, asset.get("title"))
+
+        if self.download_assets:
+            for component in components:
+                asset = component.get("asset")
+                if asset:
+                    self._download_practice_asset(lecture, asset, chapter_dir)
+
+        self._write_template(
+            "assignment_template.html",
+            {
+                "title": lecture_title,
+                "description": practice.get("description"),
+                "estimated_duration": practice.get("estimated_duration"),
+                "instructions": practice.get("instructions"),
+                "solutions": practice.get("solutions"),
+                "questions": practice.get("questions"),
+            },
+            lecture_path,
+        )
+
+    def _download_practice_asset(self, lecture, asset: dict, chapter_dir: Path):
+        asset_id = asset.get("id")
+        filename = sanitize_filename(asset.get("title"))
+        try:
+            if (asset.get("asset_type") or "").lower() == "video":
+                # video assets come from the assets api instead of the practice's supplementary assets
+                url = PRACTICE_VIDEO_ASSET_URL.format(
+                    portal_name=self.portal_name, asset_id=asset_id
+                )
+                media_sources = self._get_json(url).get("media_sources") or []
+                mp4_sources = [
+                    source
+                    for source in media_sources
+                    if source.get("type") == "video/mp4" and source.get("src")
+                ]
+                if not mp4_sources:
+                    self.logger.warning(
+                        f"    > No MP4 sources found for practice video asset {asset_id}"
+                    )
+                    return
+                best = max(mp4_sources, key=lambda x: int(x.get("label") or 0))
+                if not filename.lower().endswith(".mp4"):
+                    filename += ".mp4"
+                download_url = best.get("src")
+            else:
+                url = PRACTICE_SUPPLEMENTARY_ASSET_URL.format(
+                    portal_name=self.portal_name,
+                    practice_id=lecture.get("id"),
+                    asset_id=asset_id,
+                )
+                files = (self._get_json(url).get("download_urls") or {}).get("File")
+                if not files:
+                    self.logger.warning(
+                        f"    > No download link found for practice asset {asset_id}"
+                    )
+                    return
+                download_url = files[0].get("file")
+
+            if (chapter_dir / filename).is_file():
+                self.logger.info(f"    > Practice asset '{filename}' already downloaded")
+                return
+            ret_code = download_aria(download_url, chapter_dir, filename)
+            self.logger.debug(f"      > Download return code: {ret_code}")
+        except Exception:
+            self.logger.exception("    > Error downloading practice asset")
+            self.summary["failed"].append(
+                f"{lecture.get('lecture_title')} (practice asset: {filename})"
+            )
+
+    def process_role_play(self, lecture, chapter_dir: Path):
+        lecture_title = lecture.get("lecture_title")
+        lecture_index = lecture.get("lecture_index")
+        lecture_path = chapter_dir / sanitize_filename(lecture_title + ".html")
+
+        self.logger.info(f"  > Processing role play {lecture_index}")
+
+        # the role play is only available in the course page, which needs the access_token cookie
+        cookies = self.session._session.cookies
+        if self.bearer_token and not cookies.get("access_token"):
+            cookies.set("access_token", self.bearer_token, domain="www.udemy.com")
+
+        url = ROLE_PLAY_URL.format(
+            portal_name=self.portal_name, course_name="None", role_play_id=lecture.get("id")
+        )
+        role_play = extract_role_play(self.session._get(url).text)
+        if not role_play:
+            self.logger.warning(f"  > Could not extract role play for {lecture_index}.")
+            return False
+
+        meeting = role_play.get("meeting") or {}
+        character = role_play.get("aiCharacter") or {}
+        self._write_template(
+            "role_play_template.html",
+            {
+                "title": lecture_title,
+                "scenario": role_play.get("scenario", ""),
+                "learnerRole": role_play.get("learnerRole", ""),
+                "meeting": {
+                    "title": meeting.get("title", ""),
+                    "goalsList": meeting.get("goalsList", []),
+                },
+                "aiCharacter": {
+                    "name": character.get("name", ""),
+                    "role": character.get("role", ""),
+                    "details": character.get("details", ""),
+                },
+            },
+            lecture_path,
+        )
+        return True
 
     def load_keys(self):
         if self.key_file_path.exists():
