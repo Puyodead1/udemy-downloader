@@ -1,13 +1,44 @@
 import argparse
+import re
 import sys
 from pathlib import Path
 
 from udemy_downloader.Udemy import Udemy
+from udemy_downloader.utils import parse_chapter_filter
+
+
+def int_in_range(minimum: int, maximum: int):
+    def parse(value: str):
+        try:
+            number = int(value)
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"'{value}' is not a whole number")
+        if not minimum <= number <= maximum:
+            raise argparse.ArgumentTypeError(f"must be between {minimum} and {maximum}, got {number}")
+        return number
+
+    return parse
+
+
+def course_url(value: str):
+    if not re.search(r"(?i)//[^/]+\.udemy\.com/", value):
+        raise argparse.ArgumentTypeError(
+            f"'{value}' doesn't look like a Udemy course URL (e.g. https://www.udemy.com/course/<name>/)"
+        )
+    return value
+
+
+def chapter_filter(value: str):
+    try:
+        parse_chapter_filter(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error))
+    return value
 
 
 def main():
     parser = argparse.ArgumentParser(description="Udemy Downloader")
-    parser.add_argument("course_url", type=str, help="The URL of the course to download")
+    parser.add_argument("course_url", type=course_url, help="The URL of the course to download")
     parser.add_argument(
         "-b",
         "--bearer",
@@ -19,7 +50,7 @@ def main():
         "-q",
         "--quality",
         dest="quality",
-        type=int,
+        type=int_in_range(1, 4320),
         help="Download specific video quality. If the requested quality isn't available, the closest quality will be used. If not specified, the best quality will be downloaded for each lecture",
     )
     parser.add_argument(
@@ -33,7 +64,7 @@ def main():
         "-cd",
         "--concurrent-downloads",
         dest="concurrent_downloads",
-        type=int,
+        type=int_in_range(1, 30),
         help="The number of maximum concurrent downloads for segments (HLS and DASH, must be a number 1-30)",
         default=1,
     )
@@ -80,6 +111,13 @@ def main():
         help="If specified, only course information will be printed, nothing will be downloaded",
     )
     parser.add_argument(
+        "-y",
+        "--yes",
+        dest="assume_yes",
+        action="store_true",
+        help="Answer yes to confirmation prompts (e.g. --info on courses with many lectures)",
+    )
+    parser.add_argument(
         "--id-as-course-name",
         dest="id_as_course_name",
         action="store_true",
@@ -107,7 +145,8 @@ def main():
     parser.add_argument(
         "--log-level",
         dest="log_level",
-        type=str,
+        type=str.upper,
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Logging level: one of DEBUG, INFO, ERROR, WARNING, CRITICAL (Default is INFO)",
         default="INFO",
     )
@@ -126,7 +165,7 @@ def main():
     parser.add_argument(
         "--h265-crf",
         dest="h265_crf",
-        type=int,
+        type=int_in_range(0, 51),
         default=28,
         help="Set a custom CRF value for H.265 encoding. FFMPEG default is 28",
     )
@@ -160,7 +199,7 @@ def main():
     parser.add_argument(
         "--chapter",
         dest="chapter_filter_raw",
-        type=str,
+        type=chapter_filter,
         help="Download specific chapters. Use comma separated values and ranges (e.g., '1,3-5,7,9-11').",
     )
     parser.add_argument("--device", "-d", dest="device", type=str, help="Name of WVD file to use")

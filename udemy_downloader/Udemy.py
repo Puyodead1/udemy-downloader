@@ -94,6 +94,7 @@ class Udemy:
         use_continuous_lecture_numbers: bool,
         chapter_filter_raw: Union[str, None] = None,
         device: Union[str, None] = None,
+        assume_yes: bool = False,
     ):
         self.chapter_filter = None
         self.keys: dict[str, str] = {}
@@ -147,6 +148,7 @@ class Udemy:
         self.h265_preset = h265_preset
         self.use_nvenc = use_nvenc
         self.id_as_course_name = id_as_course_name
+        self.assume_yes = assume_yes
         self.out = out
         self.use_continuous_lecture_numbers = use_continuous_lecture_numbers
         self.device = None
@@ -646,13 +648,37 @@ class Udemy:
     def _get_json(self, url: str, params=None):
         """GET a url and decode the json body, exiting if the request or decoding fails"""
         try:
-            return self.session._get(url, params).json()
+            r = self.session._get(url, params)
         except requests.RequestException as error:
-            self.logger.fatal(f"Connection error: {error}")
+            self.logger.fatal(
+                f"Couldn't reach Udemy: {error}. Check your internet connection and try again."
+            )
             sys.exit(1)
-        except ValueError as error:
-            self.logger.fatal(f"{error} on {url}")
+
+        auth_hint = "Check that your bearer token or browser cookies are valid and that you're enrolled in this course."
+        try:
+            data = r.json()
+        except ValueError:
+            # usually a login, captcha or block page instead of an API response
+            hint = (
+                auth_hint
+                if r.status_code in (401, 403)
+                else "Udemy may be blocking the request or having problems, try again later."
+            )
+            self.logger.fatal(
+                f"Udemy returned an unexpected response (HTTP {r.status_code}) for {url}. {hint}"
+            )
+            self.logger.debug(f"Response body: {r.text[:1000]}")
             sys.exit(1)
+
+        if not r.ok:
+            detail = data.get("detail") if isinstance(data, dict) else None
+            self.logger.warning(
+                f"Udemy returned HTTP {r.status_code} for {url}"
+                + (f": {detail.rstrip('.')}" if detail else "")
+                + (f". {auth_hint}" if r.status_code in (401, 403) else "")
+            )
+        return data
 
     def _subscribed_courses(self, portal_name: str, course_name: str):
         self.session._headers.update(
@@ -771,10 +797,15 @@ class Udemy:
         chapter_count = self.parsed_data.get("total_chapters")
         lecture_count = self.parsed_data.get("total_lectures")
 
-        if lecture_count > 100:
+        if lecture_count > 100 and not self.assume_yes:
             self.logger.warning(
                 "This course has a lot of lectures! Fetching all the information can take a long time as well as spams Udemy's servers. It is NOT recommended to continue! Are you sure you want to do this?"
             )
+            if not sys.stdin.isatty():
+                self.logger.info(
+                    "No terminal to confirm in. Re-run with --yes to continue anyway."
+                )
+                sys.exit(1)
             yn = input("(y/n): ")
             if yn.lower() != "y":
                 self.logger.info(
@@ -1009,6 +1040,9 @@ class Udemy:
         course_dir = self.download_dir / sanitize_filename(course_name)
         course_dir.mkdir(parents=True, exist_ok=True)
 
+        # lecture counts plus everything that failed, reported once processing finishes
+        self.summary = {"downloaded": 0, "already_present": 0, "failed": []}
+
         for chapter in self.parsed_data.get("chapters"):
             chapter_title: str = chapter.get("chapter_title")
             chapter_index = chapter.get("chapter_index")
@@ -1067,6 +1101,7 @@ class Udemy:
                             "      > Lecture '%s' is already downloaded, skipping..."
                             % lecture_title
                         )
+                        self.summary["already_present"] += 1
                     else:
                         # Check if the file is an html file
                         if extension == "html":
@@ -1088,14 +1123,18 @@ class Udemy:
                                         mode="w", encoding="utf8"
                                     ) as f:
                                         f.write(html_content)
+                                    self.summary["downloaded"] += 1
                                 except Exception:
                                     self.logger.exception(
                                         "    > Failed to write html file"
                                     )
+                                    self.summary["failed"].append(lecture_title)
+                        elif self.process_lecture(
+                            parsed_lecture, lecture_path, chapter_dir
+                        ):
+                            self.summary["downloaded"] += 1
                         else:
-                            self.process_lecture(
-                                parsed_lecture, lecture_path, chapter_dir
-                            )
+                            self.summary["failed"].append(lecture_title)
 
                 # download subtitles for this lecture
                 subtitles = parsed_lecture.get("subtitles")
@@ -1110,7 +1149,12 @@ class Udemy:
                     for subtitle in subtitles:
                         lang = subtitle.get("language")
                         if lang == self.lang or self.lang == "all":
-                            self.process_caption(subtitle, lecture_title, chapter_dir)
+                            if not self.process_caption(
+                                subtitle, lecture_title, chapter_dir
+                            ):
+                                self.summary["failed"].append(
+                                    f"{lecture_title} (caption: {lang})"
+                                )
 
                 if self.download_assets:
                     assets = parsed_lecture.get("assets")
@@ -1151,13 +1195,13 @@ class Udemy:
                                     ) as f:
                                         f.write(content)
                             except Exception as e:
-                                print("Failed to write html file: ", e)
+                                self.logger.error(f"    > Failed to write html file: {e}")
                                 continue
                         elif asset_type == "video":
                             self.logger.warning(
                                 "If you're seeing this message, that means that you reached a secret area that I haven't finished! jk I haven't implemented handling for this asset type, please report this at https://github.com/Puyodead1/udemy-downloader/issues so I can add it. When reporting, please provide the following information: "
                             )
-                            self.logger.warning("AssetType: Video; AssetData: ", asset)
+                            self.logger.warning("AssetType: Video; AssetData: %s", asset)
                         elif (
                             asset_type == "audio"
                             or asset_type == "e-book"
@@ -1175,6 +1219,9 @@ class Udemy:
                                 )
                             except Exception:
                                 self.logger.exception("> Error downloading asset")
+                                self.summary["failed"].append(
+                                    f"{lecture_title} (asset: {file_path})"
+                                )
                         elif asset_type == "external_link":
                             # write the external link to a shortcut file
                             file_path = chapter_dir / f"{file_path}.url"
@@ -1206,6 +1253,24 @@ class Udemy:
                                 ) as f:
                                     f.write(content)
 
+
+        self.log_summary()
+
+    def log_summary(self):
+        failed = self.summary["failed"]
+        self.logger.info(
+            "> Finished: %d downloaded, %d already present, %d failed",
+            self.summary["downloaded"],
+            self.summary["already_present"],
+            len(failed),
+        )
+        if failed:
+            self.logger.warning(
+                "> These items failed, run the same command again to retry them:"
+            )
+            for item in failed:
+                self.logger.warning(f"    - {item}")
+            self.logger.warning(f"> Details are in the log file: {self.log_file_path}")
     def parse_course_data(self):
         self.parsed_data["bearer_token"] = self.bearer_token
         self.parsed_data["course_id"] = self.course_id
@@ -1272,7 +1337,7 @@ class Udemy:
                             )
                             chapter_index_counter += 1
                     if lecture_id:
-                        self.logger.info(
+                        self.logger.debug(
                             f"Processing {position} of {len(course)}"
                         )
 
@@ -1336,7 +1401,7 @@ class Udemy:
                 self.logger.info(
                     f"      > Lecture '{lecture_title}' has DRM, attempting to download. Selected quality: {source.get('height')}"
                 )
-                self.handle_segments(
+                return self.handle_segments(
                     source.get("download_url"),
                     source.get("format_id"),
                     str(lecture_id),
@@ -1349,6 +1414,7 @@ class Udemy:
                     f"      > Lecture '{lecture_title}' is missing media links"
                 )
                 self.logger.debug(f"Lecture source count: {len(lecture_sources)}")
+                return False
         else:
             sources = lecture.get("sources")
             sources = sorted(sources, key=lambda x: int(x.get("height")), reverse=True)
@@ -1423,7 +1489,7 @@ class Udemy:
                                         "comment=Downloaded with Udemy-Downloader by Puyodead1 (https://github.com/Puyodead1/udemy-downloader)",
                                         tmp_file_path,
                                     ]
-                                    print(" ".join([str(x) for x in cmd]))
+                                    self.logger.debug(" ".join([str(x) for x in cmd]))
                                     process = subprocess.Popen(cmd)
                                     log_subprocess_output(
                                         "FFMPEG-STDOUT", process.stdout
@@ -1437,9 +1503,15 @@ class Udemy:
                                         os.rename(tmp_file_path, lecture_path)
                                         self.logger.info("      > Encoding complete")
                                     else:
+                                        # the unencoded download is kept, so the lecture still counts as downloaded
                                         self.logger.error(
                                             "      > Encoding returned non-zero return code"
                                         )
+                                return True
+                            self.logger.error(
+                                f"      > HLS download failed with return code {ret_code}"
+                            )
+                            return False
                         else:
                             ret_code = download_aria(
                                 url, chapter_dir, lecture_path.name
@@ -1447,14 +1519,18 @@ class Udemy:
                             self.logger.debug(
                                 f"      > Download return code: {ret_code}"
                             )
+                            return True
                     except Exception:
                         self.logger.exception(">        Error downloading lecture")
+                        return False
                 else:
                     self.logger.info(
                         f"      > Lecture '{lecture_title}' is already downloaded, skipping..."
                     )
+                    return True
             else:
-                self.logger.error("      > Missing sources for lecture", lecture)
+                self.logger.error("      > Missing sources for lecture %s", lecture.get("lecture_title"))
+                return False
 
     def handle_segments(
         self,
@@ -1503,17 +1579,17 @@ class Udemy:
                 "Return code from the downloader was non-0 (error), skipping!"
             )
             os.chdir(self.home_dir)
-            return
+            return False
 
         pssh = extract_pssh(video_filepath_enc)
         if pssh is None or not pssh.key_ids:
             self.logger.error("No Widevine PSSH found in the video track, skipping!")
             os.chdir(self.home_dir)
-            return
+            return False
         kid = pssh.key_ids[0]
 
-        self.logger.info(f"KID is: {kid.hex}")
-        self.logger.info(f"PSSH is: {pssh}")
+        self.logger.debug(f"KID is: {kid.hex}")
+        self.logger.debug(f"PSSH is: {pssh}")
 
         key = None
 
@@ -1528,7 +1604,7 @@ class Udemy:
                 "No key found and no device is available to make a license request, skipping!"
             )
             os.chdir(self.home_dir)
-            return
+            return False
 
         if not key:
             # request a media license token
@@ -1538,7 +1614,7 @@ class Udemy:
                 lecture_id=lecture_id,
                 rand=random.random(),
             )
-            self.logger.info("Requesting a media license token...")
+            self.logger.debug("Requesting a media license token...")
             try:
                 r = self.session._get(lecture_url)
                 r.raise_for_status()
@@ -1546,7 +1622,7 @@ class Udemy:
             except Exception as e:
                 self.logger.error(f"Failed to get media license token: {e}")
                 os.chdir(self.home_dir)
-                return
+                return False
 
             # try to make a license request
             license_url = LICENSE_URL.format(
@@ -1571,12 +1647,12 @@ class Udemy:
             if not key:
                 self.logger.error("Failed to get decryption key, skipping!")
                 os.chdir(self.home_dir)
-                return
+                return False
 
             self.keys[kid.hex.replace("-", "")] = key
             self.save_keys()
 
-            self.logger.info(f"Got decryption key: {key}")
+            self.logger.debug(f"Got decryption key: {key}")
 
         try:
             self.logger.info("> Merging video and audio, this might take a minute...")
@@ -1587,13 +1663,15 @@ class Udemy:
                 temp_output_path,
                 key,
             )
-            self.logger.info("> Merging complete, renaming final file...")
+            self.logger.debug("> Merging complete, renaming final file...")
             temp_output_path.rename(output_path)
-            self.logger.info("> Cleaning up temporary files...")
+            self.logger.debug("> Cleaning up temporary files...")
             os.remove(video_filepath_enc)
             os.remove(audio_filepath_enc)
+            return True
         except Exception as e:
             self.logger.exception(f"Muxing error: {e}")
+            return False
         finally:
             os.chdir(self.home_dir)
             # if the url is a file url, we need to remove the file after we're done with it
@@ -1654,7 +1732,7 @@ class Udemy:
             str(output_path),
         ]
 
-        print(" ".join(command))
+        self.logger.debug(" ".join(command))
         process = subprocess.Popen(command)
         log_subprocess_output("FFMPEG-STDOUT", process.stdout)
         log_subprocess_output("FFMPEG-STDERR", process.stderr)
@@ -1675,9 +1753,13 @@ class Udemy:
             caption.get("language"),
         )
         filepath = lecture_dir / filename
+        srt_filepath = lecture_dir / f"{filename_no_ext}.srt"
+        is_vtt = caption.get("extension") == "vtt"
 
-        if filepath.is_file():
+        # vtt captions are converted to srt (and the vtt removed unless --keep-vtt), so check for either
+        if filepath.is_file() or (is_vtt and srt_filepath.is_file()):
             self.logger.info("    > Caption '%s' already downloaded." % filename)
+            return True
         else:
             self.logger.info("    >  Downloading caption: '%s'" % filename)
             try:
@@ -1690,21 +1772,25 @@ class Udemy:
                     self.logger.error(
                         f"    > Error downloading caption: {e}. Exceeded retries, skipping."
                     )
-                    return
+                    return False
                 else:
                     self.logger.error(
                         f"    > Error downloading caption: {e}. Will retry {3-tries} more times."
                     )
-                    self.process_caption(caption, lecture_title, lecture_dir, tries + 1)
-            if caption.get("extension") == "vtt":
+                    return self.process_caption(
+                        caption, lecture_title, lecture_dir, tries + 1
+                    )
+            if is_vtt:
                 try:
-                    self.logger.info("    > Converting caption to SRT format...")
+                    self.logger.debug("    > Converting caption to SRT format...")
                     convert(lecture_dir, filename_no_ext)
-                    self.logger.info("    > Caption conversion complete.")
+                    self.logger.debug("    > Caption conversion complete.")
                     if not self.keep_vtt:
                         filepath.unlink()
                 except Exception:
                     self.logger.exception("    > Error converting caption")
+                    return False
+            return True
 
     def process_quiz(self, lecture, chapter_dir: Path):
         quiz = self._get_quiz_with_info(lecture.get("id"))
@@ -1766,12 +1852,13 @@ class Udemy:
         if self.key_file_path.exists():
             with self.key_file_path.open("r") as keyfile:
                 self.keys = json.loads(keyfile.read())
-        else:
+        elif not self.device:
+            # with a device, keys are requested at runtime so a missing keyfile is expected
             self.logger.warning(
                 "> Keyfile not found, you may not be able to decrypt DRM content."
             )
 
     def save_keys(self):
-        self.logger.info("> Saving keys to keyfile...")
+        self.logger.debug("> Saving keys to keyfile...")
         with self.key_file_path.open("w") as keyfile:
             keyfile.write(json.dumps(self.keys))

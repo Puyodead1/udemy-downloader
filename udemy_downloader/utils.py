@@ -166,20 +166,23 @@ def download_aria(url, file_dir, filename):
 def parse_chapter_filter(chapter_str: str):
     """
     Given a string like "1,3-5,7,9-11", return a set of chapter numbers.
+
+    Raises ValueError describing the first invalid part.
     """
     chapters = set()
     for part in chapter_str.split(","):
+        part = part.strip()
         if "-" in part:
             try:
-                start, end = part.split("-")
-                start = int(start.strip())
-                end = int(end.strip())
-                chapters.update(range(start, end + 1))
+                start, end = (int(x.strip()) for x in part.split("-"))
             except ValueError:
-                logger.error("Invalid range in --chapter argument: %s", part)
+                raise ValueError(f"invalid chapter range '{part}', expected e.g. '3-5'")
+            if start > end:
+                raise ValueError(f"invalid chapter range '{part}', the start is after the end")
+            chapters.update(range(start, end + 1))
         else:
             try:
-                chapters.add(int(part.strip()))
+                chapters.add(int(part))
             except ValueError:
-                logger.error("Invalid chapter number in --chapter argument: %s", part)
+                raise ValueError(f"invalid chapter number '{part}', expected e.g. '1,3-5,7'")
     return chapters

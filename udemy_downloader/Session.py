@@ -43,7 +43,7 @@ class Session(object):
     def _post(self, url, data, redirect=True):
         r = self._session.post(url, data, allow_redirects=redirect)
         if not r.ok:
-            print(r.text)
+            logger.debug(f"Response body: {r.text}")
             raise Exception(f"{r.status_code} {r.reason}")
         return r
 
