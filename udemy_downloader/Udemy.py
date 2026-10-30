@@ -13,6 +13,7 @@ from typing import Union
 
 import browser_cookie3
 import m3u8
+import requests
 import yt_dlp
 from bs4 import BeautifulSoup
 from coloredlogs import ColoredFormatter
@@ -44,6 +45,24 @@ from udemy_downloader.utils import (
     extract_pssh,
 )
 from udemy_downloader.vtt_to_srt import convert
+
+# asset_type -> (key in download_urls, parsed asset type)
+DOWNLOADABLE_ASSETS = {
+    "e-book": ("E-Book", "ebook"),
+    "file": ("File", "file"),
+    "presentation": ("Presentation", "presentation"),
+    "audio": ("Audio", "audio"),
+}
+
+HEIGHT_TO_WIDTH = {
+    "2160": "3840",
+    "1440": "2560",
+    "1080": "1920",
+    "720": "1280",
+    "480": "854",
+    "360": "640",
+    "240": "426",
+}
 
 
 class Udemy:
@@ -188,7 +207,7 @@ class Udemy:
             sys.exit(1)
 
         # ffmpeg version check, 5.0+ is required
-        match = re.search(r"ffmpeg version (\d+)\.(\d+)", ffmpeg_version)
+        match = re.search(r"ffmpeg version (\d+)\.(\d+)", ffmpeg_version or "")
         if match:
             major_version = int(match.group(1))  # major version
             minor_version = int(match.group(2))  # minor version
@@ -197,9 +216,10 @@ class Udemy:
                     f"Found FFmpeg version {major_version}.{minor_version}"
                 )
             else:
-                self.logger.info(
+                self.logger.fatal(
                     f"FFmpeg version {major_version}.{minor_version} is too old! Please update to version 5 or higher."
                 )
+                sys.exit(1)
         else:
             self.logger.warning("Failed to extract FFmpeg version.")
 
@@ -221,24 +241,13 @@ class Udemy:
 
             self.session = self.auth._session
 
-            if self.browser == "chrome":
-                self.cj = browser_cookie3.chrome()
-            elif self.browser == "firefox":
-                self.cj = browser_cookie3.firefox()
-            elif self.browser == "opera":
-                self.cj = browser_cookie3.opera()
-            elif self.browser == "edge":
-                self.cj = browser_cookie3.edge()
-            elif self.browser == "brave":
-                self.cj = browser_cookie3.brave()
-            elif self.browser == "chromium":
-                self.cj = browser_cookie3.chromium()
-            elif self.browser == "vivaldi":
-                self.cj = browser_cookie3.vivaldi()
-            elif self.browser == "file":
+            if self.browser == "file":
                 # load netscape cookies from file
-                self.cj = MozillaCookieJar("cookies.txt")
+                self.cj = MozillaCookieJar(self.cookies_path)
                 self.cj.load()
+            else:
+                # argparse limits browser to names browser_cookie3 provides a loader for
+                self.cj = getattr(browser_cookie3, self.browser)()
 
             self.session.set_cookiejar(self.cj)
 
@@ -329,14 +338,7 @@ class Udemy:
             }
         )
         url = QUIZ_URL.format(portal_name=self.portal_name, quiz_id=quiz_id)
-        try:
-            resp = self.session._get(url).json()
-        except ConnectionError as error:
-            self.logger.fatal(f"[-] Connection error: {error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        else:
-            return resp.get("results")
+        return self._get_json(url).get("results")
 
     def _get_elem_value_or_none(self, elem, key):
         return elem[key] if elem and key in elem else "(None)"
@@ -376,52 +378,55 @@ class Udemy:
 
         return resp
 
+    def _extract_download(
+        self,
+        asset: dict,
+        lecture_counter: int,
+        url_key: str,
+        asset_type: str,
+        title: Union[str, None] = None,
+    ):
+        """extracts a downloadable asset, url_key is its key in download_urls (e.g. File, E-Book)"""
+        download_urls = asset.get("download_urls")
+        if not download_urls or not isinstance(download_urls, dict):
+            return []
+        filename = asset.get("filename")
+        entry = {
+            "type": asset_type,
+            "filename": "{0:03d} ".format(lecture_counter) + filename,
+            "extension": filename.rsplit(".", 1)[-1] if "." in filename else "",
+            "download_url": download_urls.get(url_key, [])[0].get("file"),
+            "id": asset.get("id"),
+        }
+        if title is not None:
+            entry["title"] = title
+        return [entry]
+
     def _extract_supplementary_assets(self, supp_assets: list, lecture_counter: int):
         _temp = []
         for entry in supp_assets:
             title = sanitize_filename(entry.get("title"))
-            filename = entry.get("filename")
-            download_urls = entry.get("download_urls")
-            external_url = entry.get("external_url")
             asset_type = entry.get("asset_type").lower()
-            id = entry.get("id")
             if asset_type == "file":
-                if download_urls and isinstance(download_urls, dict):
-                    extension = filename.rsplit(".", 1)[-1] if "." in filename else ""
-                    download_url = download_urls.get("File", [])[0].get("file")
-                    _temp.append(
-                        {
-                            "type": "file",
-                            "title": title,
-                            "filename": "{0:03d} ".format(lecture_counter) + filename,
-                            "extension": extension,
-                            "download_url": download_url,
-                            "id": id,
-                        }
-                    )
+                _temp.extend(
+                    self._extract_download(entry, lecture_counter, "File", "file", title)
+                )
             elif asset_type == "sourcecode":
-                if download_urls and isinstance(download_urls, dict):
-                    extension = filename.rsplit(".", 1)[-1] if "." in filename else ""
-                    download_url = download_urls.get("SourceCode", [])[0].get("file")
-                    _temp.append(
-                        {
-                            "type": "source_code",
-                            "title": title,
-                            "filename": "{0:03d} ".format(lecture_counter) + filename,
-                            "extension": extension,
-                            "download_url": download_url,
-                            "id": id,
-                        }
+                _temp.extend(
+                    self._extract_download(
+                        entry, lecture_counter, "SourceCode", "source_code", title
                     )
+                )
             elif asset_type == "externallink":
                 _temp.append(
                     {
                         "type": "external_link",
                         "title": title,
-                        "filename": "{0:03d} ".format(lecture_counter) + filename,
+                        "filename": "{0:03d} ".format(lecture_counter)
+                        + entry.get("filename"),
                         "extension": "txt",
-                        "download_url": external_url,
-                        "id": id,
+                        "download_url": entry.get("external_url"),
+                        "id": entry.get("id"),
                     }
                 )
         return _temp
@@ -436,82 +441,6 @@ class Udemy:
             }
         ]
 
-    def _extract_ppt(self, asset: dict, lecture_counter: int):
-        _temp = []
-        download_urls = asset.get("download_urls")
-        filename = asset.get("filename")
-        id = asset.get("id")
-        if download_urls and isinstance(download_urls, dict):
-            extension = filename.rsplit(".", 1)[-1] if "." in filename else ""
-            download_url = download_urls.get("Presentation", [])[0].get("file")
-            _temp.append(
-                {
-                    "type": "presentation",
-                    "filename": "{0:03d} ".format(lecture_counter) + filename,
-                    "extension": extension,
-                    "download_url": download_url,
-                    "id": id,
-                }
-            )
-        return _temp
-
-    def _extract_file(self, asset: dict, lecture_counter: int):
-        _temp = []
-        download_urls = asset.get("download_urls")
-        filename = asset.get("filename")
-        id = asset.get("id")
-        if download_urls and isinstance(download_urls, dict):
-            extension = filename.rsplit(".", 1)[-1] if "." in filename else ""
-            download_url = download_urls.get("File", [])[0].get("file")
-            _temp.append(
-                {
-                    "type": "file",
-                    "filename": "{0:03d} ".format(lecture_counter) + filename,
-                    "extension": extension,
-                    "download_url": download_url,
-                    "id": id,
-                }
-            )
-        return _temp
-
-    def _extract_ebook(self, asset: dict, lecture_counter: int):
-        _temp = []
-        download_urls = asset.get("download_urls")
-        filename = asset.get("filename")
-        id = asset.get("id")
-        if download_urls and isinstance(download_urls, dict):
-            extension = filename.rsplit(".", 1)[-1] if "." in filename else ""
-            download_url = download_urls.get("E-Book", [])[0].get("file")
-            _temp.append(
-                {
-                    "type": "ebook",
-                    "filename": "{0:03d} ".format(lecture_counter) + filename,
-                    "extension": extension,
-                    "download_url": download_url,
-                    "id": id,
-                }
-            )
-        return _temp
-
-    def _extract_audio(self, asset: dict, lecture_counter: int):
-        _temp = []
-        download_urls = asset.get("download_urls")
-        filename = asset.get("filename")
-        id = asset.get("id")
-        if download_urls and isinstance(download_urls, dict):
-            extension = filename.rsplit(".", 1)[-1] if "." in filename else ""
-            download_url = download_urls.get("Audio", [])[0].get("file")
-            _temp.append(
-                {
-                    "type": "audio",
-                    "filename": "{0:03d} ".format(lecture_counter) + filename,
-                    "extension": extension,
-                    "download_url": download_url,
-                    "id": id,
-                }
-            )
-        return _temp
-
     def _extract_sources(self, sources, skip_hls: bool):
         _temp = []
         if sources and isinstance(sources, list):
@@ -523,22 +452,7 @@ class Udemy:
                 if label.lower() == "audio":
                     continue
                 height = label if label else None
-                if height == "2160":
-                    width = "3840"
-                elif height == "1440":
-                    width = "2560"
-                elif height == "1080":
-                    width = "1920"
-                elif height == "720":
-                    width = "1280"
-                elif height == "480":
-                    width = "854"
-                elif height == "360":
-                    width = "640"
-                elif height == "240":
-                    width = "426"
-                else:
-                    width = "256"
+                width = HEIGHT_TO_WIDTH.get(height, "256")
                 if (
                     source.get("type") == "application/x-mpegURL"
                     or "m3u8" in download_url
@@ -668,27 +582,8 @@ class Udemy:
 
     def _extract_mpd(self, url):
         """extracts mpd streams"""
-        asset_id_re = re.compile(r"(assets|cmaf)/(?P<id>\d+)/")
-        _temp = {}
-
-        # # get temp folder
-        # temp_path = Path(Path.cwd(), "temp")
-
-        # # ensure the folder exists
-        # temp_path.mkdir(parents=True, exist_ok=True)
-
-        # # # extract the asset id from the url
-        # asset_id = asset_id_re.search(url).group("id")
-
-        # # download the mpd and save it to the temp file
-        # mpd_path = Path(temp_path, f"index_{asset_id}.mpd")
-
+        _temp = []
         try:
-            # with open(mpd_path, "wb") as f:
-            #     r = self.session._get(url)
-            #     r.raise_for_status()
-            #     f.write(r.content)
-
             ytdl = yt_dlp.YoutubeDL(
                 {
                     "quiet": True,
@@ -702,53 +597,39 @@ class Udemy:
             )
             formats = results.get("formats", [])
             best_audio = next(
-                f for f in formats if (f["acodec"] != "none" and f["vcodec"] == "none")
+                (
+                    f
+                    for f in formats
+                    if f["acodec"] != "none" and f["vcodec"] == "none"
+                ),
+                None,
             )
-            # filter formats to remove any audio only formats
-            formats = [
-                f for f in formats if f["vcodec"] != "none" and f["acodec"] == "none"
-            ]
             if not best_audio:
                 raise ValueError("No suitable audio format found in MPD")
             audio_format_id = best_audio.get("format_id")
 
+            # for each resolution, use only the highest bitrate video only format
+            best_by_height = {}
             for format in formats:
-                video_format_id = format.get("format_id")
-                extension = format.get("ext")
+                if format["vcodec"] == "none" or format["acodec"] != "none":
+                    continue
                 height = format.get("height")
-                width = format.get("width")
-                tbr = format.get("tbr", 0)
-
-                # add to dict based on height
-                if height not in _temp:
-                    _temp[height] = []
-
-                _temp[height].append(
-                    {
-                        "type": "dash",
-                        "height": str(height),
-                        "width": str(width),
-                        "format_id": f"{video_format_id},{audio_format_id}",
-                        "extension": extension,
-                        "download_url": url,
-                        "tbr": round(tbr),
-                    }
-                )
-            # for each resolution, use only the highest bitrate
-            _temp2 = []
-            for height, formats in _temp.items():
-                if formats:
-                    # sort by tbr and take the first one
-                    formats.sort(key=lambda x: x["tbr"], reverse=True)
-                    _temp2.append(formats[0])
-                else:
-                    del _temp[height]
-
-            _temp = _temp2
+                tbr = round(format.get("tbr") or 0)
+                if height in best_by_height and best_by_height[height]["tbr"] >= tbr:
+                    continue
+                best_by_height[height] = {
+                    "type": "dash",
+                    "height": str(height),
+                    "width": str(format.get("width")),
+                    "format_id": f"{format.get('format_id')},{audio_format_id}",
+                    "extension": format.get("ext"),
+                    "download_url": url,
+                    "tbr": tbr,
+                }
+            _temp = list(best_by_height.values())
         except Exception:
-            self.logger.exception(f"Error fetching MPD streams")
+            self.logger.exception("Error fetching MPD streams")
 
-        # We don't delete the mpd file yet because we can use it to download later
         return _temp
 
     def extract_course_name(self, url: str):
@@ -762,13 +643,18 @@ class Udemy:
         if obj:
             return obj.group("portal_name"), obj.group("name_or_id")
 
-    def extract_portal_name(self, url: str):
-        obj = re.search(r"(?i)(?://(?P<portal_name>.+?).udemy.com)", url)
-        if obj:
-            return obj.group("portal_name")
+    def _get_json(self, url: str, params=None):
+        """GET a url and decode the json body, exiting if the request or decoding fails"""
+        try:
+            return self.session._get(url, params).json()
+        except requests.RequestException as error:
+            self.logger.fatal(f"Connection error: {error}")
+            sys.exit(1)
+        except ValueError as error:
+            self.logger.fatal(f"{error} on {url}")
+            sys.exit(1)
 
     def _subscribed_courses(self, portal_name: str, course_name: str):
-        results = []
         self.session._headers.update(
             {
                 "Host": "{portal_name}.udemy.com".format(portal_name=portal_name),
@@ -778,70 +664,32 @@ class Udemy:
             }
         )
         url = COURSE_SEARCH.format(portal_name=portal_name, course_name=course_name)
-        try:
-            webpage = self.session._get(url).content
-            webpage = webpage.decode("utf8", "ignore")
-            webpage = json.loads(webpage)
-        except ConnectionError as error:
-            self.logger.fatal(f"Connection error: {error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        except (ValueError, Exception) as error:
-            self.logger.fatal(f"{error} on {url}")
-            time.sleep(0.8)
-            sys.exit(1)
-        else:
-            results = webpage.get("results", [])
-        return results
+        return self._get_json(url).get("results", [])
 
     def _extract_course_info_json(self, portal_name: str, course_id: str, url: str):
         self.session._headers.update({"Referer": url})
         url = COURSE_URL.format(portal_name=portal_name, course_id=course_id)
-        try:
-            resp = self.session._get(url).json()
-        except ConnectionError as error:
-            self.logger.fatal(f"Connection error: {error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        else:
-            return resp
+        return self._get_json(url)
 
     def extract_course_content(self, portal_name: str, course_id: str, url: str):
         self.session._headers.update({"Referer": url})
         url = CURRICULUM_ITEMS_URL.format(portal_name=portal_name, course_id=course_id)
         page = 1
-        try:
-            data = self.session._get(url, CURRICULUM_ITEMS_PARAMS).json()
-        except ConnectionError as error:
-            self.logger.fatal(f"Connection error: {error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        else:
-            _next = data.get("next")
-            _count = data.get("count")
-            est_page_count = math.ceil(_count / 100)  # 100 is the max results per page
-            while _next:
-                self.logger.info(
-                    f"> Downloading course curriculum.. (Page {page + 1}/{est_page_count})"
-                )
-                try:
-                    resp = self.session._get(_next)
-                    if not resp.ok:
-                        self.logger.error(f"Failed to fetch a page, will retry")
-                        continue
-                    resp = resp.json()
-                except ConnectionError as error:
-                    self.logger.fatal(f"Connection error: {error}")
-                    time.sleep(0.8)
-                    sys.exit(1)
-                else:
-                    _next = resp.get("next")
-                    results = resp.get("results")
-                    if results and isinstance(results, list):
-                        for d in resp["results"]:
-                            data["results"].append(d)
-                        page = page + 1
-            return data
+        data = self._get_json(url, CURRICULUM_ITEMS_PARAMS)
+        _next = data.get("next")
+        _count = data.get("count") or 0
+        est_page_count = math.ceil(_count / 100)  # 100 is the max results per page
+        while _next:
+            self.logger.info(
+                f"> Downloading course curriculum.. (Page {page + 1}/{est_page_count})"
+            )
+            resp = self._get_json(_next)
+            _next = resp.get("next")
+            results = resp.get("results")
+            if results and isinstance(results, list):
+                data["results"].extend(results)
+                page = page + 1
+        return data
 
     def _extract_course(self, response, course_name: str):
         _temp = {}
@@ -855,62 +703,21 @@ class Udemy:
         return _temp
 
     def _my_courses(self, portal_name):
-        results = []
-        try:
-            url = MY_COURSES_URL.format(portal_name=portal_name)
-            webpage = self.session._get(url).json()
-        except ConnectionError as error:
-            self.logger.fatal(f"Connection error: {error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        except (ValueError, Exception) as error:
-            self.logger.fatal(f"{error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        else:
-            results = webpage.get("results", [])
-        return results
+        url = MY_COURSES_URL.format(portal_name=portal_name)
+        return self._get_json(url).get("results", [])
 
     def _subscribed_collection_courses(self, portal_name: str):
         url = COLLECTION_URL.format(portal_name=portal_name)
-        courses_lists = []
-        try:
-            webpage = self.session._get(url).json()
-        except ConnectionError as error:
-            self.logger.fatal(f"Connection error: {error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        except (ValueError, Exception) as error:
-            self.logger.fatal(f"{error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        else:
-            results = webpage.get("results", [])
-            if results:
-                [
-                    courses_lists.extend(courses.get("courses", []))
-                    for courses in results
-                    if courses.get("courses", [])
-                ]
-        return courses_lists
+        results = self._get_json(url).get("results", [])
+        return [
+            course
+            for collection in results
+            for course in collection.get("courses", [])
+        ]
 
     def _archived_courses(self, portal_name):
-        results = []
-        try:
-            url = MY_COURSES_URL.format(portal_name=portal_name)
-            url = f"{url}&is_archived=true"
-            webpage = self.session._get(url).json()
-        except ConnectionError as error:
-            self.logger.fatal(f"Connection error: {error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        except (ValueError, Exception) as error:
-            self.logger.fatal(f"{error}")
-            time.sleep(0.8)
-            sys.exit(1)
-        else:
-            results = webpage.get("results", [])
-        return results
+        url = MY_COURSES_URL.format(portal_name=portal_name)
+        return self._get_json(f"{url}&is_archived=true").get("results", [])
 
     def _extract_subscription_course_info(self, url):
         course_html = self.session._get(url).text
@@ -1088,14 +895,11 @@ class Udemy:
                 retVal.extend(self._extract_article(asset, index))
             elif asset_type == "video":
                 pass
-            elif asset_type == "e-book":
-                retVal.extend(self._extract_ebook(asset, index))
-            elif asset_type == "file":
-                retVal.extend(self._extract_file(asset, index))
-            elif asset_type == "presentation":
-                retVal.extend(self._extract_ppt(asset, index))
-            elif asset_type == "audio":
-                retVal.extend(self._extract_audio(asset, index))
+            elif asset_type in DOWNLOADABLE_ASSETS:
+                url_key, download_type = DOWNLOADABLE_ASSETS[asset_type]
+                retVal.extend(
+                    self._extract_download(asset, index, url_key, download_type)
+                )
             else:
                 self.logger.warning(f"Unknown asset type: {asset_type}")
 
@@ -1424,7 +1228,7 @@ class Udemy:
             lecture_counter = 0
             lectures = []
 
-            for entry in course:
+            for position, entry in enumerate(course, 1):
                 clazz = entry.get("_class")
 
                 if clazz == "chapter":
@@ -1448,7 +1252,7 @@ class Udemy:
                             }
                         )
                         chapter_index_counter += 1
-                elif clazz == "lecture":
+                elif clazz in ("lecture", "quiz"):
                     lecture_counter += 1
                     lecture_id = entry.get("id")
                     if len(self.parsed_data["chapters"]) == 0:
@@ -1469,7 +1273,7 @@ class Udemy:
                             chapter_index_counter += 1
                     if lecture_id:
                         self.logger.info(
-                            f"Processing {course.index(entry) + 1} of {len(course)}"
+                            f"Processing {position} of {len(course)}"
                         )
 
                         lecture_index = entry.get("object_index")
@@ -1488,49 +1292,7 @@ class Udemy:
                             }
                         )
                     else:
-                        self.logger.debug("Lecture: ID is None, skipping")
-                elif clazz == "quiz":
-                    lecture_counter += 1
-                    lecture_id = entry.get("id")
-                    if len(self.parsed_data["chapters"]) == 0:
-                        # dummy chapters to handle lectures without chapters
-                        chapter_index = entry.get("object_index")
-                        chapter_title = "{0:02d} - ".format(
-                            chapter_index
-                        ) + sanitize_filename(entry.get("title"))
-                        if chapter_title not in self.parsed_data["chapters"]:
-                            self.parsed_data["chapters"].append(
-                                {
-                                    "chapter_title": chapter_title,
-                                    "chapter_id": lecture_id,
-                                    "chapter_index": chapter_index,
-                                    "lectures": [],
-                                }
-                            )
-                            chapter_index_counter += 1
-
-                    if lecture_id:
-                        self.logger.info(
-                            f"Processing {course.index(entry) + 1} of {len(course)}"
-                        )
-
-                        lecture_index = entry.get("object_index")
-                        lecture_title = "{0:03d} ".format(
-                            lecture_counter
-                        ) + sanitize_filename(entry.get("title"))
-
-                        lectures.append(
-                            {
-                                "index": lecture_counter,
-                                "lecture_index": lecture_index,
-                                "lecture_title": lecture_title,
-                                "_class": entry.get("_class"),
-                                "id": lecture_id,
-                                "data": entry,
-                            }
-                        )
-                    else:
-                        self.logger.debug("Quiz: ID is None, skipping")
+                        self.logger.debug(f"{clazz.capitalize()}: ID is None, skipping")
 
                 self.parsed_data["chapters"][chapter_index_counter][
                     "lectures"
@@ -1680,13 +1442,13 @@ class Udemy:
                                         )
                         else:
                             ret_code = download_aria(
-                                url, chapter_dir, lecture_title + ".mp4"
+                                url, chapter_dir, lecture_path.name
                             )
                             self.logger.debug(
                                 f"      > Download return code: {ret_code}"
                             )
                     except Exception:
-                        self.logger.exception(f">        Error downloading lecture")
+                        self.logger.exception(">        Error downloading lecture")
                 else:
                     self.logger.info(
                         f"      > Lecture '{lecture_title}' is already downloaded, skipping..."
@@ -1740,9 +1502,14 @@ class Udemy:
             self.logger.warning(
                 "Return code from the downloader was non-0 (error), skipping!"
             )
+            os.chdir(self.home_dir)
             return
 
         pssh = extract_pssh(video_filepath_enc)
+        if pssh is None or not pssh.key_ids:
+            self.logger.error("No Widevine PSSH found in the video track, skipping!")
+            os.chdir(self.home_dir)
+            return
         kid = pssh.key_ids[0]
 
         self.logger.info(f"KID is: {kid.hex}")
@@ -1760,71 +1527,58 @@ class Udemy:
             self.logger.error(
                 "No key found and no device is available to make a license request, skipping!"
             )
+            os.chdir(self.home_dir)
             return
 
         if not key:
             # request a media license token
-            url = LECTURE_URL.format(
+            lecture_url = LECTURE_URL.format(
                 portal_name=self.portal_name,
                 course_id=self.course_id,
                 lecture_id=lecture_id,
                 rand=random.random(),
             )
-            self.logger.info(f"Requesting a media license token...")
+            self.logger.info("Requesting a media license token...")
             try:
-                r = self.session._get(url)
+                r = self.session._get(lecture_url)
                 r.raise_for_status()
                 media_license_token = r.json()["asset"]["media_license_token"]
+            except Exception as e:
+                self.logger.error(f"Failed to get media license token: {e}")
+                os.chdir(self.home_dir)
+                return
 
-                # try to make a license request
-                license_url = LICENSE_URL.format(
-                    portal_name=self.portal_name, auth_token=media_license_token
-                )
-                session_id = self.cdm.open()
+            # try to make a license request
+            license_url = LICENSE_URL.format(
+                portal_name=self.portal_name, auth_token=media_license_token
+            )
+            session_id = self.cdm.open()
+            try:
                 challenge = self.cdm.get_license_challenge(
                     session_id, pssh, "STREAMING", False
                 )
-
-                try:
-                    self.logger.debug(f"Making license request to {license_url}")
-                    r = self.session._post(license_url, challenge)
-                    if not r.ok:
-                        print(r.text)
-                    r.raise_for_status()
-                    self.cdm.parse_license(session_id, r.content)
-                    keys = self.cdm.get_keys(session_id, "CONTENT")
-                    # find key that matches kid
-                    key = next((k.key.hex() for k in keys if k.kid == kid), None)
-                    if not key:
-                        self.logger.error("Failed to get decryption key, skipping!")
-                        return
-
-                    self.keys[kid.hex.replace("-", "")] = key
-                    self.save_keys()
-
-                    self.logger.info(f"Got decryption key: {key}")
-                except Exception as e:
-                    self.logger.error(f"Failed to get media license token: {e}")
-                    return
-
-                self.cdm.close(session_id)
+                self.logger.debug(f"Making license request to {license_url}")
+                r = self.session._post(license_url, challenge)
+                self.cdm.parse_license(session_id, r.content)
+                keys = self.cdm.get_keys(session_id, "CONTENT")
+                # find key that matches kid
+                key = next((k.key.hex() for k in keys if k.kid == kid), None)
             except Exception as e:
                 self.logger.error(f"Failed to get license: {e}")
+            finally:
+                self.cdm.close(session_id)
+
+            if not key:
+                self.logger.error("Failed to get decryption key, skipping!")
+                os.chdir(self.home_dir)
                 return
 
+            self.keys[kid.hex.replace("-", "")] = key
+            self.save_keys()
+
+            self.logger.info(f"Got decryption key: {key}")
+
         try:
-            # logger.info("> Decrypting video, this might take a minute...")
-            # ret_code = decrypt(video_kid, video_filepath_enc, video_filepath_dec)
-            # if ret_code != 0:
-            #     logger.error("> Return code from the decrypter was non-0 (error), skipping!")
-            #     return
-            # logger.info("> Decryption complete")
-            # logger.info("> Decrypting audio, this might take a minute...")
-            # decrypt(audio_kid, audio_filepath_enc, audio_filepath_dec)
-            # if ret_code != 0:
-            #     logger.error("> Return code from the decrypter was non-0 (error), skipping!")
-            #     return
-            # logger.info("> Decryption complete")
             self.logger.info("> Merging video and audio, this might take a minute...")
             self.mux_process(
                 video_filepath_enc,
@@ -1833,11 +1587,6 @@ class Udemy:
                 temp_output_path,
                 key,
             )
-            if ret_code != 0:
-                self.logger.error(
-                    "> Return code from ffmpeg was non-0 (error), skipping!"
-                )
-                return
             self.logger.info("> Merging complete, renaming final file...")
             temp_output_path.rename(output_path)
             self.logger.info("> Cleaning up temporary files...")
@@ -1864,23 +1613,49 @@ class Udemy:
     ):
         codec = "hevc_nvenc" if self.use_nvenc else "libx265"
         transcode = (
-            "-hwaccel cuda -hwaccel_output_format cuda" if self.use_nvenc else ""
+            ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"]
+            if self.use_nvenc
+            else []
         )
-        decryption_arg = f"-decryption_key {key}" if key is not None else ""
+        decryption_arg = ["-decryption_key", key] if key is not None else []
 
-        if os.name == "nt":
-            if self.use_h265:
-                command = f'ffmpeg {transcode} -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c:v {codec} -vtag hvc1 -crf {self.h265_crf} -preset {self.h265_preset} -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" -metadata comment="Downloaded with Udemy-Downloader by Puyodead1 (https://github.com/Puyodead1/udemy-downloader)" "{output_path}"'
-            else:
-                command = f'ffmpeg -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" -metadata comment="Downloaded with Udemy-Downloader by Puyodead1 (https://github.com/Puyodead1/udemy-downloader)" "{output_path}"'
+        # build an argument list instead of a shell string so titles can't inject commands
+        command = [] if os.name == "nt" else ["nice", "-n", "7"]
+        command += ["ffmpeg"]
+        if self.use_h265:
+            command += transcode
+        command += ["-y", *decryption_arg, "-i", str(video_filepath)]
+        command += [*decryption_arg, "-i", str(audio_filepath)]
+        if self.use_h265:
+            command += [
+                "-c:v",
+                codec,
+                "-vtag",
+                "hvc1",
+                "-crf",
+                str(self.h265_crf),
+                "-preset",
+                self.h265_preset,
+                "-c:a",
+                "copy",
+            ]
         else:
-            if self.use_h265:
-                command = f'nice -n 7 ffmpeg {transcode} -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c:v {codec} -vtag hvc1 -crf {h265_crf} -preset {h265_preset} -c:a copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" -metadata comment="Downloaded with Udemy-Downloader by Puyodead1 (https://github.com/Puyodead1/udemy-downloader)" "{output_path}"'
-            else:
-                command = f'nice -n 7 ffmpeg -y {decryption_arg} -i "{video_filepath}" {decryption_arg} -i "{audio_filepath}" -c copy -fflags +bitexact -shortest -map_metadata -1 -metadata title="{video_title}" -metadata comment="Downloaded with Udemy-Downloader by Puyodead1 (https://github.com/Puyodead1/udemy-downloader)" "{output_path}"'
+            command += ["-c", "copy"]
+        command += [
+            "-fflags",
+            "+bitexact",
+            "-shortest",
+            "-map_metadata",
+            "-1",
+            "-metadata",
+            f"title={video_title}",
+            "-metadata",
+            "comment=Downloaded with Udemy-Downloader by Puyodead1 (https://github.com/Puyodead1/udemy-downloader)",
+            str(output_path),
+        ]
 
-        print(command)
-        process = subprocess.Popen(command, shell=True)
+        print(" ".join(command))
+        process = subprocess.Popen(command)
         log_subprocess_output("FFMPEG-STDOUT", process.stdout)
         log_subprocess_output("FFMPEG-STDERR", process.stderr)
         ret_code = process.wait()
@@ -1890,12 +1665,12 @@ class Udemy:
         return ret_code
 
     def process_caption(self, caption, lecture_title: str, lecture_dir: Path, tries=0):
-        filename = f"%s_%s.%s" % (
+        filename = "%s_%s.%s" % (
             sanitize_filename(lecture_title),
             caption.get("language"),
             caption.get("extension"),
         )
-        filename_no_ext = f"%s_%s" % (
+        filename_no_ext = "%s_%s" % (
             sanitize_filename(lecture_title),
             caption.get("language"),
         )
@@ -1904,7 +1679,7 @@ class Udemy:
         if filepath.is_file():
             self.logger.info("    > Caption '%s' already downloaded." % filename)
         else:
-            self.logger.info(f"    >  Downloading caption: '%s'" % filename)
+            self.logger.info("    >  Downloading caption: '%s'" % filename)
             try:
                 ret_code = download_aria(
                     caption.get("download_url"), lecture_dir, filename
@@ -1929,7 +1704,7 @@ class Udemy:
                     if not self.keep_vtt:
                         filepath.unlink()
                 except Exception:
-                    self.logger.exception(f"    > Error converting caption")
+                    self.logger.exception("    > Error converting caption")
 
     def process_quiz(self, lecture, chapter_dir: Path):
         quiz = self._get_quiz_with_info(lecture.get("id"))

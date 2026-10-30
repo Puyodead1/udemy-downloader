@@ -1,5 +1,4 @@
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -165,7 +164,6 @@ def main():
         help="Download specific chapters. Use comma separated values and ranges (e.g., '1,3-5,7,9-11').",
     )
     parser.add_argument("--device", "-d", dest="device", type=str, help="Name of WVD file to use")
-    # parser.add_argument("-v", "--version", action="version", version="You are running version {version}".format(version=__version__))
 
     args = parser.parse_args()
 
@@ -180,7 +178,7 @@ def main():
     if udemy.out:
         out_path = Path(udemy.out)
         if out_path.is_file():
-            udemy.logger.error(f"The output path is a file")
+            udemy.logger.error("The output path is a file")
             sys.exit(1)
         udemy.download_dir = out_path
 

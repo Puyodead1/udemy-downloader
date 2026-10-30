@@ -1,18 +1,33 @@
-import base64
-import codecs
 import logging
 import os
+import struct
 import subprocess
-from pathlib import Path
 from typing import IO
-from udemy_downloader.mp4parse import F4VParser
-from udemy_downloader import widevine_pssh_data_pb2
+
 import demoji
-import requests
-from tqdm import tqdm
 from pywidevine.pssh import PSSH
 
 logger = logging.getLogger(__name__)
+
+WIDEVINE_SYSTEM_ID = bytes.fromhex("edef8ba979d64acea3c827dcd51d21ed")
+
+
+def _read_box_header(data: bytes, offset: int):
+    """Return (box_type, header_size, box_size) for the mp4 box at offset, or None if truncated."""
+    if offset + 8 > len(data):
+        return None
+    size, box_type = struct.unpack_from(">I4s", data, offset)
+    header_size = 8
+    if size == 1:
+        if offset + 16 > len(data):
+            return None
+        size = struct.unpack_from(">Q", data, offset + 8)[0]
+        header_size = 16
+    elif size == 0:
+        size = len(data) - offset
+    if size < header_size:
+        return None
+    return box_type, header_size, size
 
 
 def extract_pssh(mp4_file):
@@ -25,22 +40,39 @@ def extract_pssh(mp4_file):
 
     Returns
     -------
-    PSSH
+    PSSH, or None if the moov box has no Widevine PSSH box
 
     """
-
-    boxes = F4VParser.parse(filename=mp4_file)
     if not os.path.exists(mp4_file):
         raise Exception("File does not exist")
-    for box in boxes:
-        if box.header.box_type == "moov" and box.pssh:
-            pssh_box = next(
-                x for x in box.pssh if x.system_id == "edef8ba979d64acea3c827dcd51d21ed"
-            )
-            pssh_raw = codecs.decode(pssh_box.payload, "hex")
-            return PSSH(pssh_raw)
 
-    # No Moof or PSSH header found
+    with open(mp4_file, "rb") as f:
+        # walk the top-level boxes without reading media data into memory
+        while True:
+            header = f.read(16)
+            box = _read_box_header(header, 0)
+            if box is None:
+                return None
+            box_type, header_size, box_size = box
+            if box_type == b"moov":
+                f.seek(header_size - len(header), os.SEEK_CUR)
+                moov = f.read(box_size - header_size)
+                break
+            if struct.unpack_from(">I", header)[0] == 0:
+                # a size of 0 means the box runs to the end of the file
+                return None
+            f.seek(box_size - len(header), os.SEEK_CUR)
+
+    offset = 0
+    while (box := _read_box_header(moov, offset)) is not None:
+        box_type, header_size, box_size = box
+        # pssh layout: header, 4 bytes version/flags, 16 byte system id
+        system_id = moov[offset + header_size + 4 : offset + header_size + 20]
+        if box_type == b"pssh" and system_id == WIDEVINE_SYSTEM_ID:
+            return PSSH(moov[offset : offset + box_size])
+        offset += box_size
+
+    # No Widevine PSSH box found
     return None
 
 
@@ -51,40 +83,9 @@ def deEmojify(inputStr: str):
 # from https://stackoverflow.com/a/21978778/9785713
 def log_subprocess_output(prefix: str, pipe: IO[bytes]):
     if pipe:
-        for line in iter(lambda: pipe.read(1), ""):
+        for line in iter(pipe.readline, b""):
             logger.debug("[%s]: %r", prefix, line.decode("utf8").strip())
         pipe.flush()
-
-
-def durationtoseconds(period):
-    """
-    @author Jayapraveen
-    """
-
-    # Duration format in PTxDxHxMxS
-    if period[:2] == "PT":
-        period = period[2:]
-        day = int(period.split("D")[0] if "D" in period else 0)
-        hour = int(period.split("H")[0].split("D")[-1] if "H" in period else 0)
-        minute = int(period.split("M")[0].split("H")[-1] if "M" in period else 0)
-        second = period.split("S")[0].split("M")[-1]
-        # logger.debug("Total time: " + str(day) + " days " + str(hour) + " hours " +
-        #       str(minute) + " minutes and " + str(second) + " seconds")
-        total_time = float(
-            str(
-                (day * 24 * 60 * 60)
-                + (hour * 60 * 60)
-                + (minute * 60)
-                + (int(second.split(".")[0]))
-            )
-            + "."
-            + str(int(second.split(".")[-1]))
-        )
-        return total_time
-
-    else:
-        logger.error("Duration Format Error")
-        return None
 
 
 def check_for_aria():
@@ -98,21 +99,6 @@ def check_for_aria():
     except Exception:
         logger.exception(
             "> Unexpected exception while checking for Aria2c, please tell the program author about this! "
-        )
-        return True
-
-
-def check_for_ffmpeg():
-    try:
-        subprocess.Popen(
-            ["ffmpeg"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
-        ).wait()
-        return True
-    except FileNotFoundError:
-        return False
-    except Exception:
-        logger.exception(
-            "> Unexpected exception while checking for FFMPEG, please tell the program author about this! "
         )
         return True
 
@@ -146,32 +132,6 @@ def check_for_ffmpeg():
             "> Unexpected exception while checking for FFmpeg, please tell the program author about this! "
         )
         return False, None
-
-
-def download(url, path, filename):
-    """
-    @author Puyodead1
-    """
-    file_size = int(requests.head(url).headers["Content-Length"])
-    if os.path.exists(path):
-        first_byte = os.path.getsize(path)
-    else:
-        first_byte = 0
-    if first_byte >= file_size:
-        return file_size
-    header = {"Range": "bytes=%s-%s" % (first_byte, file_size)}
-    pbar = tqdm(
-        total=file_size, initial=first_byte, unit="B", unit_scale=True, desc=filename
-    )
-    res = requests.get(url, headers=header, stream=True)
-    res.raise_for_status()
-    with open(path, encoding="utf8", mode="ab") as f:
-        for chunk in res.iter_content(chunk_size=1024):
-            if chunk:
-                f.write(chunk)
-                pbar.update(1024)
-    pbar.close()
-    return file_size
 
 
 def download_aria(url, file_dir, filename):

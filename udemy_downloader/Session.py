@@ -11,10 +11,11 @@ logger = logging.getLogger(LOGGER_NAME)
 
 
 class Session(object):
-    def __init__(self, headers={}):
-        self._headers = headers
+    def __init__(self, headers=None):
         self._session = requests.sessions.Session()
-        self._session.headers.update(self._headers)
+        self._session.headers.update(headers or {})
+        # alias the live session headers so updates are sent with requests
+        self._headers = self._session.headers
         # self.cookiejar = CookieJar()
         # this is to bypass TLS fingerprinting
         self._session.mount(
@@ -31,13 +32,13 @@ class Session(object):
     def _get(self, url, params=None):
         for i in range(10):
             r = self._session.get(url, params=params)
-            if not r.ok and r.status_code not in [502, 503]:
-                print(r.text)
-                logger.error("Failed request " + url)
-                logger.error(f"{r.status_code} {r.reason}, retrying (attempt {i} )...")
-                time.sleep(0.8)
-
-            return r
+            if r.status_code not in [502, 503]:
+                if not r.ok:
+                    logger.error(f"Failed request {url}: {r.status_code} {r.reason}")
+                return r
+            logger.warning(f"{r.status_code} {r.reason}, retrying (attempt {i + 1}/10)...")
+            time.sleep(0.8)
+        return r
 
     def _post(self, url, data, redirect=True):
         r = self._session.post(url, data, allow_redirects=redirect)
@@ -48,3 +49,6 @@ class Session(object):
 
     def set_cookiejar(self, cookiejar: CookieJar):
         self._session.cookies = cookiejar
+
+    def terminate(self):
+        self._session.close()
