@@ -254,7 +254,8 @@ class Udemy:
                 )
                 sys.exit(1)
 
-            self.logger.warning(
+            # --browser was given, so using cookies is expected rather than worth a warning
+            self.logger.debug(
                 "No bearer token was provided, attempting to use browser cookies."
             )
 
