@@ -78,6 +78,77 @@ def extract_pssh(mp4_file):
     return None
 
 
+def _iter_child_boxes(data: bytes, start: int, end: int):
+    """Yield (box_type, offset, header_size, box_size) for each box between start and end"""
+    offset = start
+    while offset < end and (box := _read_box_header(data[:end], offset)) is not None:
+        box_type, header_size, box_size = box
+        yield box_type, offset, header_size, box_size
+        offset += box_size
+
+
+def _empty_saiz_type_offsets(moof: bytes):
+    """Offsets of the type fields of empty saiz boxes (and their saio) in a moof box"""
+    offsets = []
+    moof_box = _read_box_header(moof, 0)
+    if moof_box is None:
+        # truncated file
+        return offsets
+    _, moof_header, moof_size = moof_box
+    for box_type, traf_offset, traf_header, traf_size in _iter_child_boxes(moof, moof_header, moof_size):
+        if box_type != b"traf":
+            continue
+        children = list(_iter_child_boxes(moof, traf_offset + traf_header, traf_offset + traf_size))
+        for child_type, child_offset, child_header, _ in children:
+            if child_type != b"saiz":
+                continue
+            # saiz layout: header, 1 byte version, 3 byte flags, [aux info type + param], default size, sample count
+            body = child_offset + child_header
+            flags = int.from_bytes(moof[body + 1 : body + 4], "big")
+            pos = body + 4 + (8 if flags & 1 else 0)
+            default_size = moof[pos]
+            sample_count = struct.unpack_from(">I", moof, pos + 1)[0]
+            if default_size == 0 and sample_count == 0:
+                offsets += [offset + 4 for box_type, offset, _, _ in children if box_type in (b"saiz", b"saio")]
+    return offsets
+
+
+def fix_empty_saiz(mp4_file):
+    """
+    Turn empty saiz boxes (default size 0 and sample count 0), and the saio boxes that go with them, into free boxes.
+
+    Udemy writes these for fully encrypted audio that has no per-sample encryption info. FFmpeg rejects a saiz like
+    this with "Invalid data found when processing input" before it reaches the senc box that has the same information,
+    so without the fix the audio can't be decrypted or muxed. See issues #307 and #314.
+
+    Returns the number of boxes that were changed.
+    """
+    patches = []
+    with open(mp4_file, "r+b") as f:
+        file_size = os.fstat(f.fileno()).st_size
+        offset = 0
+        # walk the top-level boxes without reading media data into memory
+        while offset + 8 <= file_size:
+            f.seek(offset)
+            header = f.read(16)
+            box = _read_box_header(header, 0)
+            if box is None:
+                break
+            box_type, _, box_size = box
+            if struct.unpack_from(">I", header)[0] == 0:
+                # a size of 0 means the box runs to the end of the file
+                box_size = file_size - offset
+            if box_type == b"moof":
+                f.seek(offset)
+                patches += [offset + p for p in _empty_saiz_type_offsets(f.read(box_size))]
+            offset += box_size
+
+        for patch in patches:
+            f.seek(patch)
+            f.write(b"free")
+    return len(patches)
+
+
 def _find_role_play(data):
     """Depth-first search for the object that describes the role play"""
     if isinstance(data, dict):

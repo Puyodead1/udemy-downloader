@@ -52,6 +52,7 @@ from udemy_downloader.utils import (
     extract_role_play,
     parse_chapter_filter,
     extract_pssh,
+    fix_empty_saiz,
 )
 from udemy_downloader.vtt_to_srt import convert
 
@@ -1722,6 +1723,10 @@ class Udemy:
             self.logger.debug(f"Got decryption key: {key}")
 
         try:
+            # some audio tracks have an empty saiz box that ffmpeg refuses to open (#307, #314)
+            fixed = fix_empty_saiz(audio_filepath_enc)
+            if fixed:
+                self.logger.debug(f"> Removed {fixed} empty saiz/saio boxes from the audio track")
             self.logger.info("> Merging video and audio, this might take a minute...")
             self.mux_process(
                 video_filepath_enc,
