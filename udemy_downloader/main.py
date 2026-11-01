@@ -6,6 +6,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from udemy_downloader.constants import NVENC_PRESETS, X265_PRESETS
 from udemy_downloader.Udemy import Udemy
 from udemy_downloader.utils import parse_chapter_filter
 
@@ -174,20 +175,20 @@ def main():
         dest="h265_crf",
         type=int_in_range(0, 51),
         default=28,
-        help="Set a custom CRF value for H.265 encoding. FFMPEG default is 28",
+        help="Set a custom quality value for H.265 encoding, lower is better quality (CRF for libx265, CQ for NVENC). Default is 28",
     )
     parser.add_argument(
         "--h265-preset",
         dest="h265_preset",
-        type=str,
+        type=str.lower,
         default="medium",
-        help="Set a custom preset value for H.265 encoding. FFMPEG default is medium",
+        help=f"Set the preset for H.265 encoding, one of {', '.join(X265_PRESETS)}. With --use-nvenc these map to the closest NVENC preset, and p1-p7 can also be used. Default is medium",
     )
     parser.add_argument(
         "--use-nvenc",
         dest="use_nvenc",
         action="store_true",
-        help="Whether to use the NVIDIA hardware transcoding for H.265. Only works if you have a supported NVIDIA GPU and ffmpeg with nvenc support",
+        help="Encode H.265 with NVIDIA hardware encoding (implies --use-h265). Only works if you have a supported NVIDIA GPU and ffmpeg with nvenc support",
     )
     parser.add_argument(
         "--out",
@@ -212,6 +213,17 @@ def main():
     parser.add_argument("--device", "-d", dest="device", type=str, help="Name of WVD file to use")
 
     args = parser.parse_args()
+
+    # the encoders accept different preset names
+    valid_presets = NVENC_PRESETS if args.use_nvenc else X265_PRESETS
+    if args.h265_preset not in valid_presets:
+        if args.h265_preset in NVENC_PRESETS:
+            reason = "is an NVENC preset, use it with --use-nvenc"
+        else:
+            reason = "isn't a valid preset" + (" for NVENC" if args.use_nvenc else "")
+        parser.error(
+            f"argument --h265-preset: '{args.h265_preset}' {reason} (choose from {', '.join(valid_presets)})"
+        )
 
     # rename log_level to log_level_str
     args.log_level_str = args.log_level

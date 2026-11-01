@@ -37,6 +37,25 @@ LICENSE_URL = (
     "https://{portal_name}.udemy.com/media-license-server/validate-auth-token?drm_type=widevine&auth_token={auth_token}"
 )
 
+FFMPEG_COMMENT = "comment=Downloaded with Udemy-Downloader by Puyodead1 (https://github.com/Puyodead1/udemy-downloader)"
+
+# libx265 presets, fastest to slowest
+X265_PRESETS = ["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow", "placebo"]
+# hevc_nvenc has its own preset names, so x265 names are mapped to the closest one and nvenc's own names pass through
+NVENC_PRESETS = {
+    "ultrafast": "p1",
+    "superfast": "p1",
+    "veryfast": "p2",
+    "faster": "p3",
+    "fast": "p3",
+    "medium": "p4",
+    "slow": "p5",
+    "slower": "p6",
+    "veryslow": "p7",
+    "placebo": "p7",
+    **{f"p{i}": f"p{i}" for i in range(1, 8)},
+}
+
 CURRICULUM_ITEMS_PARAMS = {
     "fields[lecture]": "title,object_index,created,asset,supplementary_assets,description,download_url",
     "fields[quiz]": "title,object_index,type",

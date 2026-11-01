@@ -28,10 +28,12 @@ from udemy_downloader.constants import (
     COURSE_URL,
     CURRICULUM_ITEMS_PARAMS,
     CURRICULUM_ITEMS_URL,
+    FFMPEG_COMMENT,
     LECTURE_URL,
     LICENSE_URL,
     LOGGER_NAME,
     MY_COURSES_URL,
+    NVENC_PRESETS,
     PRACTICE_COMPONENTS_URL,
     PRACTICE_QUESTIONS_URL,
     PRACTICE_SUPPLEMENTARY_ASSET_URL,
@@ -153,7 +155,8 @@ class Udemy:
         self.save_to_file = save_to_file
         self.course_url = course_url
         self.info = info
-        self.use_h265 = use_h265
+        # nvenc only encodes h265 here, so asking for it implies h265
+        self.use_h265 = use_h265 or use_nvenc
         self.h265_crf = h265_crf
         self.h265_preset = h265_preset
         self.use_nvenc = use_nvenc
@@ -1528,53 +1531,9 @@ class Udemy:
                             log_subprocess_output("YTDLP-STDERR", process.stderr)
                             ret_code = process.wait()
                             if ret_code == 0:
-                                tmp_file_path = str(lecture_path) + ".tmp"
                                 self.logger.info("      > HLS Download success")
                                 if self.use_h265:
-                                    codec = (
-                                        "hevc_nvenc" if self.use_nvenc else "libx265"
-                                    )
-                                    transcode = (
-                                        "-hwaccel cuda -hwaccel_output_format cuda".split(
-                                            " "
-                                        )
-                                        if self.use_nvenc
-                                        else []
-                                    )
-                                    cmd = [
-                                        "ffmpeg",
-                                        *transcode,
-                                        "-y",
-                                        "-i",
-                                        lecture_path,
-                                        "-c:v",
-                                        codec,
-                                        "-c:a",
-                                        "copy",
-                                        "-f",
-                                        "mp4",
-                                        "-metadata",
-                                        "comment=Downloaded with Udemy-Downloader by Puyodead1 (https://github.com/Puyodead1/udemy-downloader)",
-                                        tmp_file_path,
-                                    ]
-                                    self.logger.debug(" ".join([str(x) for x in cmd]))
-                                    process = subprocess.Popen(cmd)
-                                    log_subprocess_output(
-                                        "FFMPEG-STDOUT", process.stdout
-                                    )
-                                    log_subprocess_output(
-                                        "FFMPEG-STDERR", process.stderr
-                                    )
-                                    ret_code = process.wait()
-                                    if ret_code == 0:
-                                        os.unlink(lecture_path)
-                                        os.rename(tmp_file_path, lecture_path)
-                                        self.logger.info("      > Encoding complete")
-                                    else:
-                                        # the unencoded download is kept, so the lecture still counts as downloaded
-                                        self.logger.error(
-                                            "      > Encoding returned non-zero return code"
-                                        )
+                                    self.encode_h265(lecture_path)
                                 return True
                             self.logger.error(
                                 f"      > HLS download failed with return code {ret_code}"
@@ -1587,6 +1546,8 @@ class Udemy:
                             self.logger.debug(
                                 f"      > Download return code: {ret_code}"
                             )
+                            if self.use_h265:
+                                self.encode_h265(lecture_path)
                             return True
                     except Exception:
                         self.logger.exception(">        Error downloading lecture")
@@ -1753,6 +1714,67 @@ class Udemy:
                 except:
                     pass
 
+    def _ffmpeg_prefix(self):
+        """The start of an ffmpeg command: lower priority off windows, and gpu decoding when encoding with nvenc"""
+        command = [] if os.name == "nt" else ["nice", "-n", "7"]
+        command += ["ffmpeg"]
+        if self.use_h265 and self.use_nvenc:
+            command += ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"]
+        return command
+
+    def _h265_args(self):
+        """ffmpeg video encoder arguments for h265 with libx265 or hevc_nvenc"""
+        if self.use_nvenc:
+            # nvenc has no crf, its equivalent is constant quality (-cq) in vbr mode with no bitrate cap
+            encoder = [
+                "-c:v",
+                "hevc_nvenc",
+                "-rc",
+                "vbr",
+                "-cq",
+                str(self.h265_crf),
+                "-b:v",
+                "0",
+                "-preset",
+                NVENC_PRESETS[self.h265_preset],
+            ]
+        else:
+            encoder = ["-c:v", "libx265", "-crf", str(self.h265_crf), "-preset", self.h265_preset]
+        # hvc1 lets apple players (quicktime, safari) play the file
+        return [*encoder, "-tag:v", "hvc1"]
+
+    def encode_h265(self, path: Path):
+        """Re-encode a downloaded video to h265 in place, keeping the original if encoding fails"""
+        tmp_path = path.with_name(path.name + ".tmp")
+        command = self._ffmpeg_prefix()
+        command += [
+            "-y",
+            "-i",
+            str(path),
+            *self._h265_args(),
+            "-c:a",
+            "copy",
+            "-f",
+            "mp4",
+            "-metadata",
+            FFMPEG_COMMENT,
+            str(tmp_path),
+        ]
+        self.logger.info("      > Encoding to H.265, this might take a minute...")
+        self.logger.debug(" ".join(command))
+        process = subprocess.Popen(command)
+        log_subprocess_output("FFMPEG-STDOUT", process.stdout)
+        log_subprocess_output("FFMPEG-STDERR", process.stderr)
+        ret_code = process.wait()
+        if ret_code != 0:
+            # the unencoded download is kept, so the lecture still counts as downloaded
+            self.logger.error(f"      > Encoding returned non-zero return code {ret_code}, keeping the original")
+            tmp_path.unlink(missing_ok=True)
+            return False
+        os.replace(tmp_path, path)
+        self.logger.info("      > Encoding complete")
+        return True
+
     def mux_process(
         self,
         video_filepath: str,
@@ -1761,34 +1783,14 @@ class Udemy:
         output_path: str,
         key: Union[str | None] = None,
     ):
-        codec = "hevc_nvenc" if self.use_nvenc else "libx265"
-        transcode = (
-            ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"]
-            if self.use_nvenc
-            else []
-        )
         decryption_arg = ["-decryption_key", key] if key is not None else []
 
         # build an argument list instead of a shell string so titles can't inject commands
-        command = [] if os.name == "nt" else ["nice", "-n", "7"]
-        command += ["ffmpeg"]
-        if self.use_h265:
-            command += transcode
+        command = self._ffmpeg_prefix()
         command += ["-y", *decryption_arg, "-i", str(video_filepath)]
         command += [*decryption_arg, "-i", str(audio_filepath)]
         if self.use_h265:
-            command += [
-                "-c:v",
-                codec,
-                "-vtag",
-                "hvc1",
-                "-crf",
-                str(self.h265_crf),
-                "-preset",
-                self.h265_preset,
-                "-c:a",
-                "copy",
-            ]
+            command += [*self._h265_args(), "-c:a", "copy"]
         else:
             command += ["-c", "copy"]
         command += [
@@ -1800,7 +1802,7 @@ class Udemy:
             "-metadata",
             f"title={video_title}",
             "-metadata",
-            "comment=Downloaded with Udemy-Downloader by Puyodead1 (https://github.com/Puyodead1/udemy-downloader)",
+            FFMPEG_COMMENT,
             str(output_path),
         ]
 
