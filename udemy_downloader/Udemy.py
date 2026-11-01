@@ -652,9 +652,10 @@ class Udemy:
                 ),
                 None,
             )
-            if not best_audio:
-                raise ValueError("No suitable audio format found in MPD")
-            audio_format_id = best_audio.get("format_id")
+            # some lectures are silent and have no audio track at all (#303), so only the video is downloaded
+            audio_format_id = best_audio.get("format_id") if best_audio else None
+            if not audio_format_id:
+                self.logger.debug("No audio track found in MPD, the lecture will be video only")
 
             # for each resolution, use only the highest bitrate video only format
             best_by_height = {}
@@ -669,7 +670,9 @@ class Udemy:
                     "type": "dash",
                     "height": str(height),
                     "width": str(format.get("width")),
-                    "format_id": f"{format.get('format_id')},{audio_format_id}",
+                    "format_id": ",".join(
+                        x for x in (format.get("format_id"), audio_format_id) if x
+                    ),
                     "extension": format.get("ext"),
                     "download_url": url,
                     "tbr": tbr,
@@ -1683,15 +1686,21 @@ class Udemy:
 
             self.logger.debug(f"Got decryption key: {key}")
 
+        # silent lectures only have a video format (#303), otherwise the format id is "<video>,<audio>"
+        has_audio = "," in format_id
+
         try:
-            # some audio tracks have an empty saiz box that ffmpeg refuses to open (#307, #314)
-            fixed = fix_empty_saiz(audio_filepath_enc)
-            if fixed:
-                self.logger.debug(f"> Removed {fixed} empty saiz/saio boxes from the audio track")
-            self.logger.info("> Merging video and audio, this might take a minute...")
+            if has_audio:
+                # some audio tracks have an empty saiz box that ffmpeg refuses to open (#307, #314)
+                fixed = fix_empty_saiz(audio_filepath_enc)
+                if fixed:
+                    self.logger.debug(f"> Removed {fixed} empty saiz/saio boxes from the audio track")
+                self.logger.info("> Merging video and audio, this might take a minute...")
+            else:
+                self.logger.info("> Lecture has no audio track, decrypting video only...")
             self.mux_process(
                 video_filepath_enc,
-                audio_filepath_enc,
+                audio_filepath_enc if has_audio else None,
                 video_title,
                 temp_output_path,
                 key,
@@ -1700,7 +1709,8 @@ class Udemy:
             temp_output_path.rename(output_path)
             self.logger.debug("> Cleaning up temporary files...")
             os.remove(video_filepath_enc)
-            os.remove(audio_filepath_enc)
+            if has_audio:
+                os.remove(audio_filepath_enc)
             return True
         except Exception as e:
             self.logger.exception(f"Muxing error: {e}")
@@ -1778,7 +1788,7 @@ class Udemy:
     def mux_process(
         self,
         video_filepath: str,
-        audio_filepath: str,
+        audio_filepath: Union[str, None],
         video_title: str,
         output_path: str,
         key: Union[str | None] = None,
@@ -1788,7 +1798,9 @@ class Udemy:
         # build an argument list instead of a shell string so titles can't inject commands
         command = self._ffmpeg_prefix()
         command += ["-y", *decryption_arg, "-i", str(video_filepath)]
-        command += [*decryption_arg, "-i", str(audio_filepath)]
+        # audio_filepath is None for silent lectures that only have a video track
+        if audio_filepath is not None:
+            command += [*decryption_arg, "-i", str(audio_filepath)]
         if self.use_h265:
             command += [*self._h265_args(), "-c:a", "copy"]
         else:
