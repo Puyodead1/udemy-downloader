@@ -60,14 +60,14 @@ You will need to get a few things before you can use this program:
 
 ## Setting up
 
--   rename `.env.sample` to `.env` _(you only need to do this if you plan to use the .env file to store your bearer token)_
+-   rename `.env.sample` to `.env` _(only needed for Docker Compose)_
 -   rename `keyfile.example.json` to `keyfile.json`
 
 ## Acquire Bearer Token
 
 -   Firefox: [Udemy-DL Guide](https://github.com/r0oth3x49/udemy-dl/issues/389#issuecomment-491903900)
 -   Chrome: [Udemy-DL Guide](https://github.com/r0oth3x49/udemy-dl/issues/389#issuecomment-492569372)
--   If you want to use the .env file to store your Bearer Token, edit the .env and add your token.
+-   Pass the token with `-b` / `--bearer`. It can't be combined with `--browser`, use one or the other.
 
 ## Key ID and Key
 

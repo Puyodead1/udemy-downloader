@@ -9,6 +9,5 @@ services:
       # writable so keys fetched with --device are saved
       - ./keyfile.json:/app/keyfile.json:rw
       - ./devices:/app/devices:ro
-    env_file:
-      - .env
-    command: $COURSE_URL -o /app/out_dir
+    # COURSE_URL and UDEMY_BEARER are filled in by docker compose from the .env file
+    command: $COURSE_URL -b $UDEMY_BEARER -o /app/out_dir

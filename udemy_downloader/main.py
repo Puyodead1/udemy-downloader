@@ -1,10 +1,7 @@
 import argparse
-import os
 import re
 import sys
 from pathlib import Path
-
-from dotenv import load_dotenv
 
 from udemy_downloader.constants import NVENC_PRESETS, X265_PRESETS
 from udemy_downloader.Udemy import Udemy
@@ -41,18 +38,22 @@ def chapter_filter(value: str):
 
 
 def main():
-    # allow UDEMY_BEARER to be set in a .env file
-    load_dotenv()
-
     parser = argparse.ArgumentParser(description="Udemy Downloader")
     parser.add_argument("course_url", type=course_url, help="The URL of the course to download")
-    parser.add_argument(
+    # a bearer token and browser cookies are two different ways to log in, so only one can be used
+    auth = parser.add_mutually_exclusive_group()
+    auth.add_argument(
         "-b",
         "--bearer",
         dest="bearer_token",
         type=str,
-        default=os.getenv("UDEMY_BEARER"),
-        help="The Bearer token to use (Default is the UDEMY_BEARER environment variable)",
+        help="The Bearer token to use. Can't be used with --browser",
+    )
+    auth.add_argument(
+        "--browser",
+        dest="browser",
+        help="The browser to extract cookies from, or 'file' to use cookies.txt. Can't be used with --bearer",
+        choices=["chrome", "firefox", "opera", "edge", "brave", "chromium", "vivaldi", "safari", "file"],
     )
     parser.add_argument(
         "-q",
@@ -157,12 +158,6 @@ def main():
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Logging level: one of DEBUG, INFO, ERROR, WARNING, CRITICAL (Default is INFO)",
         default="INFO",
-    )
-    parser.add_argument(
-        "--browser",
-        dest="browser",
-        help="The browser to extract cookies from",
-        choices=["chrome", "firefox", "opera", "edge", "brave", "chromium", "vivaldi", "safari", "file"],
     )
     parser.add_argument(
         "--use-h265",

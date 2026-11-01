@@ -20,7 +20,6 @@ browser-cookie3 = "^0.20.1"
 demoji = "^1.1.0"
 pywidevine = "^1.9.0"
 curl-cffi = "^0.17.0"
-python-dotenv = "^1.2.4"
 
 
 [tool.poetry.group.dev.dependencies]
