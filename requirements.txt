@@ -29,7 +29,7 @@ pywin32==312 ; python_version >= "3.11" and python_version < "4.0" and (platform
 pyyaml==6.0.3 ; python_version >= "3.11" and python_version < "4.0"
 requests==2.34.2 ; python_version >= "3.11" and python_version < "4.0"
 shadowcopy==0.0.4 ; python_version >= "3.11" and python_version < "4.0" and (platform_system == "Windows")
-soupsieve==2.8.4 ; python_version >= "3.11" and python_version < "4.0"
+soupsieve==3.0.4 ; python_version >= "3.11" and python_version < "4.0"
 typing-extensions==4.15.0 ; python_version >= "3.11" and python_version < "4.0"
 unidecode==1.4.0 ; python_version >= "3.11" and python_version < "4.0"
 urllib3==2.7.0 ; python_version >= "3.11" and python_version < "4.0"
