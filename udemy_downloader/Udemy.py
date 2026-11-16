@@ -2038,7 +2038,7 @@ class Udemy:
             cookies.set("access_token", self.bearer_token, domain="www.udemy.com")
 
         url = ROLE_PLAY_URL.format(
-            portal_name=self.portal_name, course_name="None", role_play_id=lecture.get("id")
+            portal_name=self.portal_name, course_name=self.course_slug, role_play_id=lecture.get("id")
         )
         role_play = extract_role_play(self.session._get(url).text)
         if not role_play:
