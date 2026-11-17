@@ -4,7 +4,7 @@ certifi==2026.10.23 ; python_version >= "3.11" and python_version < "4.0"
 cffi==2.1.1 ; python_version >= "3.11" and python_version < "4.0"
 chardet==7.4.3 ; python_version >= "3.11" and python_version < "4.0"
 charset-normalizer==3.4.7 ; python_version >= "3.11" and python_version < "4.0"
-click==8.4.1 ; python_version >= "3.11" and python_version < "4.0"
+click==8.5.0 ; python_version >= "3.11" and python_version < "4.0"
 colorama==0.4.6 ; python_version >= "3.11" and python_version < "4.0" and (platform_system == "Windows")
 coloredlogs==15.0.1 ; python_version >= "3.11" and python_version < "4.0"
 construct==2.8.8 ; python_version >= "3.11" and python_version < "4.0"
