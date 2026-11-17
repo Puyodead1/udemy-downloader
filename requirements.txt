@@ -32,7 +32,7 @@ shadowcopy==0.0.4 ; python_version >= "3.11" and python_version < "4.0" and (pla
 soupsieve==2.8.4 ; python_version >= "3.11" and python_version < "4.0"
 typing-extensions==4.15.0 ; python_version >= "3.11" and python_version < "4.0"
 unidecode==1.4.0 ; python_version >= "3.11" and python_version < "4.0"
-urllib3==2.7.0 ; python_version >= "3.11" and python_version < "4.0"
+urllib3==2.8.0 ; python_version >= "3.11" and python_version < "4.0"
 webvtt-py==0.6.0 ; python_version >= "3.11" and python_version < "4.0"
 wmi==1.5.1 ; python_version >= "3.11" and python_version < "4.0" and (platform_system == "Windows")
 yt-dlp ; python_version >= "3.11" and python_version < "4.0"
