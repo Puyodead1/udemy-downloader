@@ -20,7 +20,7 @@ pathvalidate==3.3.1 ; python_version >= "3.11" and python_version < "4.0"
 protobuf==6.33.6 ; python_version >= "3.11" and python_version < "4.0"
 pycparser==3.12 ; python_version >= "3.11" and python_version < "4.0" and (implementation_name != "PyPy")
 pycryptodome==3.23.0 ; python_version >= "3.11" and python_version < "4.0"
-pycryptodomex==3.23.0 ; python_version >= "3.11" and python_version < "4.0"
+pycryptodomex==3.24.1 ; python_version >= "3.11" and python_version < "4.0"
 pymp4==1.4.0 ; python_version >= "3.11" and python_version < "4.0"
 pyreadline3==3.5.6 ; python_version >= "3.11" and python_version < "4.0" and (sys_platform == "win32")
 pysrt==1.1.2 ; python_version >= "3.11" and python_version < "4.0"
